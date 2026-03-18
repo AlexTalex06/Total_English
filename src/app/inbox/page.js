@@ -288,7 +288,7 @@ export default function PaginaInbox() {
       {chatActivo ? (
         <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-white">
           {/* Central: Chat Area */}
-          <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative bg-[url('https://i.ibb.co/3YxH1h1/wa-bg.png')] bg-contain">
+          <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative">
             
             {/* Header del Chat */}
             <div className="h-[59px] shrink-0 px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#d1d7db] z-10 w-full">
