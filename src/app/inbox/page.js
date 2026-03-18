@@ -57,7 +57,6 @@ export default function PaginaInbox() {
         setChatActivo(convs[0])
         cargarMensajes(convs[0].id)
       } else if (chatActivo) {
-        // Actualizar el chatActivo si cambió algo en su prospecto
         const actualizado = convs.find(c => c.id === chatActivo.id)
         if (actualizado) setChatActivo(actualizado)
       }
@@ -98,10 +97,8 @@ export default function PaginaInbox() {
     }
 
     try {
-      // 1. Guardar localmente
       await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
 
-      // 2. Enviar a Meta HTTP POST
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -114,12 +111,11 @@ export default function PaginaInbox() {
         throw new Error(datos.error || 'Fallo desconocido al contactar Meta')
       }
 
-      // 3. Actualizar timestamp de conversación
       await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
       
     } catch (error) {
       console.error('Error enviando mensaje:', error)
-      alert(`No se pudo enviar el mensaje a WhatsApp.\nCausa probable: ${error.message}\n(Revisa las variables de entorno en Vercel o si expiró la ventana de 24 horas de Meta).`)
+      alert(`Error al enviar mensaje a WhatsApp.\nCausa probable: ${error.message}\n(Revisa tus llaves de Vercel y recuerda la regla de 24 horas de Meta).`)
     }
   }
 
@@ -129,7 +125,7 @@ export default function PaginaInbox() {
   }
 
   const forzarAgendamiento = async () => {
-    if (!chatActivo?.prospecto_id) return prompt("El prospecto no está vinculado.")
+    if (!chatActivo?.prospecto_id) return alert("El prospecto no está vinculado.")
     const fecha = prompt("Ingrese la fecha (YYYY-MM-DD):", new Date().toISOString().split('T')[0])
     if (!fecha) return
     
@@ -138,41 +134,73 @@ export default function PaginaInbox() {
     })
     await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', chatActivo.prospecto_id)
     cargarConversaciones()
-    alert("Cita agendada.")
+    alert("Cita agendada correctamente.")
   }
 
   const iniciarNuevoChat = async (datos) => {
-    // 1. Crear prospecto
-    const { data: nuevoProspecto } = await supabase
-      .from('prospectos')
-      .insert({ nombre: datos.nombre, telefono: datos.telefono, estado: 'nuevo' })
-      .select('id').single()
-
-    // 2. Crear conversación
-    const { data: nuevaConv } = await supabase
-      .from('conversaciones')
-      .insert({ prospecto_id: nuevoProspecto.id, plataforma: 'whatsapp', id_plataforma: datos.telefono, asignado_a_humano: true })
-      .select('*, prospectos(*)').single()
-
-    const textoMensaje = datos.mensaje_inicial
-    await supabase.from('mensajes').insert({ conversacion_id: nuevaConv.id, remitente: 'humano', contenido: textoMensaje })
-    
-    setModalNuevoChat(false)
-    cargarConversaciones()
-    cambiarChat(nuevaConv)
-
     try {
-      // 3. Enviar mensaje platilla a Meta
+      // 1. Buscar si el prospecto ya existe para no chocar con Unique constraints
+      let idProspecto = null;
+      const { data: prosExistente } = await supabase.from('prospectos').select('id').eq('telefono', datos.telefono).single()
+      
+      if (prosExistente) {
+        idProspecto = prosExistente.id;
+      } else {
+        const { data: nuevoProspecto, error: errProsp } = await supabase
+          .from('prospectos')
+          .insert({ nombre: datos.nombre, telefono: datos.telefono, estado: 'nuevo' })
+          .select('id').single()
+        if (errProsp) throw errProsp
+        idProspecto = nuevoProspecto.id
+      }
+
+      // 2. Buscar si la conversación ya existe
+      let idConversacion = null;
+      let convActual = null;
+      const { data: convExistente } = await supabase.from('conversaciones').select('*, prospectos(*)').eq('plataforma', 'whatsapp').eq('id_plataforma', datos.telefono).single()
+
+      if (convExistente) {
+        idConversacion = convExistente.id;
+        convActual = convExistente;
+        // Asignar a humano
+        await supabase.from('conversaciones').update({ asignado_a_humano: true }).eq('id', idConversacion)
+      } else {
+        const { data: nuevaConv, error: errConv } = await supabase
+          .from('conversaciones')
+          .insert({ prospecto_id: idProspecto, plataforma: 'whatsapp', id_plataforma: datos.telefono, asignado_a_humano: true })
+          .select('*, prospectos(*)').single()
+        if (errConv) throw errConv
+        idConversacion = nuevaConv.id
+        convActual = nuevaConv
+      }
+
+      const textoMensaje = datos.usa_plantilla === 'si' ? `[Plantilla Meta]: ${datos.nombre_plantilla}` : datos.mensaje_inicial
+      await supabase.from('mensajes').insert({ conversacion_id: idConversacion, remitente: 'humano', contenido: textoMensaje })
+      
+      setModalNuevoChat(false)
+      cargarConversaciones()
+      cambiarChat(convActual)
+
+      // 3. Enviar a Meta
+      const payloadMeta = {
+        to: datos.telefono, 
+        text: datos.usa_plantilla === 'si' ? undefined : datos.mensaje_inicial, 
+        plataforma: 'whatsapp',
+        tipo: datos.usa_plantilla === 'si' ? 'template' : 'text',
+        nombrePlantilla: datos.usa_plantilla === 'si' ? datos.nombre_plantilla : ''
+      }
+
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: datos.telefono, text: textoMensaje, plataforma: 'whatsapp' })
+        body: JSON.stringify(payloadMeta)
       })
       const respuestaApi = await res.json()
       if (!res.ok) throw new Error(respuestaApi.error || 'Error de Meta API')
+      
     } catch (error) {
-       console.error(error)
-       alert(`El chat se ha creado en el sistema, pero el mensaje físico no se pudo enviar a WhatsApp: ${error.message}`)
+       console.error("Fallo al crear o iniciar chat:", error)
+       alert(`Problema al iniciar el chat: ${error.message}`)
     }
   }
 
@@ -204,40 +232,49 @@ export default function PaginaInbox() {
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
   return (
-    <div className="h-[calc(100vh-64px)] md:h-screen w-full flex overflow-hidden bg-slate-50">
+    <div className="h-[calc(100vh-64px)] md:h-screen w-full flex overflow-hidden bg-[#e9edef]"> {/* Fondo típico WA */}
       
-      {/* 1. Lista Chats */}
-      <div className="w-full md:w-[320px] lg:w-[380px] bg-white border-r border-slate-200 flex flex-col h-full z-10 shrink-0">
-        <div className="p-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-[#191c1d]">Inbox</h2>
-          <button 
-            onClick={() => setModalNuevoChat(true)}
-            className="w-10 h-10 bg-[#1e3a8a] text-white rounded-full flex items-center justify-center hover:bg-blue-900 shadow-md transition-transform hover:scale-105"
-            title="Nuevo Chat de WhatsApp"
-          >
-            <span className="material-symbols-outlined">maps_ugc</span>
-          </button>
+      {/* 1. Lista Chats (Barra Izquierda parecida a WhatsApp Web) */}
+      <div className="w-full md:w-[350px] lg:w-[400px] bg-white border-r border-slate-200 flex flex-col h-full z-10 shrink-0">
+        <div className="p-3.5 bg-[#f0f2f5] border-b border-[#d1d7db] shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold">TE</div>
+             <h2 className="text-[16px] font-semibold text-[#111b21]">Chats Activos</h2>
+          </div>
+          <div className="flex items-center gap-3 text-[#54656f]">
+            <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">donutchart</button>
+            <button onClick={() => setModalNuevoChat(true)} className="material-symbols-outlined text-[24px] hover:text-[#111b21]">chat</button>
+            <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">more_vert</button>
+          </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        {/* Buscador In-Chat */}
+        <div className="p-2 border-b border-[#f2f2f2] bg-white">
+          <div className="bg-[#f0f2f5] rounded-lg flex items-center px-3 py-1.5 h-9">
+            <span className="material-symbols-outlined text-[18px] text-[#54656f]">search</span>
+            <input type="text" placeholder="Busca un chat o contacto" className="bg-transparent w-full text-sm outline-none ml-4 placeholder-[#54656f]" />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto bg-white">
           {conversaciones.map(conv => {
-            const estilo = iconoPlataforma(conv.plataforma)
             const activo = chatActivo?.id === conv.id
             const iniciales = conv.prospectos?.nombre ? conv.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'
             
             return (
-              <div key={conv.id} onClick={() => cambiarChat(conv)} className={`flex gap-3 p-3 rounded-2xl cursor-pointer transition-colors border-l-4 ${activo ? 'bg-blue-50 border-[#1e3a8a]' : 'border-transparent hover:bg-slate-50'}`}>
-                <div className="relative shrink-0 mt-1">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm border border-slate-200">{iniciales}</div>
-                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white ${estilo.bg}`}><span className={`material-symbols-outlined text-[10px] ${estilo.c}`}>{estilo.i}</span></div>
+              <div key={conv.id} onClick={() => cambiarChat(conv)} className={`flex items-center gap-3 px-3 cursor-pointer transition-colors ${activo ? 'bg-[#f0f2f5]' : 'hover:bg-[#f5f6f6]'}`}>
+                <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-sm shrink-0 border border-slate-100 overflow-hidden mt-1 mb-1">
+                  {iniciales}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <h3 className={`text-sm truncate pr-2 ${activo ? 'font-bold text-[#1e3a8a]' : 'font-semibold text-slate-800'}`}>{conv.prospectos?.nombre || conv.id_plataforma}</h3>
-                    <span className="text-[10px] text-slate-400 whitespace-nowrap">{new Date(conv.actualizado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <div className="flex-1 min-w-0 border-b border-[#f2f2f2] py-3 pr-2 h-full">
+                  <div className="flex justify-between items-baseline mb-0.5">
+                    <h3 className="text-[17px] text-[#111b21] truncate">{conv.prospectos?.nombre || conv.id_plataforma}</h3>
+                    <span className="text-[12px] text-[#667781] whitespace-nowrap">{new Date(conv.actualizado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className={`text-[11px] truncate font-medium ${activo ? 'text-slate-600' : 'text-slate-500'}`}>{conv.asignado_a_humano ? '👨‍💼 Atendiendo Humano' : '🤖 Alex Analizando'}</p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-[14px] truncate text-[#667781] leading-tight pr-4">
+                      {conv.asignado_a_humano ? '👨‍💼 Atendiendo Humano' : '🤖 Alex Analizando'}
+                    </p>
                     {conv.estado === 'cerrado' && <span className="bg-red-50 text-red-500 border border-red-100 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Cerrado</span>}
                   </div>
                 </div>
@@ -247,42 +284,55 @@ export default function PaginaInbox() {
         </div>
       </div>
 
-      {/* 2 y 3. Chat + Right Panel */}
+      {/* 2 y 3. Ventana Principal WhatsApp Web */}
       {chatActivo ? (
         <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-white">
-          {/* Central: Chat */}
-          <div className="flex-1 flex flex-col h-full border-r border-slate-100 min-w-0 bg-[url('https://i.ibb.co/3YxH1h1/wa-bg.png')] bg-cover relative">
-            <div className="absolute inset-0 bg-white/90 z-0"></div> {/* WhatsApp overlay bg */}
+          {/* Central: Chat Area */}
+          <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative bg-[url('https://i.ibb.co/3YxH1h1/wa-bg.png')] bg-contain">
             
-            <div className="h-16 shrink-0 border-b border-slate-200 px-6 flex items-center justify-between bg-white/95 backdrop-blur-sm z-10">
-              <div className="flex flex-col">
-                <span className="font-bold text-[#1e3a8a] text-lg leading-tight">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
-                <span className="text-xs text-slate-500 font-medium">{chatActivo.id_plataforma}</span>
+            {/* Header del Chat */}
+            <div className="h-[59px] shrink-0 px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#d1d7db] z-10 w-full">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center font-bold text-white text-sm">
+                  {chatActivo.prospectos?.nombre ? chatActivo.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'}
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold text-[#111b21] text-[16px] leading-snug">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
+                  <span className="text-[13px] text-[#667781]">{chatActivo.id_plataforma}</span>
+                </div>
               </div>
-              <button onClick={cambiarEstadoBot} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm border ${chatActivo.asignado_a_humano ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-[#1e3a8a] text-white border-transparent hover:shadow-md hover:-translate-y-0.5'}`}>
-                <span className="material-symbols-outlined text-[16px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
-                {chatActivo.asignado_a_humano ? 'IA Pausada (Reactivar Alex)' : 'Tomar Control Humano'}
-              </button>
+              <div className="flex items-center gap-4 text-[#54656f]">
+                <button onClick={cambiarEstadoBot} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all shadow-sm border ${chatActivo.asignado_a_humano ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-[#00a884] text-white py-1.5 border-transparent'}`}>
+                  <span className="material-symbols-outlined text-[16px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
+                  {chatActivo.asignado_a_humano ? 'Pausar y Habilitar IA' : 'Tomar Chat'}
+                </button>
+                <div className="h-4 w-px bg-[#d1d7db]"></div>
+                <button className="material-symbols-outlined text-[24px]">search</button>
+                <button className="material-symbols-outlined text-[24px]">more_vert</button>
+              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 z-10 scroll-smooth">
-              {mensajes.map((msj) => {
+            {/* Burbujas de Chat */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 z-10 scroll-smooth pb-8">
+              {mensajes.map((msj, idx) => {
                 const soyYo = msj.remitente === 'humano' || msj.remitente === 'bot'
                 return (
-                  <div key={msj.id} className={`flex w-full ${soyYo ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] md:max-w-[70%] flex flex-col gap-0.5 ${soyYo ? 'items-end' : 'items-start'}`}>
-                      <div className="flex items-center gap-1.5 px-1 mb-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                          {msj.remitente === 'usuario' ? chatActivo.prospectos?.nombre?.split(' ')[0] : msj.remitente === 'bot' ? '🤖 Alex' : '👨‍💼 Asesor'}
-                        </span>
-                        <span className="text-[9px] text-slate-400 font-medium">{new Date(msj.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  <div key={msj.id} className={`flex w-full mb-1 ${soyYo ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] md:max-w-[65%] flex flex-col relative px-3 py-1.5 rounded-lg text-[14px] leading-snug shadow-sm ${soyYo ? 'bg-[#d9fdd3] text-[#111b21] rounded-tr-[4px]' : 'bg-white text-[#111b21] rounded-tl-[4px]'}`}>
+                      {/* Name tag only if it's the bot making a distinction, or just simple wa style */}
+                      {msj.remitente === 'bot' && <span className="text-[12px] font-semibold text-slate-400 mb-0.5">🤖 Alex</span>}
+                      {msj.remitente === 'humano' && <span className="text-[12px] font-semibold text-[#00a884] mb-0.5">👨‍💼 Asesor</span>}
+                      
+                      <span className="text-[#111b21] pb-3 whitespace-pre-wrap">{msj.contenido}</span>
+                      
+                      <div className="absolute bottom-1 right-2 flex items-center gap-1">
+                        <span className="text-[11px] text-[#667781] leading-none mb-0.5 font-medium">{new Date(msj.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        {soyYo && <span className="material-symbols-outlined text-[14px] text-[#53bdeb] leading-none font-bold">done_all</span>}
                       </div>
-                      <div className={`px-4 py-3 rounded-2xl text-[14px] leading-snug shadow-sm ${soyYo ? 'bg-[#1e3a8a] text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-[#191c1d] rounded-tl-sm'}`}>
-                        {msj.contenido}
-                        {msj.tipo === 'imagen' && msj.url_archivo && (
-                          <div className="mt-2 rounded-lg overflow-hidden border border-black/10"><img src={msj.url_archivo} alt="Foto" className="max-w-xs h-auto cursor-pointer hover:opacity-90 transition-opacity" onClick={()=>window.open(msj.url_archivo, '_blank')}/></div>
-                        )}
-                      </div>
+
+                      {msj.tipo === 'imagen' && msj.url_archivo && (
+                        <div className="mt-1 mb-3 rounded-md overflow-hidden"><img src={msj.url_archivo} alt="Foto" className="max-w-xs h-auto cursor-pointer" onClick={()=>window.open(msj.url_archivo, '_blank')}/></div>
+                      )}
                     </div>
                   </div>
                 )
@@ -290,81 +340,101 @@ export default function PaginaInbox() {
               <div ref={finalChatRef}></div>
             </div>
 
-            <form onSubmit={enviarMensaje} className="p-4 bg-slate-50 border-t border-slate-200 z-10">
-              <div className="flex items-end gap-2 bg-white p-1.5 rounded-2xl ring-1 ring-slate-300 focus-within:ring-2 focus-within:ring-[#1e3a8a] shadow-sm transition-shadow">
-                <button type="button" className="p-2.5 text-slate-400 hover:text-blue-600 transition-colors shrink-0 rounded-xl hover:bg-slate-50"><span className="material-symbols-outlined">attach_file</span></button>
+            {/* Barra Inferior (Envío Profesional) */}
+            <form onSubmit={enviarMensaje} className="px-4 py-3 bg-[#f0f2f5] z-10 flex items-end gap-3 w-full">
+              <div className="flex items-center gap-3 text-[#54656f] pb-2">
+                <button type="button" className="material-symbols-outlined text-[26px] hover:text-[#111b21]">mood</button>
+                <button type="button" className="material-symbols-outlined text-[26px] hover:text-[#111b21] rotate-45">attach_file</button>
+              </div>
+              <div className="flex-1 bg-white rounded-lg border border-transparent focus-within:border-slate-300">
                 <textarea 
                   value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }}
-                  placeholder="Escribe un mensaje al cliente..."
-                  className="w-full bg-transparent border-none focus:ring-0 resize-none max-h-32 min-h-[44px] py-3 text-sm placeholder-slate-400"
+                  placeholder="Escribe un mensaje"
+                  className="w-full bg-transparent border-none focus:ring-0 resize-none max-h-32 min-h-[44px] py-3 text-[15px] outline-none text-[#111b21] px-4"
                   rows={1}
                 />
-                <button type="submit" disabled={!nuevoMensaje.trim()} className="w-11 h-11 shrink-0 bg-[#1e3a8a] text-white rounded-xl flex items-center justify-center disabled:opacity-40 hover:bg-blue-900 transition-all shadow-sm hover:shadow-md mb-0.5 mr-0.5"><span className="material-symbols-outlined -ml-1 text-lg">send</span></button>
+              </div>
+              <div className="text-[#54656f] pb-1.5 pl-1">
+                {nuevoMensaje.trim() ? (
+                  <button type="submit" className="material-symbols-outlined text-[28px] text-[#00a884]">send</button>
+                ) : (
+                  <button type="button" className="material-symbols-outlined text-[28px]">mic</button>
+                )}
               </div>
             </form>
           </div>
 
-          {/* Derecho: CRM */}
-          <div className="w-80 bg-slate-50 h-full overflow-y-auto hidden xl:block border-l border-slate-200">
-            <div className="p-6 flex flex-col items-center border-b border-slate-200 bg-white">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#00236f] to-[#1e3a8a] flex items-center justify-center text-white text-3xl font-black shadow-lg mb-4 tracking-tighter ring-4 ring-blue-50">
+          {/* Derecho: Perfil del Contacto (Sidebar WhatsApp) */}
+          <div className="w-[320px] bg-[#f0f2f5] h-full overflow-y-auto hidden xl:block border-l border-[#d1d7db]">
+            {/* Header sidebar */}
+            <div className="h-[59px] flex items-center px-6 bg-[#f0f2f5] border-b border-[#d1d7db] gap-4">
+              <button className="material-symbols-outlined text-[#54656f]">close</button>
+              <h3 className="text-[#111b21] text-[16px] font-semibold">Info. del contacto</h3>
+            </div>
+            
+            <div className="bg-white flex flex-col items-center py-8 mb-2 shadow-sm">
+              <div className="w-48 h-48 rounded-full bg-slate-300 flex items-center justify-center text-white text-6xl font-bold mb-4 overflow-hidden">
                 {chatActivo.prospectos?.nombre ? chatActivo.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'}
               </div>
-              <h2 className="text-xl font-bold text-[#1e3a8a] text-center">{chatActivo.prospectos?.nombre}</h2>
-              <p className="text-sm text-slate-500 mt-0.5 font-medium">{chatActivo.id_plataforma}</p>
+              <h2 className="text-[24px] text-[#111b21]">{chatActivo.prospectos?.nombre}</h2>
+              <p className="text-[16px] text-[#667781]">{chatActivo.id_plataforma}</p>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">Perfil CRM</h4>
-                  <button onClick={() => setModalEditarCRM(true)} className="text-[#1e3a8a] text-[10px] uppercase font-bold hover:underline flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">edit</span> Editar</button>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Estado</span>
-                    <span className="inline-flex self-start px-2 py-1 rounded text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">{chatActivo.prospectos?.estado?.toUpperCase()}</span>
-                  </div>
-                  <div className="flex flex-col gap-1 pt-2 border-t border-slate-100">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">Interés</span>
-                    <span className="text-sm font-semibold text-[#191c1d]">{chatActivo.prospectos?.curso_interes || 'Indeterminado'}</span>
-                  </div>
-                </div>
+            <div className="bg-white p-5 mb-2 shadow-sm space-y-4">
+              <div className="flex justify-between items-center text-[#00a884] cursor-pointer" onClick={() => setModalEditarCRM(true)}>
+                <span className="text-[14px]">Modificar datos (CRM)</span>
+                <span className="material-symbols-outlined text-[20px]">edit</span>
               </div>
+              <div className="pt-2 text-[14px] text-[#111b21] space-y-1">
+                <p><span className="text-[#667781]">Interés:</span> {chatActivo.prospectos?.curso_interes || 'Indeterminado'}</p>
+                <p><span className="text-[#667781]">Estado Pipeline:</span> {chatActivo.prospectos?.estado?.toUpperCase()}</p>
+              </div>
+            </div>
 
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">Acciones Comerciales</h4>
-                <div className="flex flex-col gap-2">
-                  <button onClick={forzarAgendamiento} className="flex items-center justify-center gap-2 w-full bg-[#1e3a8a] text-white p-3 rounded-xl hover:bg-blue-900 transition-colors shadow-sm font-semibold text-sm">
-                    <span className="material-symbols-outlined text-[18px]">event_available</span> Forzar Cita
-                  </button>
-                  <button onClick={cerrarConversacion} className="flex items-center justify-center gap-2 w-full bg-white border border-red-200 text-red-600 p-3 rounded-xl hover:bg-red-50 transition-colors shadow-sm font-semibold text-sm">
-                    <span className="material-symbols-outlined text-[18px]">archive</span> Cerrar Chat
-                  </button>
-                </div>
-              </div>
+            <div className="bg-white p-2 mb-2 shadow-sm">
+              <button onClick={forzarAgendamiento} className="w-full flex items-center gap-4 px-4 py-3 text-[#111b21] hover:bg-[#f5f6f6] transition-colors rounded-lg">
+                <span className="material-symbols-outlined text-[#54656f]">edit_calendar</span>
+                <span className="text-[16px]">Agendar Lección / Cita</span>
+              </button>
+              <button className="w-full flex items-center gap-4 px-4 py-3 text-[#111b21] hover:bg-[#f5f6f6] transition-colors rounded-lg">
+                <span className="material-symbols-outlined text-[#54656f]">star</span>
+                <span className="text-[16px]">Mensajes destacados</span>
+              </button>
+            </div>
+
+            <div className="bg-white p-2 pb-6 shadow-sm">
+              <button className="w-full flex items-center gap-4 px-4 py-3 text-[#ea0038] hover:bg-[#f5f6f6] transition-colors rounded-lg">
+                <span className="material-symbols-outlined text-[#ea0038]">block</span>
+                <span className="text-[16px]">Bloquear prospecto</span>
+              </button>
+              <button onClick={cerrarConversacion} className="w-full flex items-center gap-4 px-4 py-3 text-[#ea0038] hover:bg-[#f5f6f6] transition-colors rounded-lg">
+                <span className="material-symbols-outlined text-[#ea0038]">delete</span>
+                <span className="text-[16px]">Cerrar chat</span>
+              </button>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex-1 hidden md:flex flex-col items-center justify-center bg-slate-50 p-10 text-center">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-200 mb-6">
-            <span className="material-symbols-outlined text-4xl text-slate-300">forum</span>
+        <div className="flex-1 hidden md:flex flex-col items-center justify-center bg-[#f0f2f5] p-10 text-center border-l border-[#d1d7db]">
+          <h2 className="text-[32px] font-light text-[#41525d] mb-4">Total English Inbox</h2>
+          <p className="text-[#667781] text-[14px] leading-relaxed max-w-[400px]">Envía y recibe mensajes de prospectos conectando directamente tu teléfono o redes sociales.<br/>Aprovecha el "Cerebro de Alex" para auto-responder.</p>
+          <div className="mt-10 flex items-center gap-2 text-[#8696a0] text-[13px]">
+            <span className="material-symbols-outlined text-[16px]">lock</span>
+            Cifrado de extremo a extremo
           </div>
-          <h2 className="text-xl font-bold text-slate-700 mb-2">Inbox Seleccionado</h2>
-          <p className="text-slate-500 text-sm max-w-sm">Haz clic en una conversación para iniciar a chatear o administrar los contactos.</p>
         </div>
       )}
 
-      {/* Modales */}
       {modalNuevoChat && (
         <ModalFormulario 
-          titulo="Nuevo Chat de WhatsApp"
+          titulo="Nuevo Mensaje de WhatsApp"
           campos={[
             { id: 'nombre', label: 'Nombre del prospecto', tipo: 'text', placeholder: 'Ej. Juan Pérez' },
-            { id: 'telefono', label: 'Número de WhatsApp (con código de país ej. 521234567890)', tipo: 'text', placeholder: 'Ej. 525512345678' },
-            { id: 'mensaje_inicial', label: 'Mensaje Inicial (Plantilla aprobada o conversación activa)', tipo: 'textarea', placeholder: '¡Hola! Te escribimos de Total English...' }
+            { id: 'telefono', label: 'Número de WhatsApp (ej. 521234567890)', tipo: 'text', placeholder: 'Ej. 525512345678' },
+            { id: 'usa_plantilla', label: '¿Forzar plantilla aprobada? (Regla de 24 horas de Meta Meta)', tipo: 'select', opciones: ['no', 'si'] },
+            { id: 'nombre_plantilla', label: 'Nombre de plantilla (Solo si eligió "si" arriba)', tipo: 'text', placeholder: 'Ej. bienvenida_curso' },
+            { id: 'mensaje_inicial', label: 'Mensaje libre (Solo si eligió "no" arriba)', tipo: 'textarea', placeholder: '¡Hola! Te escribimos de Total English...' }
           ]}
           alEnviar={iniciarNuevoChat}
           alCerrar={() => setModalNuevoChat(false)}
@@ -373,11 +443,11 @@ export default function PaginaInbox() {
 
       {modalEditarCRM && chatActivo && (
         <ModalFormulario 
-          titulo="Editar Perfil de CRM"
+          titulo="Actualizar Ficha (CRM)"
           campos={[
             { id: 'nombre', label: 'Nombre Completo', tipo: 'text', valorInicial: chatActivo.prospectos?.nombre },
             { id: 'curso_interes', label: 'Curso de Interés', tipo: 'select', opciones: ['Diplomado Children', 'Diplomado Pre-Teens', 'Young & Professionals', 'My Time English', 'Otro'], valorInicial: chatActivo.prospectos?.curso_interes },
-            { id: 'estado', label: 'Estado del Pipeline', tipo: 'select', opciones: ['nuevo', 'en_proceso', 'contactado', 'agendado', 'cerrado'], valorInicial: chatActivo.prospectos?.estado }
+            { id: 'estado', label: 'Fase de Venta', tipo: 'select', opciones: ['nuevo', 'en_proceso', 'contactado', 'agendado', 'cerrado'], valorInicial: chatActivo.prospectos?.estado }
           ]}
           alEnviar={guardarEdicionCRM}
           alCerrar={() => setModalEditarCRM(false)}
