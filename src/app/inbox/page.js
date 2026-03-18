@@ -144,7 +144,7 @@ export default function PaginaInbox() {
     try {
       // 1. Buscar si el prospecto ya existe para no chocar con Unique constraints
       let idProspecto = null;
-      const { data: prosExistente } = await supabase.from('prospectos').select('id').eq('telefono', datos.telefono).single()
+      const { data: prosExistente, error: errExist } = await supabase.from('prospectos').select('id').eq('telefono', datos.telefono).maybeSingle()
       
       if (prosExistente) {
         idProspecto = prosExistente.id;
@@ -160,7 +160,7 @@ export default function PaginaInbox() {
       // 2. Buscar si la conversación ya existe
       let idConversacion = null;
       let convActual = null;
-      const { data: convExistente } = await supabase.from('conversaciones').select('*, prospectos(*)').eq('plataforma', 'whatsapp').eq('id_plataforma', datos.telefono).single()
+      const { data: convExistente, error: errConvExist } = await supabase.from('conversaciones').select('*, prospectos(*)').eq('plataforma', 'whatsapp').eq('id_plataforma', datos.telefono).maybeSingle()
 
       if (convExistente) {
         idConversacion = convExistente.id;
@@ -242,11 +242,11 @@ export default function PaginaInbox() {
       <div className="w-full md:w-[350px] lg:w-[400px] bg-white border-r border-slate-200 flex flex-col h-full z-10 shrink-0">
         <div className="p-3.5 bg-[#f0f2f5] border-b border-[#d1d7db] shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold">TE</div>
+             <div className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center font-bold">TE</div>
              <h2 className="text-[16px] font-semibold text-[#111b21]">Chats Activos</h2>
           </div>
           <div className="flex items-center gap-3 text-[#54656f]">
-            <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">donutchart</button>
+            <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">data_usage</button>
             <button onClick={() => setModalNuevoChat(true)} className="material-symbols-outlined text-[24px] hover:text-[#111b21]">chat</button>
             <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">more_vert</button>
           </div>
