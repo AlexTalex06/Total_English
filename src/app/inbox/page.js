@@ -247,7 +247,7 @@ export default function PaginaInbox() {
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
   return (
-    <div className="h-[calc(100vh-64px)] w-full flex overflow-hidden bg-[#e9edef] relative"> {/* Altura calculada para no encimar */}
+    <div className="h-[82vh] md:h-[calc(100vh-80px)] w-full flex overflow-hidden bg-[#e9edef] border-t border-slate-200">
       
       {/* 1. Lista Chats (Barra Izquierda responsiva) */}
       <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[400px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0`}>

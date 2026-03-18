@@ -119,9 +119,9 @@ export async function POST(solicitud) {
             .order('creado_en', { ascending: false })
             .limit(15)
 
-          // Mapear historial al formato de OpenAI
+          // Mapear historial al formato de OpenAI (excluyendo el actual para meterlo nosotros al final)
           const historialOrdenado = (historial || [])
-            .filter(m => m.contenido !== textoMensaje) // Evitar duplicados si el fetch lo trajo
+            .filter(m => m.id_mensaje_meta !== mensaje.id) // Filtrar por ID único de Meta, no por contenido
             .reverse()
             .map(m => ({
               role: m.remitente === 'usuario' ? 'user' : 'assistant',
@@ -131,7 +131,8 @@ export async function POST(solicitud) {
           // Forzar la inclusión del mensaje actual al FINAL del historial
           historialOrdenado.push({ role: 'user', content: textoMensaje })
 
-          console.log(`🤖 Consultando al Cerebro AI para ${nombrePerfil}...`)
+          console.log(`🤖 AlexIA en acción. ID de conversación: ${conversacion.id}`)
+          console.log(`💬 Historial preparado para enviar a OpenAI (${historialOrdenado.length} msgs)`)
           
           try {
             let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
