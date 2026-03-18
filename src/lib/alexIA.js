@@ -32,10 +32,23 @@ export async function consultarAlex(historialMensajes, nombreProspecto, platafor
       temperatura = config.temperatura || 0.7
     }
 
-    const formattedMessages = historialMensajes.map(m => ({
-      role: m.remitente === 'usuario' ? 'user' : 'assistant',
-      content: m.contenido
-    }))
+    console.log(`🧠 AlexIA: Recibidos ${historialMensajes.length} mensajes de historial.`)
+
+    const formattedMessages = historialMensajes.map(m => {
+      // Mapeo robusto de roles
+      let role = 'user'
+      if (m.role) role = m.role // Si ya viene formateado
+      else if (m.remitente === 'bot' || m.remitente === 'assistant') role = 'assistant'
+      
+      return {
+        role: role,
+        content: m.contenido || m.content || ''
+      }
+    })
+
+    if (formattedMessages.length === 0) {
+      console.warn('⚠️ AlexIA: El historial formateado está VACÍO.')
+    }
 
     const MEGA_PROMPT_TOTAL_ENGLISH = `
 

@@ -18,21 +18,25 @@ export default function PaginaInbox() {
   const finalChatRef = useRef(null)
 
   useEffect(() => {
+    console.log('🔌 Iniciando suscripción Realtime...')
     cargarConversaciones()
 
     const suscripcionRealtime = supabase
-      .channel('chat_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, () => {
+      .channel('chat_realtime_global')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, (payload) => {
+        console.log('🔄 Cambio en conversaciones detectado:', payload.eventType)
         cargarConversaciones()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-        // Actualizar lista de mensajes si es del chat activo gestionado vía Ref o similar fuera de este efecto
-        // O simplemente recargar para ser seguros
+        console.log('📩 Nuevo mensaje detectado:', payload.new.contenido)
         cargarConversaciones()
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('📡 Estado suscripción:', status)
+      })
 
     return () => {
+      console.log('🔌 Cerrando suscripción Realtime')
       supabase.removeChannel(suscripcionRealtime)
     }
   }, []) // Solo al montar
@@ -243,7 +247,7 @@ export default function PaginaInbox() {
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
   return (
-    <div className="h-full w-full flex overflow-hidden bg-[#e9edef] fixed inset-0"> {/* Layout fijo a pantalla completa */}
+    <div className="h-[calc(100vh-64px)] w-full flex overflow-hidden bg-[#e9edef] relative"> {/* Altura calculada para no encimar */}
       
       {/* 1. Lista Chats (Barra Izquierda responsiva) */}
       <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[400px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0`}>
