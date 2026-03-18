@@ -1,0 +1,98 @@
+import { supabase } from '@/lib/supabase'
+import { NextResponse } from 'next/server'
+
+// GET - Obtener todos los prospectos
+export async function GET(solicitud) {
+  const { searchParams } = new URL(solicitud.url)
+  const estado = searchParams.get('estado')
+  const busqueda = searchParams.get('busqueda')
+
+  let consulta = supabase
+    .from('prospectos')
+    .select('*')
+    .order('creado_en', { ascending: false })
+
+  if (estado && estado !== 'todos') {
+    consulta = consulta.eq('estado', estado)
+  }
+
+  if (busqueda) {
+    consulta = consulta.or(`nombre.ilike.%${busqueda}%,correo.ilike.%${busqueda}%,telefono.ilike.%${busqueda}%`)
+  }
+
+  const { data: prospectos, error } = await consulta
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(prospectos)
+}
+
+// POST - Crear nuevo prospecto
+export async function POST(solicitud) {
+  const cuerpo = await solicitud.json()
+
+  const { data: prospecto, error } = await supabase
+    .from('prospectos')
+    .insert([{
+      nombre: cuerpo.nombre,
+      correo: cuerpo.correo,
+      telefono: cuerpo.telefono,
+      estado: cuerpo.estado || 'nuevo',
+      curso_interes: cuerpo.curso_interes,
+      notas: cuerpo.notas
+    }])
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(prospecto, { status: 201 })
+}
+
+// PATCH - Actualizar un prospecto
+export async function PATCH(solicitud) {
+  const cuerpo = await solicitud.json()
+  const { id, ...datosActualizacion } = cuerpo
+
+  if (!id) {
+    return NextResponse.json({ error: 'Se requiere el ID del prospecto' }, { status: 400 })
+  }
+
+  const { data: prospecto, error } = await supabase
+    .from('prospectos')
+    .update({ ...datosActualizacion, actualizado_en: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(prospecto)
+}
+
+// DELETE - Eliminar un prospecto
+export async function DELETE(solicitud) {
+  const { searchParams } = new URL(solicitud.url)
+  const id = searchParams.get('id')
+
+  if (!id) {
+    return NextResponse.json({ error: 'Se requiere el ID del prospecto' }, { status: 400 })
+  }
+
+  const { error } = await supabase
+    .from('prospectos')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ mensaje: 'Prospecto eliminado correctamente' })
+}
