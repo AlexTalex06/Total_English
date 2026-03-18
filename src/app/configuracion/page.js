@@ -1,222 +1,181 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function PaginaConfiguracion() {
-  const [chatbotHabilitado, setChatbotHabilitado] = useState(true)
-  const [modoIA, setModoIA] = useState(true)
-  const [recolectarProspectos, setRecolectarProspectos] = useState(false)
-  const [mensajeBienvenida, setMensajeBienvenida] = useState(
-    '¡Hola! Bienvenido a Total English Academy. ¿Cómo podemos ayudarte a mejorar tu inglés hoy?'
-  )
-  const [guardado, setGuardado] = useState(false)
+  const [config, setConfig] = useState({
+    nombre_agente: 'Alex',
+    modelo: 'gpt-4o',
+    temperatura: 0.7,
+    system_prompt: ''
+  })
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const [mensaje, setMensaje] = useState(null)
 
-  const [pasosFAQ, setPasosFAQ] = useState([
-    {
-      id: 1,
-      titulo: 'Información de Cursos',
-      pregunta: '¿Qué cursos ofrecen?',
-      respuesta: 'Ofrecemos Inglés General, Inglés de Negocios y cursos de preparación IELTS para todos los niveles.'
-    },
-    {
-      id: 2,
-      titulo: 'Precios y Membresía',
-      pregunta: '¿Cuánto cuestan las clases?',
-      respuesta: 'Nuestros planes comienzan desde $49/mes. Puedes ver los precios completos en nuestra página de "Planes".'
-    },
-  ])
+  useEffect(() => {
+    cargarConfiguracion()
+  }, [])
 
-  const guardarMensaje = () => {
-    setGuardado(true)
-    setTimeout(() => setGuardado(false), 2000)
+  const cargarConfiguracion = async () => {
+    try {
+      setCargando(true)
+      const { data, error } = await supabase
+        .from('configuracion_bot')
+        .select('*')
+        .eq('id', 1)
+        .single()
+
+      if (data && !error) {
+        setConfig(data)
+      } else {
+        // Podría ser la primera vez antes de correr el SQL
+        console.warn('Configuración no encontrada o falta el SQL', error?.message)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setCargando(false)
+    }
   }
 
-  const agregarPasoFAQ = () => {
-    setPasosFAQ([...pasosFAQ, {
-      id: pasosFAQ.length + 1,
-      titulo: '',
-      pregunta: '',
-      respuesta: ''
-    }])
+  const guardarConfiguracion = async (e) => {
+    e.preventDefault()
+    setGuardando(true)
+    setMensaje(null)
+
+    try {
+      const { error } = await supabase
+        .from('configuracion_bot')
+        .upsert({ id: 1, ...config, actualizado_en: new Date().toISOString() })
+
+      if (error) throw error
+
+      setMensaje({ tipo: 'exito', texto: 'Configuración de la IA actualizada correctamente. Alex ya tiene sus nuevas reglas.' })
+    } catch (err) {
+      console.error(err)
+      setMensaje({ tipo: 'error', texto: `Error al guardar: ${err.message}` })
+    } finally {
+      setGuardando(false)
+      setTimeout(() => setMensaje(null), 5000)
+    }
   }
 
-  const eliminarPasoFAQ = (id) => {
-    setPasosFAQ(pasosFAQ.filter(p => p.id !== id))
+  const handleCambio = (campo, valor) => {
+    setConfig({ ...config, [campo]: valor })
   }
 
-  const actualizarPasoFAQ = (id, campo, valor) => {
-    setPasosFAQ(pasosFAQ.map(p => p.id === id ? { ...p, [campo]: valor } : p))
-  }
+  if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2"><span className="material-symbols-outlined animate-spin">refresh</span> Cargando "Cerebro" de Alex...</div>
 
   return (
-    <div className="max-w-2xl mx-auto w-full p-4 space-y-6 pb-24">
-      {/* Ajustes Globales */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 px-1">Ajustes Globales</h2>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Toggle 1 */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-100">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-semibold">Habilitar Chatbot</span>
-              <span className="text-sm text-slate-500">Mostrar el widget de chat en tu sitio</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={chatbotHabilitado}
-                onChange={() => setChatbotHabilitado(!chatbotHabilitado)}
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1e3a8a]"></div>
-            </label>
-          </div>
-          {/* Toggle 2 */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-100">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-semibold">Modo de Respuesta IA</span>
-              <span className="text-sm text-slate-500">Respuestas inteligentes basadas en datos de entrenamiento</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={modoIA}
-                onChange={() => setModoIA(!modoIA)}
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1e3a8a]"></div>
-            </label>
-          </div>
-          {/* Toggle 3 */}
-          <div className="flex items-center justify-between p-4">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-semibold">Recolectar Prospectos Automáticamente</span>
-              <span className="text-sm text-slate-500">Solicitar correo electrónico antes de iniciar el chat</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={recolectarProspectos}
-                onChange={() => setRecolectarProspectos(!recolectarProspectos)}
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#1e3a8a]"></div>
-            </label>
-          </div>
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      
+      <div className="flex justify-between items-end mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-[#191c1d]">Cerebro de la IA (Alex)</h1>
+          <p className="text-slate-500 mt-2 text-sm max-w-2xl">
+            Edita las reglas, personalidad y flujos del asistente virtual. Los cambios aplicarán inmediatamente a las nuevas conversaciones de WhatsApp, Messenger e Instagram.
+          </p>
         </div>
-      </section>
+        <button 
+          onClick={guardarConfiguracion}
+          disabled={guardando}
+          className="flex items-center gap-2 px-6 py-2.5 bg-[#1e3a8a] text-white rounded-xl shadow-md hover:bg-blue-900 transition-colors disabled:opacity-50"
+        >
+          {guardando ? (
+            <span className="material-symbols-outlined animate-spin">refresh</span>
+          ) : (
+            <span className="material-symbols-outlined">save</span>
+          )}
+          {guardando ? 'Guardando...' : 'Guardar Cerebro'}
+        </button>
+      </div>
 
-      {/* Mensaje de Bienvenida */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 px-1">Experiencia de Bienvenida</h2>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-700">Texto del Mensaje de Bienvenida</label>
-            <textarea
-              className="w-full rounded-xl border-slate-200 focus:border-[#1e3a8a] focus:ring-[#1e3a8a] text-sm p-3"
-              rows={4}
-              value={mensajeBienvenida}
-              onChange={(e) => setMensajeBienvenida(e.target.value)}
+      {mensaje && (
+        <div className={`p-4 rounded-xl flex items-center gap-3 text-sm font-semibold border ${mensaje.tipo === 'exito' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+          <span className="material-symbols-outlined text-[18px]">
+            {mensaje.tipo === 'exito' ? 'check_circle' : 'error'}
+          </span>
+          {mensaje.texto}
+        </div>
+      )}
+
+      <form onSubmit={guardarConfiguracion} className="space-y-6">
+        
+        {/* Panel Superior: Parámetros del Modelo */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#1e3a8a] text-[18px]">badge</span> Nombre del Agente
+            </label>
+            <input 
+              type="text"
+              value={config.nombre_agente}
+              onChange={(e) => handleCambio('nombre_agente', e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-[#1e3a8a] focus:border-[#1e3a8a] transition-all"
             />
           </div>
-          <div className="flex justify-end">
-            <button
-              onClick={guardarMensaje}
-              className={`font-semibold py-2 px-6 rounded-xl transition-all shadow-md active:scale-95 ${
-                guardado
-                  ? 'bg-green-500 text-white'
-                  : 'bg-[#1e3a8a] hover:bg-[#1e3a8a]/90 text-white'
-              }`}
+          
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#1e3a8a] text-[18px]">memory</span> Modelo de IA
+            </label>
+            <select 
+              value={config.modelo}
+              onChange={(e) => handleCambio('modelo', e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-[#1e3a8a] focus:border-[#1e3a8a] transition-all"
             >
-              {guardado ? '✓ Guardado' : 'Guardar Mensaje'}
-            </button>
+              <option value="gpt-4o">GPT-4o (Rápido y avanzado)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (Más económico)</option>
+              <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legado)</option>
+            </select>
           </div>
-        </div>
-      </section>
 
-      {/* Flujo FAQ */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Flujo de FAQ (Respuestas Rápidas)</h2>
-          <button
-            onClick={agregarPasoFAQ}
-            className="text-[#1e3a8a] text-sm font-bold flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-lg">add_circle</span> Agregar Paso
-          </button>
-        </div>
-        <div className="space-y-3">
-          {pasosFAQ.map((paso, indice) => (
-            <div key={paso.id} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-[#1e3a8a]/10 text-[#1e3a8a] w-8 h-8 rounded-lg flex items-center justify-center font-bold">
-                    {indice + 1}
-                  </div>
-                  <input
-                    className="font-semibold bg-transparent border-none focus:ring-0 p-0 text-base"
-                    value={paso.titulo}
-                    onChange={(e) => actualizarPasoFAQ(paso.id, 'titulo', e.target.value)}
-                    placeholder="Título del paso..."
-                  />
-                </div>
-                <button
-                  onClick={() => eliminarPasoFAQ(paso.id)}
-                  className="text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  <span className="material-symbols-outlined">delete</span>
-                </button>
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#1e3a8a] text-[18px]">device_thermostat</span> Creatividad (Temp)
               </div>
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Pregunta del Usuario / Disparador</p>
-                  <input
-                    className="w-full rounded-lg border-slate-200 text-sm p-2 focus:ring-[#1e3a8a]"
-                    type="text"
-                    value={paso.pregunta}
-                    onChange={(e) => actualizarPasoFAQ(paso.id, 'pregunta', e.target.value)}
-                    placeholder="¿Qué pregunta activa esta respuesta?"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Respuesta del Bot</p>
-                  <textarea
-                    className="w-full rounded-lg border-slate-200 text-sm p-2 focus:ring-[#1e3a8a]"
-                    rows={2}
-                    value={paso.respuesta}
-                    onChange={(e) => actualizarPasoFAQ(paso.id, 'respuesta', e.target.value)}
-                    placeholder="Escribe la respuesta automática..."
-                  />
-                </div>
-              </div>
+              <span className="text-[#1e3a8a] font-bold">{config.temperatura}</span>
+            </label>
+            <input 
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={config.temperatura}
+              onChange={(e) => handleCambio('temperatura', parseFloat(e.target.value))}
+              className="w-full mt-2 accent-[#1e3a8a]"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+              <span>Robótico (0.0)</span>
+              <span>Equilibrado (0.7)</span>
+              <span>Creativo (1.0)</span>
             </div>
-          ))}
+          </div>
         </div>
-      </section>
 
-      {/* Info sobre Webhook */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 px-1">Integración con WhatsApp</h2>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-green-600">chat</span>
-            </div>
-            <div>
-              <p className="font-semibold">Webhook de WhatsApp</p>
-              <p className="text-sm text-slate-500">Endpoint preparado para recibir mensajes de Meta</p>
-            </div>
+        {/* Panel Principal: System Prompt */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col h-[600px]">
+          <label className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2 mb-4 shrink-0">
+            <span className="material-symbols-outlined text-[#1e3a8a] text-[18px]">terminal</span> System Prompt Maestro (Las reglas de Alex)
+          </label>
+          <div className="flex-1 relative">
+            <textarea 
+              value={config.system_prompt}
+              onChange={(e) => handleCambio('system_prompt', e.target.value)}
+              className="absolute inset-0 w-full bg-slate-800 text-slate-100 font-mono text-sm leading-relaxed p-6 rounded-xl border border-slate-700 focus:ring-2 focus:ring-[#1e3a8a] focus:outline-none resize-none shadow-inner"
+              placeholder="Introduce aquí todas las instrucciones y el flujo del bot inspirado en ManyChat..."
+            ></textarea>
           </div>
-          <div className="bg-slate-50 rounded-lg p-3">
-            <p className="text-xs font-mono text-slate-600 break-all">
-              URL: <span className="text-[#1e3a8a] font-bold">tu-dominio.vercel.app/api/webhook</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span className="material-symbols-outlined text-sm text-orange-500">info</span>
-            <p>Configura este URL en tu panel de Meta Developers como webhook de verificación y recepción de mensajes.</p>
-          </div>
+          <p className="text-xs text-slate-400 mt-4 shrink-0 flex items-start gap-2">
+            <span className="material-symbols-outlined text-[14px]">info</span>
+            Aquí es donde programas los cursos recomentados, cómo manejar el precio, y las instrucciones de agendamiento. El bot leerá esto e interpretará automáticamente todo el contexto del usuario en la base de datos al responder.
+          </p>
         </div>
-      </section>
+
+      </form>
     </div>
   )
 }
