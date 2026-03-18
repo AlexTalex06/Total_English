@@ -97,15 +97,30 @@ export default function PaginaInbox() {
       await supabase.from('conversaciones').update({ asignado_a_humano: true }).eq('id', chatActivo.id)
     }
 
-    await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
+    try {
+      // 1. Guardar localmente
+      await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
 
-    await fetch('/api/enviar-mensaje', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: chatActivo.id_plataforma, text: texto, plataforma: chatActivo.plataforma })
-    })
+      // 2. Enviar a Meta HTTP POST
+      const res = await fetch('/api/enviar-mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: chatActivo.id_plataforma, text: texto, plataforma: chatActivo.plataforma })
+      })
 
-    await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
+      const datos = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(datos.error || 'Fallo desconocido al contactar Meta')
+      }
+
+      // 3. Actualizar timestamp de conversación
+      await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
+      
+    } catch (error) {
+      console.error('Error enviando mensaje:', error)
+      alert(`No se pudo enviar el mensaje a WhatsApp.\nCausa probable: ${error.message}\n(Revisa las variables de entorno en Vercel o si expiró la ventana de 24 horas de Meta).`)
+    }
   }
 
   const cambiarEstadoBot = async () => {
@@ -139,19 +154,26 @@ export default function PaginaInbox() {
       .insert({ prospecto_id: nuevoProspecto.id, plataforma: 'whatsapp', id_plataforma: datos.telefono, asignado_a_humano: true })
       .select('*, prospectos(*)').single()
 
-    // 3. Enviar mensaje platilla a Meta y guardar historial
     const textoMensaje = datos.mensaje_inicial
     await supabase.from('mensajes').insert({ conversacion_id: nuevaConv.id, remitente: 'humano', contenido: textoMensaje })
     
-    await fetch('/api/enviar-mensaje', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: datos.telefono, text: textoMensaje, plataforma: 'whatsapp' })
-    })
-
     setModalNuevoChat(false)
     cargarConversaciones()
     cambiarChat(nuevaConv)
+
+    try {
+      // 3. Enviar mensaje platilla a Meta
+      const res = await fetch('/api/enviar-mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: datos.telefono, text: textoMensaje, plataforma: 'whatsapp' })
+      })
+      const respuestaApi = await res.json()
+      if (!res.ok) throw new Error(respuestaApi.error || 'Error de Meta API')
+    } catch (error) {
+       console.error(error)
+       alert(`El chat se ha creado en el sistema, pero el mensaje físico no se pudo enviar a WhatsApp: ${error.message}`)
+    }
   }
 
   const guardarEdicionCRM = async (datos) => {
