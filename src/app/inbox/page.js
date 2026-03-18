@@ -18,30 +18,27 @@ export default function PaginaInbox() {
   const finalChatRef = useRef(null)
 
   useEffect(() => {
-    cargarConversaciones()
-
-    const suscripcionConversaciones = supabase
-      .channel('inbox_convs')
+    const suscripcionRealtime = supabase
+      .channel('chat_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, () => {
+        cargarConversaciones()
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
+        // Actualizar lista de mensajes si es del chat activo
+        if (chatActivo && payload.new.conversacion_id === chatActivo.id) {
+          setMensajes(actuales => {
+            const existe = actuales.find(m => m.id === payload.new.id)
+            if (existe) return actuales
+            return [...actuales, payload.new].sort((a,b) => new Date(a.creado_en) - new Date(b.creado_en))
+          })
+        }
+        // Siempre recargar conversaciones para ver el último mensaje en la lista
         cargarConversaciones()
       })
       .subscribe()
 
-    const suscripcionMensajes = supabase
-      .channel('inbox_msjs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-        setMensajes(actuales => {
-          if (chatActivo && payload.new.conversacion_id === chatActivo.id) {
-            return [...actuales, payload.new].sort((a,b) => new Date(a.creado_en) - new Date(b.creado_en))
-          }
-          return actuales
-        })
-      })
-      .subscribe()
-
     return () => {
-      supabase.removeChannel(suscripcionConversaciones)
-      supabase.removeChannel(suscripcionMensajes)
+      supabase.removeChannel(suscripcionRealtime)
     }
   }, [chatActivo])
 
@@ -113,8 +110,13 @@ export default function PaginaInbox() {
       // 2. Guardar localmente SOLO si Meta lo envió con éxito
       await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
 
-      // 3. Actualizar timestamp de conversación
-      await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
+      // 3. Actualizar timestamp y último mensaje de conversación
+      await supabase.from('conversaciones')
+        .update({ 
+          actualizado_en: new Date().toISOString(),
+          ultimo_mensaje: texto
+        })
+        .eq('id', chatActivo.id)
       
     } catch (error) {
       console.error('Error enviando mensaje:', error)
@@ -198,6 +200,9 @@ export default function PaginaInbox() {
       const textoMensaje = datos.usa_plantilla === 'si' ? `[Plantilla Meta]: ${datos.nombre_plantilla}` : datos.mensaje_inicial
       await supabase.from('mensajes').insert({ conversacion_id: idConversacion, remitente: 'humano', contenido: textoMensaje })
       
+      // Actualizar último mensaje en la conversación
+      await supabase.from('conversaciones').update({ ultimo_mensaje: textoMensaje }).eq('id', idConversacion)
+      
       setModalNuevoChat(false)
       cargarConversaciones()
       cambiarChat(convActual)
@@ -277,7 +282,7 @@ export default function PaginaInbox() {
                   </div>
                   <div className="flex justify-between items-center">
                     <p className="text-[14px] truncate text-[#667781] leading-tight pr-4">
-                      {conv.asignado_a_humano ? '👨‍💼 Atendiendo Humano' : '🤖 Alex Analizando'}
+                      {conv.ultimo_mensaje || 'Sin mensajes aún'}
                     </p>
                     {conv.estado === 'cerrado' && <span className="bg-red-50 text-red-500 border border-red-100 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Cerrado</span>}
                   </div>
@@ -306,9 +311,9 @@ export default function PaginaInbox() {
                 </div>
               </div>
               <div className="flex items-center gap-4 text-[#54656f]">
-                <button onClick={cambiarEstadoBot} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all shadow-sm border ${chatActivo.asignado_a_humano ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-[#00a884] text-white py-1.5 border-transparent'}`}>
+                <button onClick={cambiarEstadoBot} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all shadow-sm border ${chatActivo.asignado_a_humano ? 'bg-orange-500 text-white border-transparent' : 'bg-[#00a884] text-white py-1.5 border-transparent'}`}>
                   <span className="material-symbols-outlined text-[16px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
-                  {chatActivo.asignado_a_humano ? 'Pausar y Habilitar IA' : 'Tomar Chat'}
+                  {chatActivo.asignado_a_humano ? 'Asignado a Humano (Pausar)' : 'Asignado a Alex (IA Activa)'}
                 </button>
                 <div className="h-4 w-px bg-[#d1d7db]"></div>
                 <button className="material-symbols-outlined text-[24px]">search</button>

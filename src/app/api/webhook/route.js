@@ -100,9 +100,12 @@ export async function POST(solicitud) {
           id_mensaje_meta: mensaje.id
         })
 
-        // Actualizar la fecha de la conversación
+        // Actualizar la fecha y el último mensaje de la conversación
         await supabase.from('conversaciones')
-          .update({ actualizado_en: new Date().toISOString() })
+          .update({ 
+            actualizado_en: new Date().toISOString(),
+            ultimo_mensaje: textoMensaje 
+          })
           .eq('id', conversacion.id)
 
         // 5. Verificar si la IA debe responder
@@ -116,9 +119,14 @@ export async function POST(solicitud) {
             .order('creado_en', { ascending: false })
             .limit(15)
 
-          // Invertir para que estén          // Actualizar estado leyendo la IA guardada
-          const historialOrdenado = [ { role: 'user', content: textoMensaje } ] // Simplificado, idealmente leer DB
+          // Mapear historial al formato de OpenAI
+          const historialOrdenado = (historial || []).reverse().map(m => ({
+            role: m.remitente === 'usuario' ? 'user' : 'assistant',
+            content: m.contenido
+          }))
 
+          // Añadir el mensaje actual si no está en el historial (aunque ya se insertó arriba, fetch podría ser asíncrono)
+          // Pero para asegurar, lo manejamos limpio:
           console.log('🤖 Consultando al Cerebro AI...')
           
           let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
@@ -159,6 +167,10 @@ export async function POST(solicitud) {
               remitente: 'bot',
               contenido: respuestaIA
             })
+            // Actualizar el último mensaje con la respuesta de la IA
+            await supabase.from('conversaciones')
+              .update({ ultimo_mensaje: respuestaIA })
+              .eq('id', conversacion.id)
           }
         } else {
           console.log(`⏸️ Chat asignado a un humano. La IA ignoró el mensaje de ${remitenteId}.`)
