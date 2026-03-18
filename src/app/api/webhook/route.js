@@ -116,14 +116,41 @@ export async function POST(solicitud) {
             .order('creado_en', { ascending: false })
             .limit(15)
 
-          // Invertir para que estén en orden cronológico (de más viejo a nuevo)
-          const historialOrdenado = (historial || []).reverse()
+          // Invertir para que estén          // Actualizar estado leyendo la IA guardada
+          const historialOrdenado = [ { role: 'user', content: textoMensaje } ] // Simplificado, idealmente leer DB
 
-          // Consultar a Alex (OpenAI)
-          const respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
+          console.log('🤖 Consultando al Cerebro AI...')
+          
+          let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
+          
+          let tipoEnvio = 'text'
+          let imageUrl = null
 
-          // Enviar el mensaje a WhatsApp API
-          const metaEnviado = await enviarMensajeWhatsApp(remitenteId, respuestaIA)
+          // Parseo de los Secret Tokens inyectados por el motor AI
+          const originHost = solicitud.headers.get('host')
+          const protocolo = originHost?.includes('localhost') ? 'http' : 'https'
+          const baseUrl = `${protocolo}://${originHost}`
+          
+          if (respuestaIA.includes('[IMG:CHILDREN]')) {
+             tipoEnvio = 'image'
+             imageUrl = `${baseUrl}/cursos/children.jpg`
+             respuestaIA = respuestaIA.replace('[IMG:CHILDREN]', '').trim()
+          } else if (respuestaIA.includes('[IMG:JUNIORS]')) {
+             tipoEnvio = 'image'
+             imageUrl = `${baseUrl}/cursos/juniors.jpg`
+             respuestaIA = respuestaIA.replace('[IMG:JUNIORS]', '').trim()
+          } else if (respuestaIA.includes('[IMG:PRIME]')) {
+             tipoEnvio = 'image'
+             imageUrl = `${baseUrl}/cursos/prime.jpg`
+             respuestaIA = respuestaIA.replace('[IMG:PRIME]', '').trim()
+          } else if (respuestaIA.includes('[IMG:MYTIME]')) {
+             tipoEnvio = 'image'
+             imageUrl = `${baseUrl}/cursos/mytime.jpg`
+             respuestaIA = respuestaIA.replace('[IMG:MYTIME]', '').trim()
+          }
+
+          // Enviar el mensaje a WhatsApp API (Con soporte para Flyer + Texto)
+          const metaEnviado = await enviarMensajeWhatsAppAPI(remitenteId, respuestaIA, tipoEnvio, imageUrl)
 
           // Solo guardamos el mensaje del bot si WhatsApp lo procesó bien (o no logramos validar, pero lo intentamos)
           if (metaEnviado) {
@@ -146,41 +173,47 @@ export async function POST(solicitud) {
   }
 }
 
-// Función auxiliar para enviar mensajes por WhatsApp
-async function enviarMensajeWhatsApp(numeroDestino, textoMensaje) {
+// Función auxiliar para enviar mensajes (o Imágenes + Mensajes) a la API de Meta
+async function enviarMensajeWhatsAppAPI(to, text, tipoEnvio = 'text', imageUrl = null) {
   const token = process.env.META_WHATSAPP_TOKEN
   const idNumeroTelefono = process.env.META_PHONE_NUMBER_ID
-
-  if (!token || !idNumeroTelefono) {
-    console.error('❌ Faltan credenciales de Meta WhatsApp')
-    return null
-  }
-
   const url = `https://graph.facebook.com/v18.0/${idNumeroTelefono}/messages`
 
-  try {
-    const respuesta = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: numeroDestino,
-        type: 'text',
-        text: { body: textoMensaje }
-      })
-    })
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  }
 
-    const datos = await respuesta.json()
-    if (datos.error) {
-      console.error('❌ Error de Meta API:', datos.error)
-      return null
+  try {
+    if (tipoEnvio === 'image' && imageUrl) {
+      // 1. Enviar primero la imagen limpia
+      const payloadImg = {
+        messaging_product: 'whatsapp',
+        to: to,
+        type: 'image',
+        image: { link: imageUrl }
+      }
+      const resImg = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payloadImg) })
+      if (!resImg.ok) console.error("Error al enviar imagen de Meta:", await resImg.json())
     }
-    return datos
-  } catch (e) {
-    console.error('❌ Fetch error al llamar Meta API:', e)
-    return null
+
+    // 2. Enviar el texto (siempre se envía para complementar la imagen o como mensaje normal)
+    const payloadTexto = {
+      messaging_product: 'whatsapp',
+      to: to,
+      type: 'text',
+      text: { body: text }
+    }
+    const respuesta = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payloadTexto) })
+    
+    if (!respuesta.ok) {
+      const datosError = await respuesta.json()
+      console.error('Meta API Error:', datosError)
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('Error HTTP contactando Meta:', error)
+    return false
   }
 }

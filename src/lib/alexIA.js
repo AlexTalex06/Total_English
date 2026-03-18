@@ -38,9 +38,19 @@ export async function consultarAlex(historialMensajes, nombreProspecto, platafor
       content: m.contenido
     }))
 
+    const INSTRUCCION_OCULTA_MULTIMEDIA = `
+---
+INSTRUCCIÓN SECRETA DEL SISTEMA:
+Eres capaz de enviar Flyers (imágenes) reales por WhatsApp. Si en esta respuesta estás recomendando OPORTUNO Y DIRECTAMENTE un nivel específico (y no lo has enviado antes), TIENES que colocar EXACTAMENTE UNO de estos tokens ocultos al puro final de tu mensaje:
+- Si ofreces Diplomado Children (6 a 9 años), pega al final: [IMG:CHILDREN]
+- Si ofreces Diplomado Pre-Teens/Juniors, pega al final: [IMG:JUNIORS]
+- Si ofreces Young & Professionals / Diplomado Prime, pega al final: [IMG:PRIME]
+- Si ofreces My Time English (para ocupados), pega al final: [IMG:MYTIME]
+No incluyas corchetes extras ni menciones que enviarás una imagen de sistema, solo pega el token.`
+
     const contextMessage = {
       role: 'system',
-      content: `Estás interactuando con ${nombreProspecto || 'un prospecto'} a través de ${plataforma}. Tu prompt maestro es: \n\n${promptActual}`
+      content: `Estás interactuando con ${nombreProspecto || 'un prospecto'} a través de ${plataforma}. Tu prompt maestro es: \n\n${promptActual}\n\n${INSTRUCCION_OCULTA_MULTIMEDIA}`
     }
 
     // 3. Consultar a OpenAI
