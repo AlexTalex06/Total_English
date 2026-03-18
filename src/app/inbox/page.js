@@ -9,11 +9,12 @@ export default function PaginaInbox() {
   const [mensajes, setMensajes] = useState([])
   const [chatActivo, setChatActivo] = useState(null)
   const [nuevoMensaje, setNuevoMensaje] = useState('')
-  const [cargando, setCargando] = useState(true)
-  
-  // Estados para Modales
+  // Estados para Modales e Interacción
   const [modalNuevoChat, setModalNuevoChat] = useState(false)
   const [modalEditarCRM, setModalEditarCRM] = useState(false)
+  const [filtroBusqueda, setFiltroBusqueda] = useState('')
+  const [mostrandoPerfil, setMostrandoPerfil] = useState(true)
+  const [simulandoIA, setSimulandoIA] = useState(false)
 
   const finalChatRef = useRef(null)
 
@@ -238,16 +239,43 @@ export default function PaginaInbox() {
     }
   }
 
-  const iconoPlataforma = (plat) => {
-    return plat === 'whatsapp' ? { i: 'forum', c: 'text-green-500', bg: 'bg-green-50' } :
-           plat === 'messenger' ? { i: 'chat_bubble', c: 'text-blue-500', bg: 'bg-blue-50' } :
-           { i: 'photo_camera', c: 'text-purple-500', bg: 'bg-purple-50' }
+  const simularRespuestaAI = async () => {
+    if (!chatActivo) return
+    setSimulandoIA(true)
+    try {
+      // Llamamos al webhook localmente con un fetch interno
+      await fetch('/api/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          object: 'whatsapp_business_account',
+          entry: [{
+            changes: [{
+              value: {
+                messages: [{ from: chatActivo.id_plataforma, text: { body: "Simulando interés" }, type: 'text', id: 'SIM_' + Date.now() }],
+                contacts: [{ profile: { name: chatActivo.prospectos?.nombre || 'Test' } }]
+              }
+            }]
+          }]
+        })
+      })
+      alert("Simulación enviada. Espera unos segundos a que Alex procese y recarga o espera el Realtime.")
+    } catch (err) {
+      alert("Error en simulación: " + err.message)
+    } finally {
+      setSimulandoIA(false)
+    }
   }
 
-  if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
+  const conversacionesFiltradas = conversaciones.filter(c => 
+    (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
+    c.id_plataforma.includes(filtroBusqueda)
+  )
+
+  if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2 h-full"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
   return (
-    <div className="h-[82vh] md:h-[calc(100vh-80px)] w-full flex overflow-hidden bg-[#e9edef] border-t border-slate-200">
+    <div className="h-[calc(100vh-140px)] md:h-[calc(100vh-65px)] w-full flex overflow-hidden bg-white border-t border-slate-100 relative">
       
       {/* 1. Lista Chats (Barra Izquierda responsiva) */}
       <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[400px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0`}>
@@ -267,12 +295,19 @@ export default function PaginaInbox() {
         <div className="p-2 border-b border-[#f2f2f2] bg-white">
           <div className="bg-[#f0f2f5] rounded-lg flex items-center px-3 py-1.5 h-9">
             <span className="material-symbols-outlined text-[18px] text-[#54656f]">search</span>
-            <input type="text" placeholder="Busca un chat o contacto" className="bg-transparent w-full text-sm outline-none ml-4 placeholder-[#54656f]" />
+            <input 
+              type="text" 
+              placeholder="Busca un chat o contacto" 
+              className="bg-transparent w-full text-sm outline-none ml-4 placeholder-[#54656f]" 
+              value={filtroBusqueda}
+              onChange={(e) => setFiltroBusqueda(e.target.value)}
+            />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-white">
-          {conversaciones.map(conv => {
+          {conversacionesFiltradas.length === 0 && <div className="p-10 text-center text-slate-400 text-sm">No se encontraron chats</div>}
+          {conversacionesFiltradas.map(conv => {
             const activo = chatActivo?.id === conv.id
             const iniciales = conv.prospectos?.nombre ? conv.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'
             
@@ -318,13 +353,22 @@ export default function PaginaInbox() {
                 </div>
               </div>
               <div className="flex items-center gap-4 text-[#54656f]">
+                {/* Botón Secreto para Pruebas */}
+                <button 
+                  onClick={simularRespuestaAI} 
+                  disabled={simulandoIA}
+                  className="material-symbols-outlined text-[20px] hover:text-blue-500 title={'Simular mensaje entrante'}"
+                >
+                  {simulandoIA ? 'sync' : 'test_mode'}
+                </button>
+
                 <button onClick={cambiarEstadoBot} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all shadow-sm border ${chatActivo.asignado_a_humano ? 'bg-orange-500 text-white border-transparent' : 'bg-[#00a884] text-white py-1.5 border-transparent'}`}>
                   <span className="material-symbols-outlined text-[16px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
-                  {chatActivo.asignado_a_humano ? 'Asignado a Humano (Pausar)' : 'Asignado a Alex (IA Activa)'}
+                  {chatActivo.asignado_a_humano ? 'Asignado a Humano' : 'Asignado a Alex (IA)'}
                 </button>
                 <div className="h-4 w-px bg-[#d1d7db]"></div>
-                <button className="material-symbols-outlined text-[24px]">search</button>
-                <button className="material-symbols-outlined text-[24px]">more_vert</button>
+                <button onClick={() => setMostrandoPerfil(!mostrandoPerfil)} className="material-symbols-outlined text-[24px]">info</button>
+                <button onClick={() => alert("Opciones de chat")} className="material-symbols-outlined text-[24px]">more_vert</button>
               </div>
             </div>
 
@@ -382,7 +426,7 @@ export default function PaginaInbox() {
           </div>
 
           {/* Derecho: Perfil del Contacto (Sidebar WhatsApp) */}
-          <div className="w-[320px] bg-[#f0f2f5] h-full overflow-y-auto hidden xl:block border-l border-[#d1d7db]">
+          <div className={`${mostrandoPerfil ? 'w-[320px]' : 'w-0 overflow-hidden'} bg-[#f0f2f5] h-full overflow-y-auto hidden xl:block border-l border-[#d1d7db] transition-all`}>
             {/* Header sidebar */}
             <div className="h-[59px] flex items-center px-6 bg-[#f0f2f5] border-b border-[#d1d7db] gap-4">
               <button className="material-symbols-outlined text-[#54656f]">close</button>
