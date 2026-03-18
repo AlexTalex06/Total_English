@@ -131,53 +131,57 @@ export async function POST(solicitud) {
           // Forzar la inclusión del mensaje actual al FINAL del historial
           historialOrdenado.push({ role: 'user', content: textoMensaje })
 
-          console.log('🤖 Consultando al Cerebro AI...')
+          console.log(`🤖 Consultando al Cerebro AI para ${nombrePerfil}...`)
           
-          let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
-          
-          let tipoEnvio = 'text'
-          let imageUrl = null
+          try {
+            let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
+            console.log(`✨ Respuesta de Alex: "${respuestaIA.substring(0, 50)}..."`)
+            
+            let tipoEnvio = 'text'
+            let imageUrl = null
 
-          // Parseo de los Secret Tokens inyectados por el motor AI
-          const originHost = solicitud.headers.get('host')
-          const protocolo = originHost?.includes('localhost') ? 'http' : 'https'
-          const baseUrl = `${protocolo}://${originHost}`
-          
-          if (respuestaIA.includes('[IMG:CHILDREN]')) {
-             tipoEnvio = 'image'
-             imageUrl = `${baseUrl}/cursos/children.jpg`
-             respuestaIA = respuestaIA.replace('[IMG:CHILDREN]', '').trim()
-          } else if (respuestaIA.includes('[IMG:JUNIORS]')) {
-             tipoEnvio = 'image'
-             imageUrl = `${baseUrl}/cursos/juniors.jpg`
-             respuestaIA = respuestaIA.replace('[IMG:JUNIORS]', '').trim()
-          } else if (respuestaIA.includes('[IMG:PRIME]')) {
-             tipoEnvio = 'image'
-             imageUrl = `${baseUrl}/cursos/prime.jpg`
-             respuestaIA = respuestaIA.replace('[IMG:PRIME]', '').trim()
-          } else if (respuestaIA.includes('[IMG:MYTIME]')) {
-             tipoEnvio = 'image'
-             imageUrl = `${baseUrl}/cursos/mytime.jpg`
-             respuestaIA = respuestaIA.replace('[IMG:MYTIME]', '').trim()
-          }
+            // Parseo de los Secret Tokens
+            const originHost = solicitud.headers.get('host')
+            const protocolo = originHost?.includes('localhost') ? 'http' : 'https'
+            const baseUrl = `${protocolo}://${originHost}`
+            
+            if (respuestaIA.includes('[IMG:CHILDREN]')) {
+               tipoEnvio = 'image'
+               imageUrl = `${baseUrl}/cursos/children.jpg`
+               respuestaIA = respuestaIA.replace('[IMG:CHILDREN]', '').trim()
+            } else if (respuestaIA.includes('[IMG:JUNIORS]')) {
+               tipoEnvio = 'image'
+               imageUrl = `${baseUrl}/cursos/juniors.jpg`
+               respuestaIA = respuestaIA.replace('[IMG:JUNIORS]', '').trim()
+            } else if (respuestaIA.includes('[IMG:PRIME]')) {
+               tipoEnvio = 'image'
+               imageUrl = `${baseUrl}/cursos/prime.jpg`
+               respuestaIA = respuestaIA.replace('[IMG:PRIME]', '').trim()
+            } else if (respuestaIA.includes('[IMG:MYTIME]')) {
+               tipoEnvio = 'image'
+               imageUrl = `${baseUrl}/cursos/mytime.jpg`
+               respuestaIA = respuestaIA.replace('[IMG:MYTIME]', '').trim()
+            }
 
-          // Enviar el mensaje a WhatsApp API (Con soporte para Flyer + Texto)
-          const metaEnviado = await enviarMensajeWhatsAppAPI(remitenteId, respuestaIA, tipoEnvio, imageUrl)
+            console.log(`📤 Enviando a Meta: ${tipoEnvio} ${imageUrl || ''}`)
+            const metaEnviado = await enviarMensajeWhatsAppAPI(remitenteId, respuestaIA, tipoEnvio, imageUrl)
 
-          // Solo guardamos el mensaje del bot si WhatsApp lo procesó bien (o no logramos validar, pero lo intentamos)
-          if (metaEnviado) {
-             await supabase.from('mensajes').insert({
-              conversacion_id: conversacion.id,
-              remitente: 'bot',
-              contenido: respuestaIA
-            })
-            // Actualizar el último mensaje con la respuesta de la IA
-            await supabase.from('conversaciones')
-              .update({ ultimo_mensaje: respuestaIA })
-              .eq('id', conversacion.id)
+            if (metaEnviado) {
+               console.log('✅ Mensaje entregado con éxito vía Meta')
+               await supabase.from('mensajes').insert({
+                 conversacion_id: conversacion.id,
+                 remitente: 'bot',
+                 contenido: respuestaIA
+               })
+               await supabase.from('conversaciones').update({ ultimo_mensaje: respuestaIA }).eq('id', conversacion.id)
+            } else {
+               console.error('❌ Meta rechazó el envío del mensaje del bot.')
+            }
+          } catch (errorAI) {
+            console.error('❌ Error crítico en motor AlexIA:', errorAI)
           }
         } else {
-          console.log(`⏸️ Chat asignado a un humano. La IA ignoró el mensaje de ${remitenteId}.`)
+           console.log(`⏸️ IA Desactivada (Asignado a Humano).`)
         }
       }
     }

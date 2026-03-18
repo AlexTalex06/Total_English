@@ -243,10 +243,10 @@ export default function PaginaInbox() {
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
   return (
-    <div className="h-[calc(100vh-64px)] md:h-screen w-full flex overflow-hidden bg-[#e9edef]"> {/* Fondo típico WA */}
+    <div className="h-full w-full flex overflow-hidden bg-[#e9edef] fixed inset-0"> {/* Layout fijo a pantalla completa */}
       
-      {/* 1. Lista Chats (Barra Izquierda parecida a WhatsApp Web) */}
-      <div className="w-full md:w-[350px] lg:w-[400px] bg-white border-r border-slate-200 flex flex-col h-full z-10 shrink-0">
+      {/* 1. Lista Chats (Barra Izquierda responsiva) */}
+      <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[400px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0`}>
         <div className="p-3.5 bg-[#f0f2f5] border-b border-[#d1d7db] shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center font-bold">TE</div>
@@ -297,13 +297,14 @@ export default function PaginaInbox() {
 
       {/* 2 y 3. Ventana Principal WhatsApp Web */}
       {chatActivo ? (
-        <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-white">
+        <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-white w-full">
           {/* Central: Chat Area */}
-          <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative">
+          <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative w-full">
             
             {/* Header del Chat */}
             <div className="h-[59px] shrink-0 px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#d1d7db] z-10 w-full">
               <div className="flex items-center gap-3">
+                <button onClick={() => setChatActivo(null)} className="md:hidden material-symbols-outlined text-[#54656f]">arrow_back</button>
                 <div className="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center font-bold text-white text-sm">
                   {chatActivo.prospectos?.nombre ? chatActivo.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'}
                 </div>
@@ -354,8 +355,8 @@ export default function PaginaInbox() {
             {/* Barra Inferior (Envío Profesional) */}
             <form onSubmit={enviarMensaje} className="px-4 py-3 bg-[#f0f2f5] z-10 flex items-end gap-3 w-full">
               <div className="flex items-center gap-3 text-[#54656f] pb-2">
-                <button type="button" className="material-symbols-outlined text-[26px] hover:text-[#111b21]">mood</button>
-                <button type="button" className="material-symbols-outlined text-[26px] hover:text-[#111b21] rotate-45">attach_file</button>
+                <button type="button" onClick={() => alert("Función de Emojis próximamente")} className="material-symbols-outlined text-[26px] hover:text-[#111b21]">mood</button>
+                <button type="button" onClick={() => alert("Sube archivos arrastrándolos al chat")} className="material-symbols-outlined text-[26px] hover:text-[#111b21] rotate-45">attach_file</button>
               </div>
               <div className="flex-1 bg-white rounded-lg border border-transparent focus-within:border-slate-300">
                 <textarea 
