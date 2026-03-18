@@ -275,19 +275,19 @@ export default function PaginaInbox() {
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2 h-full"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
   return (
-    <div className="h-[calc(100vh-140px)] md:h-[calc(100vh-65px)] w-full flex overflow-hidden bg-white border-t border-slate-100 relative">
+    <div className="h-[calc(100vh-140px)] md:h-[calc(100vh-65px)] w-full flex overflow-hidden bg-[#f8f9fa] border-t border-slate-100 relative font-sans">
       
-      {/* 1. Lista Chats (Barra Izquierda responsiva) */}
-      <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[400px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0`}>
-        <div className="p-3.5 bg-[#f0f2f5] border-b border-[#d1d7db] shrink-0 flex items-center justify-between">
+      {/* 1. Lista Chats (Barra Izquierda Estilizada) */}
+      <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[420px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0 shadow-sm`}>
+        <div className="p-4 bg-white shrink-0 flex items-center justify-between border-b border-slate-50">
           <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center font-bold">TE</div>
-             <h2 className="text-[16px] font-semibold text-[#111b21]">Chats Activos</h2>
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00a884] to-[#008a6d] text-white flex items-center justify-center font-bold shadow-lg shadow-green-100 italic">TE</div>
+             <h2 className="text-[18px] font-bold text-[#1e293b] tracking-tight">Inbox Alex</h2>
           </div>
-          <div className="flex items-center gap-3 text-[#54656f]">
-            <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">data_usage</button>
-            <button onClick={() => setModalNuevoChat(true)} className="material-symbols-outlined text-[24px] hover:text-[#111b21]">chat</button>
-            <button className="material-symbols-outlined text-[24px] hover:text-[#111b21]">more_vert</button>
+          <div className="flex items-center gap-2 text-slate-500">
+            <button className="p-2 rounded-full hover:bg-slate-50 transition-colors material-symbols-outlined text-[20px]">data_usage</button>
+            <button onClick={() => setModalNuevoChat(true)} className="p-2 rounded-full hover:bg-slate-50 transition-colors material-symbols-outlined text-[20px]">add_comment</button>
+            <button className="p-2 rounded-full hover:bg-slate-50 transition-colors material-symbols-outlined text-[20px]">more_vert</button>
           </div>
         </div>
         
