@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 
 const titulosPagina = {
   '/': 'Panel Principal',
+  '/inbox': 'Inbox Multicanal',
   '/prospectos': 'Gestión de Prospectos',
   '/cursos': 'Catálogo de Cursos',
   '/citas': 'Gestión de Citas',

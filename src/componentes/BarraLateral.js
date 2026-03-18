@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 
 const elementosNavegacion = [
   { nombre: 'Panel', ruta: '/', icono: 'dashboard' },
+  { nombre: 'Inbox', ruta: '/inbox', icono: 'forum' },
   { nombre: 'Prospectos', ruta: '/prospectos', icono: 'group' },
   { nombre: 'Cursos', ruta: '/cursos', icono: 'school' },
   { nombre: 'Citas', ruta: '/citas', icono: 'event' },
