@@ -18,21 +18,16 @@ export default function PaginaInbox() {
   const finalChatRef = useRef(null)
 
   useEffect(() => {
+    cargarConversaciones()
+
     const suscripcionRealtime = supabase
       .channel('chat_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, () => {
         cargarConversaciones()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-        // Actualizar lista de mensajes si es del chat activo
-        if (chatActivo && payload.new.conversacion_id === chatActivo.id) {
-          setMensajes(actuales => {
-            const existe = actuales.find(m => m.id === payload.new.id)
-            if (existe) return actuales
-            return [...actuales, payload.new].sort((a,b) => new Date(a.creado_en) - new Date(b.creado_en))
-          })
-        }
-        // Siempre recargar conversaciones para ver el último mensaje en la lista
+        // Actualizar lista de mensajes si es del chat activo gestionado vía Ref o similar fuera de este efecto
+        // O simplemente recargar para ser seguros
         cargarConversaciones()
       })
       .subscribe()
@@ -40,7 +35,14 @@ export default function PaginaInbox() {
     return () => {
       supabase.removeChannel(suscripcionRealtime)
     }
-  }, [chatActivo])
+  }, []) // Solo al montar
+
+  // Otro efecto para cargar mensajes cuando cambia el chat activo
+  useEffect(() => {
+    if (chatActivo) {
+      cargarMensajes(chatActivo.id)
+    }
+  }, [chatActivo?.id])
 
   const cargarConversaciones = async () => {
     const { data: convs, error } = await supabase
