@@ -97,8 +97,7 @@ export default function PaginaInbox() {
     }
 
     try {
-      await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
-
+      // 1. Enviar a Meta HTTP POST PRIMERO
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,6 +110,10 @@ export default function PaginaInbox() {
         throw new Error(datos.error || 'Fallo desconocido al contactar Meta')
       }
 
+      // 2. Guardar localmente SOLO si Meta lo envió con éxito
+      await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
+
+      // 3. Actualizar timestamp de conversación
       await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
       
     } catch (error) {
@@ -174,14 +177,7 @@ export default function PaginaInbox() {
         convActual = nuevaConv
       }
 
-      const textoMensaje = datos.usa_plantilla === 'si' ? `[Plantilla Meta]: ${datos.nombre_plantilla}` : datos.mensaje_inicial
-      await supabase.from('mensajes').insert({ conversacion_id: idConversacion, remitente: 'humano', contenido: textoMensaje })
-      
-      setModalNuevoChat(false)
-      cargarConversaciones()
-      cambiarChat(convActual)
-
-      // 3. Enviar a Meta
+      // 3. Enviar a Meta PRIMERO
       const payloadMeta = {
         to: datos.telefono, 
         text: datos.usa_plantilla === 'si' ? undefined : datos.mensaje_inicial, 
@@ -198,6 +194,14 @@ export default function PaginaInbox() {
       const respuestaApi = await res.json()
       if (!res.ok) throw new Error(respuestaApi.error || 'Error de Meta API')
       
+      // 4. Si se envió con éxito, guardar en DB
+      const textoMensaje = datos.usa_plantilla === 'si' ? `[Plantilla Meta]: ${datos.nombre_plantilla}` : datos.mensaje_inicial
+      await supabase.from('mensajes').insert({ conversacion_id: idConversacion, remitente: 'humano', contenido: textoMensaje })
+      
+      setModalNuevoChat(false)
+      cargarConversaciones()
+      cambiarChat(convActual)
+
     } catch (error) {
        console.error("Fallo al crear o iniciar chat:", error)
        alert(`Problema al iniciar el chat: ${error.message}`)
@@ -397,17 +401,9 @@ export default function PaginaInbox() {
                 <span className="material-symbols-outlined text-[#54656f]">edit_calendar</span>
                 <span className="text-[16px]">Agendar Lección / Cita</span>
               </button>
-              <button className="w-full flex items-center gap-4 px-4 py-3 text-[#111b21] hover:bg-[#f5f6f6] transition-colors rounded-lg">
-                <span className="material-symbols-outlined text-[#54656f]">star</span>
-                <span className="text-[16px]">Mensajes destacados</span>
-              </button>
             </div>
 
             <div className="bg-white p-2 pb-6 shadow-sm">
-              <button className="w-full flex items-center gap-4 px-4 py-3 text-[#ea0038] hover:bg-[#f5f6f6] transition-colors rounded-lg">
-                <span className="material-symbols-outlined text-[#ea0038]">block</span>
-                <span className="text-[16px]">Bloquear prospecto</span>
-              </button>
               <button onClick={cerrarConversacion} className="w-full flex items-center gap-4 px-4 py-3 text-[#ea0038] hover:bg-[#f5f6f6] transition-colors rounded-lg">
                 <span className="material-symbols-outlined text-[#ea0038]">delete</span>
                 <span className="text-[16px]">Cerrar chat</span>
