@@ -51,11 +51,11 @@ export async function POST(solicitud) {
 
         // 2. Buscar o Crear Prospecto en CRM
         let prospectoId = null
-        const { data: prospectoExistente } = await supabase
+        const { data: prospectoExistente, error: errPros } = await supabase
           .from('prospectos')
           .select('id, nombre')
           .eq('telefono', remitenteId)
-          .single()
+          .maybeSingle()
 
         if (prospectoExistente) {
           prospectoId = prospectoExistente.id
@@ -70,12 +70,12 @@ export async function POST(solicitud) {
 
         // 3. Buscar o Crear Conversación
         let conversacion = null
-        const { data: convExistente } = await supabase
+        const { data: convExistente, error: errConv } = await supabase
           .from('conversaciones')
           .select('*')
           .eq('plataforma', 'whatsapp')
           .eq('id_plataforma', remitenteId)
-          .single()
+          .maybeSingle()
 
         if (convExistente) {
           conversacion = convExistente
@@ -120,13 +120,17 @@ export async function POST(solicitud) {
             .limit(15)
 
           // Mapear historial al formato de OpenAI
-          const historialOrdenado = (historial || []).reverse().map(m => ({
-            role: m.remitente === 'usuario' ? 'user' : 'assistant',
-            content: m.contenido
-          }))
+          const historialOrdenado = (historial || [])
+            .filter(m => m.contenido !== textoMensaje) // Evitar duplicados si el fetch lo trajo
+            .reverse()
+            .map(m => ({
+              role: m.remitente === 'usuario' ? 'user' : 'assistant',
+              content: m.contenido
+            }))
 
-          // Añadir el mensaje actual si no está en el historial (aunque ya se insertó arriba, fetch podría ser asíncrono)
-          // Pero para asegurar, lo manejamos limpio:
+          // Forzar la inclusión del mensaje actual al FINAL del historial
+          historialOrdenado.push({ role: 'user', content: textoMensaje })
+
           console.log('🤖 Consultando al Cerebro AI...')
           
           let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
