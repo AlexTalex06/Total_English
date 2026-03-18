@@ -15,6 +15,7 @@ export default function PaginaInbox() {
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [mostrandoPerfil, setMostrandoPerfil] = useState(true)
   const [simulandoIA, setSimulandoIA] = useState(false)
+  const [cargando, setCargando] = useState(true)
 
   const finalChatRef = useRef(null)
 
@@ -340,58 +341,62 @@ export default function PaginaInbox() {
           {/* Central: Chat Area */}
           <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative w-full">
             
-            {/* Header del Chat */}
-            <div className="h-[59px] shrink-0 px-4 flex items-center justify-between bg-[#f0f2f5] border-b border-[#d1d7db] z-10 w-full">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setChatActivo(null)} className="md:hidden material-symbols-outlined text-[#54656f]">arrow_back</button>
-                <div className="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center font-bold text-white text-sm">
+            {/* Header del Chat con Glassmorphism suave */}
+            <div className="h-[65px] shrink-0 px-6 flex items-center justify-between bg-white/80 backdrop-blur-md border-b border-slate-100 z-10 w-full relative">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setChatActivo(null)} className="md:hidden p-2 -ml-2 hover:bg-slate-50 rounded-full material-symbols-outlined text-slate-500">arrow_back</button>
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-sm shadow-inner overflow-hidden">
                   {chatActivo.prospectos?.nombre ? chatActivo.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'}
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-semibold text-[#111b21] text-[16px] leading-snug">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
-                  <span className="text-[13px] text-[#667781]">{chatActivo.id_plataforma}</span>
+                  <span className="font-bold text-[#1e293b] text-[16px] tracking-tight">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span className="text-[12px] text-slate-400 font-medium">WhatsApp</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-[#54656f]">
-                {/* Botón Secreto para Pruebas */}
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={simularRespuestaAI} 
                   disabled={simulandoIA}
-                  className="material-symbols-outlined text-[20px] hover:text-blue-500 title={'Simular mensaje entrante'}"
+                  className="p-2 rounded-full hover:bg-blue-50 text-blue-400 transition-all material-symbols-outlined text-[20px]"
+                  title="Simular mensaje entrante"
                 >
-                  {simulandoIA ? 'sync' : 'test_mode'}
+                  {simulandoIA ? 'sync' : 'science'}
                 </button>
 
-                <button onClick={cambiarEstadoBot} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all shadow-sm border ${chatActivo.asignado_a_humano ? 'bg-orange-500 text-white border-transparent' : 'bg-[#00a884] text-white py-1.5 border-transparent'}`}>
-                  <span className="material-symbols-outlined text-[16px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
-                  {chatActivo.asignado_a_humano ? 'Asignado a Humano' : 'Asignado a Alex (IA)'}
+                <button onClick={cambiarEstadoBot} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-lg active:scale-95 ${chatActivo.asignado_a_humano ? 'bg-amber-500 text-white shadow-amber-100' : 'bg-[#00a884] text-white shadow-green-100'}`}>
+                  <span className="material-symbols-outlined text-[18px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
+                  {chatActivo.asignado_a_humano ? 'ASESOR HUMANO' : 'IA ALEX ACTIVA'}
                 </button>
-                <div className="h-4 w-px bg-[#d1d7db]"></div>
-                <button onClick={() => setMostrandoPerfil(!mostrandoPerfil)} className="material-symbols-outlined text-[24px]">info</button>
-                <button onClick={() => alert("Opciones de chat")} className="material-symbols-outlined text-[24px]">more_vert</button>
+                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                <button onClick={() => setMostrandoPerfil(!mostrandoPerfil)} className="p-2 rounded-full hover:bg-slate-50 text-slate-400 material-symbols-outlined text-[22px]">info</button>
               </div>
             </div>
 
-            {/* Burbujas de Chat */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 z-10 scroll-smooth pb-8">
+            {/* Burbujas de Chat con diseño moderno */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 z-10 scroll-smooth bg-white custom-scrollbar">
+              <div className="flex justify-center mb-6">
+                <span className="px-4 py-1.5 bg-slate-50 text-slate-400 text-[11px] font-bold rounded-full uppercase tracking-widest border border-slate-100">Cifrado con AlexIA</span>
+              </div>
               {mensajes.map((msj, idx) => {
                 const soyYo = msj.remitente === 'humano' || msj.remitente === 'bot'
                 return (
-                  <div key={msj.id} className={`flex w-full mb-1 ${soyYo ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] md:max-w-[65%] flex flex-col relative px-3 py-1.5 rounded-lg text-[14px] leading-snug shadow-sm ${soyYo ? 'bg-[#d9fdd3] text-[#111b21] rounded-tr-[4px]' : 'bg-white text-[#111b21] rounded-tl-[4px]'}`}>
-                      {/* Name tag only if it's the bot making a distinction, or just simple wa style */}
-                      {msj.remitente === 'bot' && <span className="text-[12px] font-semibold text-slate-400 mb-0.5">🤖 Alex</span>}
-                      {msj.remitente === 'humano' && <span className="text-[12px] font-semibold text-[#00a884] mb-0.5">👨‍💼 Asesor</span>}
+                  <div key={msj.id} className={`flex w-full mb-2 ${soyYo ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] md:max-w-[60%] flex flex-col relative px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm transition-all hover:shadow-md ${soyYo ? 'bg-gradient-to-br from-[#00a884] to-[#008a6e] text-white rounded-tr-none' : 'bg-slate-100 text-[#1e293b] rounded-tl-none'}`}>
+                      {msj.remitente === 'bot' && <div className="flex items-center gap-1 mb-1 opacity-70"><span className="material-symbols-outlined text-[14px]">smart_toy</span> <span className="text-[10px] font-bold uppercase tracking-tighter">Alex</span></div>}
+                      {msj.remitente === 'humano' && <div className="flex items-center gap-1 mb-1 opacity-70"><span className="material-symbols-outlined text-[14px]">support_agent</span> <span className="text-[10px] font-bold uppercase tracking-tighter">Asesor</span></div>}
                       
-                      <span className="text-[#111b21] pb-3 whitespace-pre-wrap">{msj.contenido}</span>
+                      <span className="pb-3 whitespace-pre-wrap">{msj.contenido}</span>
                       
-                      <div className="absolute bottom-1 right-2 flex items-center gap-1">
-                        <span className="text-[11px] text-[#667781] leading-none mb-0.5 font-medium">{new Date(msj.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        {soyYo && <span className="material-symbols-outlined text-[14px] text-[#53bdeb] leading-none font-bold">done_all</span>}
+                      <div className={`absolute bottom-1.5 right-3 flex items-center gap-1 opacity-60`}>
+                        <span className="text-[10px] font-bold leading-none">{new Date(msj.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        {soyYo && <span className="material-symbols-outlined text-[14px] leading-none">done_all</span>}
                       </div>
 
                       {msj.tipo === 'imagen' && msj.url_archivo && (
-                        <div className="mt-1 mb-3 rounded-md overflow-hidden"><img src={msj.url_archivo} alt="Foto" className="max-w-xs h-auto cursor-pointer" onClick={()=>window.open(msj.url_archivo, '_blank')}/></div>
+                        <div className="mt-2 mb-4 rounded-xl border-2 border-white/20 overflow-hidden shadow-lg"><img src={msj.url_archivo} alt="Adjunto" className="max-w-xs h-auto cursor-zoom-in" onClick={()=>window.open(msj.url_archivo, '_blank')}/></div>
                       )}
                     </div>
                   </div>
@@ -400,36 +405,38 @@ export default function PaginaInbox() {
               <div ref={finalChatRef}></div>
             </div>
 
-            {/* Barra Inferior (Envío Profesional) */}
-            <form onSubmit={enviarMensaje} className="px-4 py-3 bg-[#f0f2f5] z-10 flex items-end gap-3 w-full">
-              <div className="flex items-center gap-3 text-[#54656f] pb-2">
-                <button type="button" onClick={() => alert("Función de Emojis próximamente")} className="material-symbols-outlined text-[26px] hover:text-[#111b21]">mood</button>
-                <button type="button" onClick={() => alert("Sube archivos arrastrándolos al chat")} className="material-symbols-outlined text-[26px] hover:text-[#111b21] rotate-45">attach_file</button>
-              </div>
-              <div className="flex-1 bg-white rounded-lg border border-transparent focus-within:border-slate-300">
-                <textarea 
-                  value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }}
-                  placeholder="Escribe un mensaje"
-                  className="w-full bg-transparent border-none focus:ring-0 resize-none max-h-32 min-h-[44px] py-3 text-[15px] outline-none text-[#111b21] px-4"
-                  rows={1}
-                />
-              </div>
-              <div className="text-[#54656f] pb-1.5 pl-1">
-                {nuevoMensaje.trim() ? (
-                  <button type="submit" className="material-symbols-outlined text-[28px] text-[#00a884]">send</button>
-                ) : (
-                  <button type="button" className="material-symbols-outlined text-[28px]">mic</button>
-                )}
-              </div>
-            </form>
+            {/* Barra Inferior Premium */}
+            <div className="p-4 bg-white border-t border-slate-50">
+              <form onSubmit={enviarMensaje} className="flex items-end gap-3 max-w-5xl mx-auto">
+                <div className="flex items-center gap-1 pb-1">
+                  <button type="button" onClick={() => alert("Emojis próximamente")} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-50 rounded-full transition-all material-symbols-outlined">mood</button>
+                  <button type="button" onClick={() => alert("Arrastra archivos aquí")} className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-50 rounded-full transition-all material-symbols-outlined rotate-45">attach_file</button>
+                </div>
+                <div className="flex-1 relative group">
+                  <textarea 
+                    value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }}
+                    placeholder="Escribe un mensaje para continuar el flujo..."
+                    className="w-full bg-slate-50 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-green-100 transition-all resize-none max-h-32 min-h-[48px] py-3 text-[14.5px] outline-none text-slate-700 px-5 shadow-inner"
+                    rows={1}
+                  />
+                </div>
+                <div className="pb-1">
+                  {nuevoMensaje.trim() ? (
+                    <button type="submit" className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center shadow-lg shadow-green-100 active:scale-90 transition-all material-symbols-outlined">send</button>
+                  ) : (
+                    <button type="button" className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-slate-200 transition-all material-symbols-outlined">mic</button>
+                  )}
+                </div>
+              </form>
+            </div>
           </div>
 
-          {/* Derecho: Perfil del Contacto (Sidebar WhatsApp) */}
-          <div className={`${mostrandoPerfil ? 'w-[320px]' : 'w-0 overflow-hidden'} bg-[#f0f2f5] h-full overflow-y-auto hidden xl:block border-l border-[#d1d7db] transition-all`}>
+          {/* Derecho: Perfil del Contacto (Sidebar Estilizada) */}
+          <div className={`${mostrandoPerfil ? 'w-[320px]' : 'w-0 overflow-hidden'} bg-white h-full overflow-y-auto hidden xl:block border-l border-slate-100 transition-all`}>
             {/* Header sidebar */}
-            <div className="h-[59px] flex items-center px-6 bg-[#f0f2f5] border-b border-[#d1d7db] gap-4">
-              <button className="material-symbols-outlined text-[#54656f]">close</button>
+            <div className="h-[65px] flex items-center px-6 border-b border-slate-50 gap-4">
+              <button onClick={() => setMostrandoPerfil(false)} className="p-1 hover:bg-slate-50 rounded-full material-symbols-outlined text-slate-400">close</button>
               <h3 className="text-[#111b21] text-[16px] font-semibold">Info. del contacto</h3>
             </div>
             
