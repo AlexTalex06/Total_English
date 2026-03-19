@@ -50,9 +50,19 @@ export default function PaginaInbox() {
         console.log('📡 Estado suscripción Supabase:', status)
       })
 
+    // Polling de seguridad cada 10 segundos (respaldo al Realtime)
+    const intervalId = setInterval(() => {
+      console.log('🔄 Ejecutando polling de seguridad...')
+      cargarConversaciones()
+      if (chatActivoRef.current) {
+        cargarMensajes(chatActivoRef.current.id)
+      }
+    }, 10000)
+
     return () => {
-      console.log('🔌 Cerrando suscripción Realtime')
+      console.log('🔌 Cerrando suscripción Realtime y Limpiando Polling')
       supabase.removeChannel(suscripcionRealtime)
+      clearInterval(intervalId)
     }
   }, []) // Solo al montar
 
