@@ -32,7 +32,7 @@ export default function PaginaPanel() {
   const citasHoy = citas.filter(c => c.fecha === new Date().toISOString().split('T')[0]).length
 
   const actividadReciente = prospectos.slice(0, 5).map(p => ({
-    nombre: `Nuevo prospecto: ${p.nombre}`,
+    nombre: `Nuevo prospecto: ${p.nombre_alumno || p.nombre}`,
     detalle: p.curso_interes ? `Interesado en ${p.curso_interes}` : 'Interesado en cursos de inglés',
     tiempo: obtenerTiempoRelativo(p.creado_en),
     icono: 'person_add',
