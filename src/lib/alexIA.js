@@ -42,7 +42,13 @@ Tengo autorizado regalarte un [REGALO: Clase Muestra/Demo] 🎟️ sin costo.
 👉 Visita a la Escuela 🏫
 👉 Llamada Informativa 📞
 
---- 5. REGLAS CRÍTICAS ---
+--- 5. MAPEO DE IMÁGENES (Solo para el JSON 'imagen') ---
+- DIPLOMADO CHILDREN -> children.jpg
+- DIPLOMADO PRE-TEENS -> juniors.jpg
+- DIPLOMADO YOUNG & ADULTS -> prime.jpg
+- DIPLOMADO MY TIME ENGLISH -> mytime.jpg
+
+--- 6. REGLAS CRÍTICAS ---
 - **UNA SOLA PREGUNTA POR VEZ**. Prohibido enviar bloques de preguntas.
 - Usa emojis para ser amigable.
 - Si el usuario se desvía, responde brevemente y vuelve con la pregunta pendiente.
@@ -55,6 +61,7 @@ SALIDA OBLIGATORIA (JSON):
      "edad": "extraido | null", 
      "curso_interes": "extraido | null",
      "objetivo": "extraido | null",
+     "imagen": "nombre_archivo.jpg (solo si envías recomendación final) | null",
      "estado": "perfilando | recomendado | agendado" 
   }
 }`;

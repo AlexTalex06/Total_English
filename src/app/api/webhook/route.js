@@ -75,7 +75,14 @@ export async function POST(solicitud) {
         }
 
         // 6. Enviar a Meta (CON LÓGICA DE REINTENTO DE MÉXICO 🇲🇽)
-        const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta)
+        // Construir URL base para las imágenes si hay una en los datos
+        let imagenUrl = null
+        if (datos && datos.imagen) {
+          const origin = new URL(solicitud.url).origin
+          imagenUrl = `${origin}/cursos/${datos.imagen}`
+        }
+
+        const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl)
         
         if (enviadoCorrectamente) {
            await supabase.from('mensajes').insert({ conversacion_id: convExist.id, remitente: 'bot', contenido: respuesta })
@@ -90,16 +97,25 @@ export async function POST(solicitud) {
   }
 }
 
-async function enviarMensajeWhatsApp(to, mensaje) {
+async function enviarMensajeWhatsApp(to, mensaje, imagen = null) {
   const token = process.env.META_WHATSAPP_TOKEN
   const phoneId = process.env.META_PHONE_NUMBER_ID
   const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`
 
-  const payload = {
+  let payload = {
     messaging_product: "whatsapp",
     to: to,
-    type: "text",
-    text: { body: mensaje },
+  }
+
+  if (imagen) {
+    payload.type = "image"
+    payload.image = {
+      link: imagen,
+      caption: mensaje
+    }
+  } else {
+    payload.type = "text"
+    payload.text = { body: mensaje }
   }
 
   const headers = {
