@@ -197,6 +197,10 @@ export default function PaginaInbox() {
                     <span className="text-[14px] font-bold uppercase text-blue-600">{chatActivo.prospectos?.estado || 'NUEVO'}</span>
                   </div>
                   <div className="flex flex-col border-b border-slate-50 pb-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre Alumno</span>
+                    <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.nombre_alumno || 'Igual al contacto'}</span>
+                  </div>
+                  <div className="flex flex-col border-b border-slate-50 pb-3">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Curso de Interés</span>
                     <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.curso_interes || 'No especificado'}</span>
                   </div>

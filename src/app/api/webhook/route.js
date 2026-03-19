@@ -73,13 +73,14 @@ export async function POST(solicitud) {
         }))
 
         // Inyectar contexto de lo que YA sabemos para que no repita preguntas
+        const fechaActualTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' });
         const contextoCrm = `CONTEXTO ACTUAL DEL PROSPECTO:
-        Nombre: ${freshPros.nombre || 'Desconocido'}
+        Fecha de Hoy: ${fechaActualTexto}
         Edad: ${freshPros.edad || 'Desconocida'}
         Categoría: ${freshPros.categoria_edad || 'Desconocida'}
         Nivel: ${freshPros.nivel || 'Desconocido'}
         Horario: ${freshPros.horario || 'Desconocido'}
-        IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo confirma si el usuario quiere cambiar algo o sigue con el flujo.`;
+        IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo avanza.`;
 
         const { respuesta, datos, intencion } = await consultarAlex([
           { role: 'system', content: contextoCrm },
@@ -101,7 +102,7 @@ export async function POST(solicitud) {
              const updateData = { actualizado_en: new Date().toISOString() };
              const fallbacks = [];
 
-             if (datos.nombre && datos.nombre !== freshPros.nombre) updateData.nombre = datos.nombre;
+             if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
              if (datos.edad) updateData.edad = parseInt(datos.edad);
              if (datos.nivel) updateData.nivel = datos.nivel;
              if (datos.horario) updateData.horario = datos.horario;
