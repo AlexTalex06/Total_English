@@ -97,8 +97,14 @@ export default function PaginaCitas() {
   const mesAnterior = () => setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() - 1))
   const mesSiguiente = () => setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() + 1))
 
-  // Datos a mostrar
-  const datosMostrar = citas
+  // Fechas y formateos seguros para zonas horarias
+  const anioSel = mesActual.getFullYear()
+  const mesSel = String(mesActual.getMonth() + 1).padStart(2, '0')
+  const diaSelVal = String(diaSeleccionado).padStart(2, '0')
+  const fechaFiltro = `${anioSel}-${mesSel}-${diaSelVal}`
+  
+  // Mostrar solo las citas del día seleccionado en el calendario
+  const datosMostrar = citas.filter(c => c.fecha === fechaFiltro)
 
   const hoy = new Date()
   const hoyString = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
@@ -191,8 +197,13 @@ export default function PaginaCitas() {
           <div className="bg-[#f3f4f5] rounded-3xl p-1">
             <div className="bg-white rounded-[1.4rem] p-6 shadow-sm">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-blue-900 tracking-tight">Próximas Citas</h3>
-                <button className="text-[#00236f] text-sm font-semibold hover:underline">Ver Todas</button>
+                <h3 className="text-xl font-bold text-blue-900 tracking-tight">Citas del {diaSeleccionado} de {nombresMes[mesActual.getMonth()]}</h3>
+                <button 
+                  onClick={() => { setMesActual(new Date()); setDiaSeleccionado(new Date().getDate()); }}
+                  className="text-[#00236f] text-sm font-semibold hover:underline"
+                >
+                  Volver a Hoy
+                </button>
               </div>
               <div className="space-y-2">
                 {cargando ? (
