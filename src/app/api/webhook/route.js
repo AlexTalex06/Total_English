@@ -64,8 +64,10 @@ export async function POST(solicitud) {
           mensajeInsert.contenido = mensajeObj.image?.caption || 'Imagen recibida'
         }
         await supabase.from('mensajes').insert(mensajeInsert)
-        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: mensajeInsert.contenido }).eq('id', convExist.id)        // 4. Consultar AlexIA
-        const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(10)
+        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: mensajeInsert.contenido }).eq('id', convExist.id)
+        
+        // 4. Consultar AlexIA
+        const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(30)
         const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
         
         const historialFormat = (historialRaw || []).reverse().map(m => ({
