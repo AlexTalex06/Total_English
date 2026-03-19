@@ -47,12 +47,9 @@ export default function PaginaInbox() {
     cargarConversacionesRef.current = cargarConversaciones
   })
 
-  // 📡 SISTEMA HÍBRIDO: Realtime + Polling (Respaldo)
   useEffect(() => {
     cargarConversacionesRef.current?.()
-
-    // 1. Realtime
-    const channel = supabase.channel('inbox_master')
+    const channel = supabase.channel('inbox_master_final')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, () => {
         cargarConversacionesRef.current?.()
       })
@@ -62,23 +59,14 @@ export default function PaginaInbox() {
           cargarMensajesRef.current?.(chatActivoRef.current.id)
         }
       })
-      .subscribe((status) => {
-        console.log("📶 Status Realtime:", status)
-      })
+      .subscribe()
 
-    // 2. Polling Fallback (Cada 5 segundos por si el socket falla)
     const interval = setInterval(() => {
-      console.log("⏱️ Polling de seguridad...")
       cargarConversacionesRef.current?.()
-      if (chatActivoRef.current) {
-        cargarMensajesRef.current?.(chatActivoRef.current.id)
-      }
+      if (chatActivoRef.current) cargarMensajesRef.current?.(chatActivoRef.current.id)
     }, 5000)
 
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(interval)
-    }
+    return () => { supabase.removeChannel(channel); clearInterval(interval) }
   }, [])
 
   const enviarMensaje = async (e) => {
@@ -86,7 +74,6 @@ export default function PaginaInbox() {
     if (!nuevoMensaje.trim() || !chatActivo) return
     const texto = nuevoMensaje
     setNuevoMensaje('')
-
     try {
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
@@ -110,44 +97,48 @@ export default function PaginaInbox() {
     c.id_plataforma.includes(filtroBusqueda)
   )
 
-  if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2 h-full"><span className="material-symbols-outlined animate-spin">refresh</span> Conectando Inbox...</div>
+  if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2 h-full font-sans"><span className="material-symbols-outlined animate-spin">refresh</span> Conectando...</div>
 
   return (
     <div className="h-[calc(100vh-65px)] w-full flex overflow-hidden bg-white font-sans border-t border-slate-100">
-      {/* Sidebar */}
-      <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[420px] bg-white border-r border-slate-200 flex-col h-full shrink-0 shadow-sm`}>
+      
+      {/* 1. SIDEBAR */}
+      <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[380px] bg-white border-r border-slate-200 flex-col h-full shrink-0`}>
         <div className="p-4 flex items-center justify-between border-b border-slate-50">
           <h2 className="text-[18px] font-bold text-[#1e293b]">Inbox Alex</h2>
-          <button onClick={() => setModalNuevoChat(true)} className="p-2 rounded-full hover:bg-slate-50 material-symbols-outlined">add_comment</button>
+          <button onClick={() => setModalNuevoChat(true)} className="p-2 rounded-full hover:bg-slate-50 material-symbols-outlined text-[20px]">add_comment</button>
         </div>
-        <div className="p-2">
-          <input type="text" placeholder="Buscar contacto..." className="w-full bg-[#f0f2f5] rounded-lg p-2 outline-none text-sm" value={filtroBusqueda} onChange={(e) => setFiltroBusqueda(e.target.value)} />
+        <div className="p-2 border-b border-slate-100">
+          <div className="bg-[#f0f2f5] rounded-lg px-3 py-1.5 flex items-center">
+             <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
+             <input type="text" placeholder="Buscar..." className="bg-transparent w-full text-sm outline-none ml-2" value={filtroBusqueda} onChange={(e) => setFiltroBusqueda(e.target.value)} />
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversacionesFiltradas.map(conv => (
-            <div key={conv.id} onClick={() => cambiarChat(conv)} className={`flex items-center gap-3 px-3 py-3 border-b border-slate-50 cursor-pointer ${chatActivo?.id === conv.id ? 'bg-slate-100' : 'hover:bg-slate-50'}`}>
-              <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500 uppercase">{conv.prospectos?.nombre?.[0] || '?'}</div>
+            <div key={conv.id} onClick={() => cambiarChat(conv)} className={`flex items-center gap-3 px-4 py-4 border-b border-slate-50 cursor-pointer ${chatActivo?.id === conv.id ? 'bg-[#f0f2f5]' : 'hover:bg-slate-50'}`}>
+              <div className="w-12 h-12 rounded-full bg-[#1e293b] text-white flex items-center justify-center font-bold uppercase">{conv.prospectos?.nombre?.[0] || '?'}</div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-[16px] text-[#111b21] truncate font-medium">{conv.prospectos?.nombre || conv.id_plataforma}</h3>
-                <p className="text-[13px] truncate text-slate-400">{conv.ultimo_mensaje || 'Sin mensajes'}</p>
+                <div className="flex justify-between items-baseline mb-0.5"><h3 className="text-[15px] font-semibold text-[#111b21] truncate">{conv.prospectos?.nombre || conv.id_plataforma}</h3></div>
+                <p className="text-[13px] truncate text-slate-500">{conv.ultimo_mensaje || 'Conversación vacía'}</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Main AREA */}
+      {/* 2. AREA DE CHAT */}
       {chatActivo ? (
-        <div className="flex-1 flex flex-col h-full bg-[#efeae2]">
-          <div className="h-[65px] flex items-center justify-between px-6 bg-white border-b border-slate-100 shadow-sm z-10 transition-all">
-            <div className="flex items-center gap-3">
+        <div className="flex-1 flex flex-col h-full bg-[#efeae2] min-w-0">
+          <div className="h-[65px] bg-white border-b border-slate-100 px-6 flex items-center justify-between z-10 shadow-sm">
+            <div className="flex items-center gap-4">
               <button onClick={() => setChatActivo(null)} className="md:hidden material-symbols-outlined">arrow_back</button>
               <div className="flex flex-col">
-                <span className="font-bold text-[#1e293b]">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
-                <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">● En Línea</span>
+                 <span className="font-bold text-[#1e293b]">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
+                 <span className="text-[10px] text-green-500 font-bold uppercase">Chat Activo con Alex</span>
               </div>
             </div>
-            <button className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold text-white shadow-sm ${chatActivo.asignado_a_humano ? 'bg-amber-500' : 'bg-green-600'}`}>
+            <button className={`px-4 py-1.5 rounded-full text-[11px] font-bold text-white shadow-md ${chatActivo.asignado_a_humano ? 'bg-amber-500' : 'bg-[#00a884]'}`}>
               {chatActivo.asignado_a_humano ? 'ASESOR HUMANO' : 'IA ALEX ACTIVA'}
             </button>
           </div>
@@ -159,23 +150,51 @@ export default function PaginaInbox() {
                 <div key={msj.id} className={`flex w-full ${soyYo ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-[14px] shadow-sm ${soyYo ? 'bg-[#00a884] text-white rounded-tr-none' : 'bg-slate-100 text-slate-700 rounded-tl-none'}`}>
                     <p className="whitespace-pre-wrap">{msj.contenido}</p>
-                    <span className="text-[10px] mt-1 block text-right opacity-60 font-bold">{new Date(msj.creado_en).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                    <span className="text-[9px] block text-right mt-1 opacity-60">{new Date(msj.creado_en).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                   </div>
                 </div>
               )
             })}
-            <div ref={el => { if(el) el.scrollIntoView({behavior:'smooth'}) }}></div>
+            <div ref={x => { if(x) x.scrollIntoView({behavior:'smooth'}) }}></div>
           </div>
 
-          <form onSubmit={enviarMensaje} className="p-4 bg-white flex gap-3 items-center border-t border-slate-50">
-             <textarea value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }} placeholder="Escribe un mensaje..." className="flex-1 bg-slate-50 rounded-3xl p-3 px-5 outline-none resize-none text-[14px] shadow-inner" rows={1} />
-             <button type="submit" className="w-11 h-11 rounded-full bg-[#00a884] text-white flex items-center justify-center material-symbols-outlined shadow-lg hover:scale-105 transition-transform">send</button>
+          <form onSubmit={enviarMensaje} className="p-4 bg-white border-t border-slate-50 flex items-center gap-3">
+             <textarea value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }} placeholder="Escribe un mensaje..." className="flex-1 bg-slate-50 rounded-2xl p-3 outline-none resize-none text-sm" rows={1} />
+             <button type="submit" className="w-10 h-10 bg-[#00a884] text-white rounded-full flex items-center justify-center material-symbols-outlined shadow-lg hover:scale-105 transition-transform">send</button>
           </form>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-          <span className="material-symbols-outlined text-7xl mb-4 opacity-20">chat_bubble</span>
-          <p className="font-medium">Selecciona un chat para comenzar</p>
+        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 text-slate-300"><span className="material-symbols-outlined text-7xl mb-4">forum</span> Selecciona un chat</div>
+      )}
+
+      {/* 3. PANEL DERECHO (INFO CONTACTO) */}
+      {chatActivo && (
+        <div className="hidden lg:flex w-[300px] border-l border-slate-200 bg-white flex-col h-full shrink-0">
+          <div className="p-6 border-b border-slate-50 text-center flex flex-col items-center">
+            <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-4xl text-slate-300 font-bold mb-4 uppercase">{chatActivo.prospectos?.nombre?.[0] || '?'}</div>
+            <h3 className="text-[20px] font-bold text-[#1e293b]">{chatActivo.prospectos?.nombre || 'Prospecto'}</h3>
+            <p className="text-[13px] text-slate-400">{chatActivo.id_plataforma}</p>
+          </div>
+          <div className="p-6 space-y-6">
+            <div>
+               <h4 className="text-[11px] font-bold text-slate-400 uppercase mb-2">Datos del CRM</h4>
+               <div className="space-y-4">
+                  <div className="flex flex-col">
+                    <span className="text-[12px] text-slate-400">Estado</span>
+                    <span className="text-[14px] font-semibold uppercase text-blue-600">{chatActivo.prospectos?.estado || 'NUEVO'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[12px] text-slate-400">Curso de Interés</span>
+                    <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.curso_interes || 'No especificado'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[12px] text-slate-400">Edad detectada</span>
+                    <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.edad || 'Indeterminada'}</span>
+                  </div>
+               </div>
+            </div>
+            <button className="w-full py-2.5 bg-[#1e293b] text-white rounded-xl font-bold text-sm shadow-md hover:bg-slate-800 transition-colors">Modificar Datos</button>
+          </div>
         </div>
       )}
     </div>
