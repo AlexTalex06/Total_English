@@ -13,14 +13,19 @@ const supabase = createClient(
   env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function reset() {
-  const { data, error } = await supabase
-    .from('conversaciones')
-    .update({ asignado_a_humano: false })
-    .eq('plataforma', 'whatsapp');
-    
-  if (error) console.error('Error reset:', error);
-  else console.log('✅ Bot reactivado para todas las conversaciones de WhatsApp.');
+async function check() {
+  console.log('--- 🔍 AUDITORÍA DE MENSAJES ---');
+  const { data: msgs, error } = await supabase
+    .from('mensajes')
+    .select('remitente, contenido, creado_en')
+    .order('creado_en', { ascending: false })
+    .limit(5);
+
+  if (error) return console.error(error);
+
+  msgs.forEach(m => {
+    console.log(`[${m.creado_en}] ${m.remitente}: ${m.contenido}`);
+  });
 }
 
-reset();
+check();

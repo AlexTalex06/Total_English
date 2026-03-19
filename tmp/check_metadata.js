@@ -14,19 +14,19 @@ const supabase = createClient(
 );
 
 async function check() {
-  const { data: config, error } = await supabase
-    .from('configuracion_bot')
+  console.log('--- 🔍 ESTADO DEL PROSPECTO ---');
+  const { data: pros, error } = await supabase
+    .from('prospectos')
     .select('*')
-    .eq('id', 1)
-    .single();
+    .eq('telefono', '5213412413119')
+    .maybeSingle();
 
-  if (error) console.error('Error config:', error);
-  else {
-    console.log('--- 🤖 CONFIG BOT ---');
-    console.log(`Modelo: ${config.modelo}`);
-    console.log(`Temperatura: ${config.temperatura}`);
-    // console.log(`Prompt: ${config.system_prompt.substring(0, 100)}...`);
-  }
+  if (error) return console.error(error);
+
+  console.log(`Nombre: ${pros.nombre}`);
+  console.log(`Estado: ${pros.estado}`);
+  console.log(`Curso: ${pros.curso_interes}`);
+  console.log(`Objetivo: ${pros.objetivo || 'vacío'}`);
 }
 
 check();
