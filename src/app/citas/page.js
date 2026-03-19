@@ -100,7 +100,9 @@ export default function PaginaCitas() {
   // Datos a mostrar
   const datosMostrar = citas
 
-  const citasHoy = datosMostrar.filter(c => c.fecha === new Date().toISOString().split('T')[0])
+  const hoy = new Date()
+  const hoyString = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
+  const citasHoy = datosMostrar.filter(c => c.fecha === hoyString)
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto w-full space-y-8">
@@ -140,7 +142,10 @@ export default function PaginaCitas() {
                 <div key={dia} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{dia}</div>
               ))}
               {obtenerDiasMes().map((dia, indice) => {
-                const fechaDia = dia.actual ? new Date(mesActual.getFullYear(), mesActual.getMonth(), dia.numero).toISOString().split('T')[0] : null
+                const year = mesActual.getFullYear();
+                const month = String(mesActual.getMonth() + 1).padStart(2, '0');
+                const day = String(dia.numero).padStart(2, '0');
+                const fechaDia = dia.actual ? `${year}-${month}-${day}` : null;
                 const tieneCita = dia.actual && citas.some(c => c.fecha === fechaDia)
                 
                 return (

@@ -209,15 +209,9 @@ export default function PaginaInbox() {
                        {chatActivo.prospectos?.categoria_edad && <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">{chatActivo.prospectos?.categoria_edad}</span>}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nivel</span>
-                      <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.nivel || 'N/A'}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Preferencia</span>
-                      <span className="text-[14px] font-black text-amber-600 uppercase">{chatActivo.prospectos?.modalidad_interes || 'N/A'}</span>
-                    </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nivel</span>
+                    <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.nivel || 'N/A'}</span>
                   </div>
                </div>
             </div>

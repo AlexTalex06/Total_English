@@ -202,7 +202,6 @@ export default function PaginaProspectos() {
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex flex-col text-sm text-slate-600">
-                      <span>{prospecto.correo || '-'}</span>
                       <span className="text-xs">{prospecto.telefono || '-'}</span>
                     </div>
                   </td>
