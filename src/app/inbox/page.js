@@ -377,6 +377,7 @@ export default function PaginaInbox() {
                       </div>
                       {msj.tipo === 'imagen' && msj.url_archivo && (
                         <div className="mt-2 mb-4 rounded-xl border-2 border-white/20 overflow-hidden shadow-lg">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={msj.url_archivo} alt="Adjunto" className="max-w-xs h-auto cursor-zoom-in" onClick={()=>window.open(msj.url_archivo, '_blank')}/>
                         </div>
                       )}
