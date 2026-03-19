@@ -18,6 +18,12 @@ export default function PaginaInbox() {
   const [cargando, setCargando] = useState(true)
 
   const finalChatRef = useRef(null)
+  const chatActivoRef = useRef(chatActivo)
+
+  // Mantener la referencia actualizada para Realtime
+  useEffect(() => {
+    chatActivoRef.current = chatActivo
+  }, [chatActivo])
 
   useEffect(() => {
     console.log('🔌 Iniciando suscripción Realtime...')
@@ -26,15 +32,22 @@ export default function PaginaInbox() {
     const suscripcionRealtime = supabase
       .channel('chat_realtime_global')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, (payload) => {
-        console.log('🔄 Cambio en conversaciones detectado:', payload.eventType)
+        console.log('🔄 Cambio en conversaciones:', payload.eventType)
         cargarConversaciones()
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-        console.log('📩 Nuevo mensaje detectado:', payload.new.contenido)
-        cargarConversaciones()
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, async (payload) => {
+        console.log('📩 Mensaje recibido vía Realtime:', payload.new.contenido)
+        // 1. Siempre refrescar barra lateral
+        await cargarConversaciones()
+        
+        // 2. Si el mensaje es para el chat que tengo abierto, cargarlo YA
+        const currentChat = chatActivoRef.current;
+        if (currentChat && payload.new.conversacion_id === currentChat.id) {
+          cargarMensajes(currentChat.id)
+        }
       })
       .subscribe((status) => {
-        console.log('📡 Estado suscripción:', status)
+        console.log('📡 Estado suscripción Supabase:', status)
       })
 
     return () => {

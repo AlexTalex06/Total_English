@@ -198,6 +198,13 @@ export async function POST(solicitud) {
 async function enviarMensajeWhatsAppAPI(to, text, tipoEnvio = 'text', imageUrl = null) {
   const token = process.env.META_WHATSAPP_TOKEN
   const idNumeroTelefono = process.env.META_PHONE_NUMBER_ID
+
+  // Normalización de números de México (521 -> 52)
+  let normalizedTo = to
+  if (to.startsWith('521')) {
+    normalizedTo = '52' + to.substring(3)
+  }
+
   const url = `https://graph.facebook.com/v18.0/${idNumeroTelefono}/messages`
 
   const headers = {
@@ -210,7 +217,7 @@ async function enviarMensajeWhatsAppAPI(to, text, tipoEnvio = 'text', imageUrl =
       // 1. Enviar primero la imagen limpia
       const payloadImg = {
         messaging_product: 'whatsapp',
-        to: to,
+        to: normalizedTo,
         type: 'image',
         image: { link: imageUrl }
       }
@@ -218,10 +225,10 @@ async function enviarMensajeWhatsAppAPI(to, text, tipoEnvio = 'text', imageUrl =
       if (!resImg.ok) console.error("Error al enviar imagen de Meta:", await resImg.json())
     }
 
-    // 2. Enviar el texto (siempre se envía para complementar la imagen o como mensaje normal)
+    // 2. Enviar el texto (siempre se envía)
     const payloadTexto = {
       messaging_product: 'whatsapp',
-      to: to,
+      to: normalizedTo,
       type: 'text',
       text: { body: text }
     }

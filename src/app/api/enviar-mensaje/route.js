@@ -18,9 +18,15 @@ export async function POST(solicitud) {
 
     const url = `https://graph.facebook.com/v18.0/${idNumeroTelefono}/messages`
 
+    // Normalización de números de México (521 -> 52)
+    let normalizedTo = to
+    if (to.startsWith('521')) {
+      normalizedTo = '52' + to.substring(3)
+    }
+
     let metaPayload = {
       messaging_product: 'whatsapp',
-      to: to
+      to: normalizedTo
     }
 
     if (tipo === 'template' && nombrePlantilla) {
