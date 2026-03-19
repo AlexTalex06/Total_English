@@ -97,6 +97,7 @@ export async function POST(solicitud) {
                updateData.edad = parseInt(datos.edad) || freshPros.edad;
              }
              if (datos.nivel) updateData.nivel = datos.nivel;
+             if (datos.horario) updateData.horario = datos.horario;
              
              if (datos.categoria_edad) {
                updateData.categoria_edad = datos.categoria_edad;
