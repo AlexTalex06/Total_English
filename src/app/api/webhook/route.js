@@ -63,60 +63,66 @@ export async function POST(solicitud) {
           mensajeInsert.contenido = mensajeObj.image?.caption || 'Imagen recibida'
         }
         await supabase.from('mensajes').insert(mensajeInsert)
-        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: mensajeInsert.contenido }).eq('id', convExist.id)
-
-        // 4. Consultar AlexIA
+        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: mensajeInsert.contenido }).eq('id', convExist.id)        // 4. Consultar AlexIA
         const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(10)
+        const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
         
         const historialFormat = (historialRaw || []).reverse().map(m => ({
           role: m.remitente === 'usuario' ? 'user' : 'assistant',
           content: m.contenido
         }))
 
-        const { respuesta, datos, intencion } = await consultarAlex(historialFormat, nombrePerfil, 'WhatsApp')
+        // Inyectar contexto de lo que YA sabemos para que no repita preguntas
+        const contextoCrm = `CONTEXTO ACTUAL DEL PROSPECTO:
+        Nombre: ${freshPros.nombre || 'Desconocido'}
+        Edad: ${freshPros.edad || 'Desconocida'}
+        Nivel: ${freshPros.nivel || 'Desconocido'}
+        Horario: ${freshPros.horario || 'Desconocido'}
+        IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo confirma si el usuario quiere cambiar algo o sigue con el flujo.`;
+
+        const { respuesta, datos, intencion } = await consultarAlex([
+          { role: 'system', content: contextoCrm },
+          ...historialFormat
+        ], nombrePerfil, 'WhatsApp')
         
-        // Evitar bucles: si la respuesta es idéntica a la última del bot, no enviarla o pedir variación
+        // Evitar bucles
         const ultimaRespuestaBot = (historialRaw || []).find(m => m.remitente === 'bot')?.contenido;
-        if (respuesta === ultimaRespuestaBot && intencion !== 'CIERRE') {
-          console.log(`⚠️ Respuesta repetida detectada para ${remitenteId}. Ignorando para evitar bucle.`);
+        if (respuesta === ultimaRespuestaBot && intencion !== 'CIERRE_CITA') {
+          console.log(`⚠️ Respuesta repetida detectada para ${remitenteId}. Ignorando.`);
           return NextResponse.json({ estado: 'repetido' }, { status: 200 });
         }
 
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
         
-        // 5. Actualizar CRM
+        // 5. Actualizar CRM (Resiliente a columnas faltantes)
         if (datos && Object.keys(datos).length > 0) {
            try {
-             const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
              const updateData = { actualizado_en: new Date().toISOString() };
-             
-             if (datos.nombre && datos.nombre !== freshPros.nombre) {
-               updateData.nombre = datos.nombre;
-             }
-             if (datos.edad !== undefined && datos.edad !== null) {
-               updateData.edad = parseInt(datos.edad) || freshPros.edad;
-             }
+             const fallbacks = [];
+
+             if (datos.nombre && datos.nombre !== freshPros.nombre) updateData.nombre = datos.nombre;
+             if (datos.edad) updateData.edad = parseInt(datos.edad);
              if (datos.nivel) updateData.nivel = datos.nivel;
              if (datos.horario) updateData.horario = datos.horario;
              if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
-             if (datos.lead_score) updateData.lead_score = datos.lead_score;
-             
-             if (datos.categoria_edad) {
-               updateData.categoria_edad = datos.categoria_edad;
-             }
-             if (datos.modalidad_interes) { // Por si acaso se envía desde la IA corregida
-               updateData.modalidad_interes = datos.modalidad_interes;
-             }
-             
-             console.log('📦 Intentando actualizar prospecto:', updateData);
+
+             // Intento de actualización directa
              const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
-             if (crmError) console.error('❌ CRM Sync Error:', crmError.message);
-             else console.log('✅ CRM Actualizado correctamente');
+             
+             if (crmError) {
+               console.error('⚠️ Error en update (posible falta de columnas):', crmError.message);
+               // Si fallan columnas específicas, guardamos en notas para no perder la info
+               const msgNotas = `[Sync Fallido] Datos extraídos: Edad:${datos.edad}, Nivel:${datos.nivel}, Horario:${datos.horario}, Interés:${datos.curso_interes}`;
+               await supabase.from('prospectos').update({ 
+                 notas: (freshPros.notas ? freshPros.notas + '\n' : '') + msgNotas 
+               }).eq('id', prosExist.id);
+             } else {
+               console.log('✅ CRM Actualizado correctamente');
+             }
            } catch (errSync) {
              console.error('❌ Error fatal en sync:', errSync.message);
            }
         }
-
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
         if (intencion === 'CIERRE_CITA') {
           await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
