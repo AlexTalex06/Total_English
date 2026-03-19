@@ -98,16 +98,17 @@ export async function POST(solicitud) {
              }
              if (datos.nivel) updateData.nivel = datos.nivel;
              if (datos.horario) updateData.horario = datos.horario;
+             if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+             if (datos.lead_score) updateData.lead_score = datos.lead_score;
              
              if (datos.categoria_edad) {
                updateData.categoria_edad = datos.categoria_edad;
              }
-             if (datos.interes) {
-               updateData.modalidad_interes = datos.interes;
+             if (datos.modalidad_interes) { // Por si acaso se envía desde la IA corregida
+               updateData.modalidad_interes = datos.modalidad_interes;
              }
-             if (datos.lead_score) updateData.lead_score = datos.lead_score;
-             if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
              
+             console.log('📦 Intentando actualizar prospecto:', updateData);
              const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
              if (crmError) console.error('❌ CRM Sync Error:', crmError.message);
              else console.log('✅ CRM Actualizado correctamente');
@@ -119,16 +120,20 @@ export async function POST(solicitud) {
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
         if (intencion === 'CIERRE_CITA') {
           await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
-          // Crear cita tentativa para hoy + 1 hora
-          const fechaCita = new Date()
-          fechaCita.setHours(fechaCita.getHours() + 1)
-          await supabase.from('citas').insert({
+          
+          const fechaDefecto = new Date()
+          fechaDefecto.setDate(fechaDefecto.getDate() + 1) // Mañana por defecto
+          
+          const insertCita = {
             prospecto_id: prosExist.id,
-            fecha: fechaCita.toISOString().split('T')[0],
-            hora: fechaCita.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            tipo: 'Sesión Informativa AlexIA',
+            fecha: datos.fecha_cita || fechaDefecto.toISOString().split('T')[0],
+            hora: datos.hora_cita || '16:00',
+            tipo: 'Inscripción / Sesión Informativa',
             estado: 'pendiente'
-          })
+          }
+          
+          console.log('📅 Creando cita:', insertCita);
+          await supabase.from('citas').insert(insertCita)
         }
 
         // 7. Enviar a Meta
