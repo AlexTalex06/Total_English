@@ -93,7 +93,7 @@ export default function PaginaCampanas() {
     },
   ]
 
-  const datosMostrar = campanas.length > 0 ? campanas : campanasEjemplo
+  const datosMostrar = campanas;
 
   const estadisticas = {
     alcanceTotal: datosMostrar.reduce((sum, c) => sum + (c.alcance || 0), 0),

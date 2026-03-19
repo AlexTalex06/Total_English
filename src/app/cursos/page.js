@@ -85,16 +85,7 @@ export default function PaginaCursos() {
     }
   }
 
-  // Cursos de ejemplo
-  const cursosEjemplo = [
-    { id: '1', nombre: 'Inglés de Negocios Elite', descripcion: 'Programa avanzado para profesionales', duracion: '12 Semanas', nivel: 'C1', precio: 599, capacidad: 8, imagen_url: imagenesDefecto[0] },
-    { id: '2', nombre: 'Intensivo A2', descripcion: 'Acelera tu aprendizaje básico', duracion: '4 Semanas', nivel: 'A2', precio: 249, capacidad: 15, imagen_url: imagenesDefecto[1] },
-    { id: '3', nombre: 'Preparación IELTS', descripcion: 'Programa de examen académico', duracion: '8 Semanas', nivel: 'B2', precio: 450, capacidad: 10, imagen_url: imagenesDefecto[2] },
-    { id: '4', nombre: 'Club de Conversación', descripcion: 'Práctica semanal de fluidez', duracion: 'Semanal', nivel: 'Abierto', precio: 15, capacidad: 20, imagen_url: imagenesDefecto[3] },
-    { id: '5', nombre: 'Escritura Profesional', descripcion: 'Redacción corporativa en inglés', duracion: '6 Semanas', nivel: 'B2', precio: 320, capacidad: 12, imagen_url: imagenesDefecto[4] },
-  ]
-
-  const datosMostrar = cursos.length > 0 ? cursos : cursosEjemplo
+  const datosMostrar = cursos;
 
   const filtros = ['Todos', 'Negocios', 'Académico', 'Intensivo', 'Niños y Jóvenes']
 
