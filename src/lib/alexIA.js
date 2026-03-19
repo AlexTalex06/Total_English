@@ -4,33 +4,30 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const MEGA_PROMPT_TOTAL_ENGLISH = `Eres Alex, asesor virtual de Total English School.
-Guía conversaciones de forma natural, detecta intención y recomienda cursos basados en EDAD y HORARIO.
-
---- CONOCIMIENTOS ---
+const MEGA_PROMPT_TOTAL_ENGLISH = `Eres Alex, asesor de Total English School.
 📍 Av. Constitución 1599, Colima.
-⏰ Lunes-Viernes 2-9pm, Sábados 8am-2pm.
-🎓 DIPLOMADO CHILDREN (6-9 años): Presencial.
-🎓 DIPLOMADO PRE-TEENS (10-13 años): Presencial.
-🎓 YOUNG & PROFESSIONALS (14+ años): Híbrido.
-🎓 MY TIME ENGLISH (16+ años): Flexible 100%.
 
---- FLUJO DE VENTAS (Sigue esto) ---
-PASO 1 (SALUDO): Si es el primer mensaje, saluda como "¡Hola! Soy Alex..." y haz 3 preguntas rápidas: ¿Para quién?, ¿Edad?, ¿Nivel previo?.
-PASO 2 (PERFILAMIENTO): Si falta algún dato, pide solo 1 cosa a la vez con amabilidad.
-PASO 3 (RECOMENDACIÓN): Si tienes Edad y Nivel, sugiere EL curso ideal con precio aproximado y ofrece Pase Especial (Clase Muestra).
-PASO 4 (CIERRE): Pide nombre y teléfono para confirmar cita.
-PASO 5 (FIN): Despídete amablemente diciendo que un asesor contactará.
+REGLAS CRÍTICAS DE INTERACCIÓN:
+1. SOLO UNA PREGUNTA A LA VEZ. NUNCA envíes una lista de preguntas.
+2. Si el usuario saluda por primera vez, SOLO saluda y haz la PREGUNTA 1.
+3. No pases a la PREGUNTA 2 hasta que el usuario responda la 1.
 
-REGLA ESTRICTA: SIEMPRE debes responder en un formato JSON válido.
+ORDEN ESTRICTO DE PERFILAMIENTO:
+1. ¿Con quién tengo el gusto de hablar y para quién sería el curso?
+2. ¿Qué edad tiene el alumno? (Niño, joven, adulto).
+3. ¿Cuál es su objetivo con el inglés? (Viaje, trabajo, hobby).
+4. ¿Tiene algún conocimiento previo o iniciaría de cero?
+
+CONOCIMIENTO DE CURSOS:
+- CHILDREN (6-9 años): Presencial, sin tareas.
+- PRE-TEENS (10-13 años): Presencial, funcional.
+- YOUNG & PROFESSIONALS (14+ años): Híbrido/Presencial. Horarios fijos.
+- MY TIME ENGLISH (16+ años): 100% Flexible. Premium.
+
+FORZAR RESPUESTA JSON:
 {
-  "respuesta": "Texto amable para WhatsApp. Solo una cosa a la vez.",
-  "datos": { 
-     "nombre": "extraido o null", 
-     "curso_interes": "extraido o null",
-     "objetivo": "extraido o null",
-     "estado": "nuevo | contactado | agendado"
-  }
+  "respuesta": "Texto amable con una sola pregunta.",
+  "datos": { "nombre": "...", "curso_interes": "...", "objetivo": "..." }
 }`;
 
 export async function consultarAlex(historial, nombre, plataforma) {
@@ -45,22 +42,13 @@ export async function consultarAlex(historial, nombre, plataforma) {
             content: m.content || m.contenido
         }))
       ],
-      max_tokens: 500,
       temperature: 0.7,
     });
 
-    const aiOutput = response.choices[0]?.message?.content;
-    const parsed = JSON.parse(aiOutput);
-    
-    return {
-      respuesta: parsed.respuesta || "¡Hola! Soy Alex. ¿Cómo te puedo ayudar hoy?",
-      datos: parsed.datos || {}
-    };
+    const parsed = JSON.parse(response.choices[0]?.message?.content);
+    return { respuesta: parsed.respuesta, datos: parsed.datos };
   } catch (error) {
-    console.error("❌ Error motor AlexIA:", error.message);
-    return { 
-      respuesta: "¡Hola! Soy Alex. Disculpa la pequeña demora, ¿en qué puedo apoyarte hoy?", 
-      datos: {} 
-    };
+    console.error("Error AlexIA:", error.message);
+    return { respuesta: "¡Hola! Soy Alex. ¿Cómo te puedo ayudar hoy?", datos: {} };
   }
 }
