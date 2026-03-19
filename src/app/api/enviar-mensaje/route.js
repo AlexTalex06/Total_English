@@ -1,65 +1,59 @@
 import { NextResponse } from 'next/server'
+import axios from 'axios'
 
 export async function POST(solicitud) {
   try {
     const { to, text, plataforma, tipo = 'text', nombrePlantilla = '' } = await solicitud.json()
     
-    // Por el momento solo implementado WhatsApp
     if (plataforma !== 'whatsapp') {
-      return NextResponse.json({ error: 'Plataforma no soportada para envío manual aún' }, { status: 400 })
+      return NextResponse.json({ error: 'Plataforma no soportada' }, { status: 400 })
     }
 
     const token = process.env.META_WHATSAPP_TOKEN
-    const idNumeroTelefono = process.env.META_PHONE_NUMBER_ID
+    const phoneId = process.env.META_PHONE_NUMBER_ID
+    const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`
 
-    if (!token || !idNumeroTelefono) {
-       return NextResponse.json({ error: 'Credenciales Meta no configuradas (META_WHATSAPP_TOKEN / ID)' }, { status: 500 })
-    }
-
-    const url = `https://graph.facebook.com/v18.0/${idNumeroTelefono}/messages`
-
-    // Normalización de números de México (521 -> 52)
-    let normalizedTo = to
-    if (to.startsWith('521')) {
-      normalizedTo = '52' + to.substring(3)
-    }
-
-    let metaPayload = {
+    const payload = {
       messaging_product: 'whatsapp',
-      to: normalizedTo
+      to: to,
     }
 
     if (tipo === 'template' && nombrePlantilla) {
-      metaPayload.type = 'template'
-      metaPayload.template = {
-        name: nombrePlantilla,
-        language: { code: 'es_MX' } // o 'es' dependiendo de la configuración del usuario
-      }
+      payload.type = 'template'
+      payload.template = { name: nombrePlantilla, language: { code: 'es_MX' } }
     } else {
-      metaPayload.type = 'text'
-      metaPayload.text = { body: text }
+      payload.type = 'text'
+      payload.text = { body: text }
     }
 
-    const respuesta = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(metaPayload)
-    })
-
-    const datos = await respuesta.json()
-    
-    if (datos.error) {
-       console.error('Meta API Error:', datos.error)
-       return NextResponse.json({ error: datos.error.message || 'Error desconocido de Meta' }, { status: 400 })
+    const headers = {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
     }
-    
-    return NextResponse.json({ exito: true, metaResponse: datos }, { status: 200 })
+
+    try {
+      // Intento 1
+      const res = await axios.post(url, payload, headers)
+      return NextResponse.json({ exito: true, metaResponse: res.data }, { status: 200 })
+    } catch (error) {
+      console.warn(`⚠️ Falló envío manual inicial a ${to}:`, error.response?.data || error.message)
+
+      // LÓGICA DE MÉXICO: Reintento 521 -> 52
+      if (to.startsWith('521') && to.length === 13) {
+        const toCorregido = to.replace('521', '52')
+        payload.to = toCorregido
+        try {
+          const resRetry = await axios.post(url, payload, headers)
+          return NextResponse.json({ exito: true, metaResponse: resRetry.data, corregido: true }, { status: 200 })
+        } catch (retryError) {
+          console.error(`❌ Falló también reintento manual a ${toCorregido}:`, retryError.response?.data || retryError.message)
+          return NextResponse.json({ error: retryError.response?.data?.error?.message || 'Fallo total en envío manual' }, { status: 400 })
+        }
+      }
+      return NextResponse.json({ error: error.response?.data?.error?.message || 'Error Meta API' }, { status: 400 })
+    }
     
   } catch (error) {
     console.error('Error al enviar mensaje manual:', error)
-    return NextResponse.json({ error: 'Error interno del servidor al contactar Meta' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
