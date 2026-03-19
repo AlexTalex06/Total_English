@@ -33,16 +33,17 @@ export async function POST(solicitud) {
 
         if (mensajeObj.type !== 'text') return NextResponse.json({ estado: 'ignorado' }, { status: 200 })
 
-        // 1. Prospecto: Buscar/Crear
-        let { data: prosExist } = await supabase.from('prospectos').select('id').eq('telefono', remitenteId).maybeSingle()
-        if (!prosExist) {
+        // 1 & 2. Conversación y Prospecto: Buscar o Crear de forma segura sin UNIQUE en teléfono
+        let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).eq('plataforma', 'whatsapp').maybeSingle()
+        let prosExist = null;
+
+        if (convExist) {
+          const { data: pData } = await supabase.from('prospectos').select('id').eq('id', convExist.prospecto_id).single()
+          prosExist = pData;
+        } else {
+          // Si no hay conversación, creamos el prospecto titular y la conversación
           const { data: nuevoP } = await supabase.from('prospectos').insert({ nombre: nombrePerfil, telefono: remitenteId, estado: 'nuevo' }).select('id').single()
           prosExist = nuevoP
-        }
-
-        // 2. Conversación: Buscar/Crear
-        let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).maybeSingle()
-        if (!convExist) {
           const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
           convExist = nuevaC
         }
@@ -96,55 +97,79 @@ export async function POST(solicitud) {
 
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
         
-        // 5. Actualizar CRM (Resiliente a columnas faltantes)
+        // 5. Actualizar CRM (Bifurcación Multi-Alumno)
         if (datos && Object.keys(datos).length > 0) {
            try {
-             const updateData = { actualizado_en: new Date().toISOString() };
-             const fallbacks = [];
+             let idTarget = prosExist.id;
 
-             if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
-             if (datos.edad) updateData.edad = parseInt(datos.edad);
-             if (datos.nivel) updateData.nivel = datos.nivel;
-             if (datos.horario) updateData.horario = datos.horario;
-             if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
-             if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
+             // Bifurcación multi-alumno
+             if (datos.nombre_alumno && freshPros.nombre_alumno && datos.nombre_alumno.toLowerCase() !== freshPros.nombre_alumno.toLowerCase()) {
+                 console.log(`Bifurcando prospecto de ${freshPros.nombre_alumno} a -> ${datos.nombre_alumno}`);
+                 const propObj = { ...freshPros };
+                 delete propObj.id; delete propObj.creado_en; delete propObj.actualizado_en;
+                 propObj.nombre_alumno = datos.nombre_alumno;
+                 propObj.edad = datos.edad ? parseInt(datos.edad) : null;
+                 propObj.nivel = datos.nivel || null;
+                 propObj.horario = datos.horario || null;
+                 propObj.categoria_edad = datos.categoria_edad || null;
 
-             // Intento de actualización directa
-             const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
-             
-             if (crmError) {
-               console.error('⚠️ Error en update (posible falta de columnas):', crmError.message);
-               const msgNotas = `[Sync Fallido] Datos extraídos: Edad:${datos.edad}, Cat:${datos.categoria_edad}, Nivel:${datos.nivel}, Horario:${datos.horario}, Interés:${datos.curso_interes}`;
-               await supabase.from('prospectos').update({ 
-                 notas: (freshPros.notas ? freshPros.notas + '\n' : '') + msgNotas 
-               }).eq('id', prosExist.id);
+                 const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('id').single();
+                 if (nuevoHijo) {
+                     await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
+                     idTarget = nuevoHijo.id;
+                     prosExist.id = nuevoHijo.id; // Actualizar local para las citas
+                 }
              } else {
-               console.log('✅ CRM Actualizado correctamente');
+                 const updateData = { actualizado_en: new Date().toISOString() };
+                 if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
+                 if (datos.edad) updateData.edad = parseInt(datos.edad);
+                 if (datos.nivel) updateData.nivel = datos.nivel;
+                 if (datos.horario) updateData.horario = datos.horario;
+                 if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+                 if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
+
+                 const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
+                 if (crmError) console.error('Error actualizando prospecto:', crmError.message);
              }
            } catch (errSync) {
-             console.error('❌ Error fatal en sync:', errSync.message);
+             console.error('❌ Error fatal en sync CRM:', errSync.message);
            }
         }
 
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
         if (intencion === 'CIERRE_CITA') {
-          // Evitar duplicados si ya tiene una cita pendiente
-          const { data: citaExistente } = await supabase.from('citas').select('id').eq('prospecto_id', prosExist.id).eq('estado', 'pendiente').maybeSingle()
-          
+          // Evitar duplicados usando .limit(1) para evadir errores 500
+          const { data: citasExistentes } = await supabase.from('citas')
+            .select('id, fecha, hora')
+            .eq('prospecto_id', prosExist.id)
+            .eq('estado', 'pendiente')
+            .order('timestamp', { ascending: false })
+            .limit(1);
+            
+          const citaExistente = citasExistentes && citasExistentes.length > 0 ? citasExistentes[0] : null;
+
+          let fCitaStr = datos.fecha_cita;
+          const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+          if (!fCitaStr || !regexFecha.test(fCitaStr)) {
+            const diaDefecto = new Date();
+            diaDefecto.setDate(diaDefecto.getDate() + 1);
+            fCitaStr = diaDefecto.toISOString().split('T')[0];
+          }
+
           if (!citaExistente) {
             await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
-            const fechaDefecto = new Date()
-            fechaDefecto.setDate(fechaDefecto.getDate() + 1)
-            
-            const insertCita = {
-              prospecto_id: prosExist.id,
-              fecha: datos.fecha_cita || fechaDefecto.toISOString().split('T')[0],
-              hora: datos.hora_cita || '16:00',
-              tipo: 'Inscripción / Sesión Informativa',
-              estado: 'pendiente'
-            }
+            const insertCita = { prospecto_id: prosExist.id, fecha: fCitaStr, hora: datos.hora_cita || '16:00', tipo: 'Inscripción / Sesión Informativa', estado: 'pendiente' };
             console.log('📅 Creando cita:', insertCita);
-            await supabase.from('citas').insert(insertCita)
+            await supabase.from('citas').insert(insertCita);
+          } else {
+            if (datos.fecha_cita || datos.hora_cita) {
+              const updateCita = {
+                fecha: (datos.fecha_cita && regexFecha.test(datos.fecha_cita)) ? datos.fecha_cita : citaExistente.fecha,
+                hora: datos.hora_cita || citaExistente.hora
+              };
+              console.log('📅 Actualizando cita existente:', updateCita);
+              await supabase.from('citas').update(updateCita).eq('id', citaExistente.id);
+            }
           }
         }
 
