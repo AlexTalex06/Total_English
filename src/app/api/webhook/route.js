@@ -73,17 +73,26 @@ export async function POST(solicitud) {
           content: m.contenido
         }))
 
-        const { respuesta, datos } = await consultarAlex(historialFormat, nombrePerfil, 'WhatsApp')
+        const { respuesta, datos, intencion } = await consultarAlex(historialFormat, nombrePerfil, 'WhatsApp')
+        console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
         
         // 5. Actualizar CRM
         if (datos && Object.keys(datos).length > 0) {
+           // Volvemos a consultar para tener datos frescos (notas, etc)
+           const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
            const updateData = { actualizado_en: new Date().toISOString() };
            
-           if (datos.nombre) updateData.nombre = datos.nombre;
-           if (datos.edad) updateData.edad = datos.edad;
+           if (datos.nombre && (!freshPros.nombre || freshPros.nombre === 'Prospecto' || freshPros.nombre.length < 4)) {
+             updateData.nombre = datos.nombre;
+           }
+           if (datos.edad) updateData.edad = parseInt(datos.edad) || freshPros.edad;
            if (datos.nivel) updateData.nivel = datos.nivel;
+           
            if (datos.categoria_edad) {
-             updateData.notas = (prosExist.notas ? prosExist.notas + '\n' : '') + `Categoría: ${datos.categoria_edad}`;
+             const notaNueva = `Categoría: ${datos.categoria_edad}`;
+             if (!freshPros.notas?.includes(notaNueva)) {
+               updateData.notas = (freshPros.notas ? freshPros.notas + '\n' : '') + notaNueva;
+             }
            }
            if (datos.lead_score) updateData.lead_score = datos.lead_score;
            if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
@@ -91,7 +100,22 @@ export async function POST(solicitud) {
            await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
         }
 
-        // 6. Enviar a Meta (CON LÓGICA DE REINTENTO DE MÉXICO 🇲🇽)
+        // 6. Lógica de Citas (Si la intención es CIERRE)
+        if (intencion === 'CIERRE') {
+          await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
+          // Crear cita tentativa para hoy + 1 hora
+          const fechaCita = new Date()
+          fechaCita.setHours(fechaCita.getHours() + 1)
+          await supabase.from('citas').insert({
+            prospecto_id: prosExist.id,
+            fecha: fechaCita.toISOString().split('T')[0],
+            hora: fechaCita.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            tipo: 'Sesión Informativa AlexIA',
+            estado: 'pendiente'
+          })
+        }
+
+        // 7. Enviar a Meta
         let imagenUrl = null
         if (datos && datos.imagen) {
           const origin = new URL(solicitud.url).origin
