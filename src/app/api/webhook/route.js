@@ -76,6 +76,7 @@ export async function POST(solicitud) {
         const contextoCrm = `CONTEXTO ACTUAL DEL PROSPECTO:
         Nombre: ${freshPros.nombre || 'Desconocido'}
         Edad: ${freshPros.edad || 'Desconocida'}
+        Categoría: ${freshPros.categoria_edad || 'Desconocida'}
         Nivel: ${freshPros.nivel || 'Desconocido'}
         Horario: ${freshPros.horario || 'Desconocido'}
         IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo confirma si el usuario quiere cambiar algo o sigue con el flujo.`;
