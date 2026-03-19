@@ -1,0 +1,15 @@
+const { POST } = require('./src/app/api/webhook/route.js'); // Assuming we can require the route handler if it's exported
+// But Next.js files are ESM. This will likely fail.
+
+// alternative: use fetch to the local dev server if it's running
+// But I don't know the port.
+
+// I'll just check the code of alexIA.js one more time.
+// Wait! I found something! 
+
+// In alexIA.js (Step 1575):
+// 96:       model: openai(modelo),
+// 'modelo' is a variable. By default 'gpt-4o'.
+// If the DB has 'gpt-4-turbo' or something, it might fail if not supported.
+
+// I'll check the DB config for the bot.
