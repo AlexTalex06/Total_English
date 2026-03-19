@@ -93,14 +93,16 @@ export async function POST(solicitud) {
            if (datos.nombre && (!freshPros.nombre || freshPros.nombre === 'Prospecto' || freshPros.nombre.length < 4)) {
              updateData.nombre = datos.nombre;
            }
-           if (datos.edad) updateData.edad = parseInt(datos.edad) || freshPros.edad;
+           if (datos.edad !== undefined && datos.edad !== null) {
+              updateData.edad = parseInt(datos.edad) || freshPros.edad;
+           }
            if (datos.nivel) updateData.nivel = datos.nivel;
            
            if (datos.categoria_edad) {
-             const notaNueva = `Categoría: ${datos.categoria_edad}`;
-             if (!freshPros.notas?.includes(notaNueva)) {
-               updateData.notas = (freshPros.notas ? freshPros.notas + '\n' : '') + notaNueva;
-             }
+             updateData.categoria_edad = datos.categoria_edad;
+           }
+           if (datos.interes) {
+             updateData.modalidad_interes = datos.interes;
            }
            if (datos.lead_score) updateData.lead_score = datos.lead_score;
            if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;

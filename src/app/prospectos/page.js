@@ -173,7 +173,8 @@ export default function PaginaProspectos() {
               <tr className="bg-slate-50/50">
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Identidad</th>
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Contacto</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Perfil / Interés</th>
+                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Perfil</th>
+                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Interés</th>
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Lead Score</th>
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Estado</th>
                 <th className="px-6 py-5 text-right text-[11px] font-bold uppercase tracking-widest text-slate-400">Acciones</th>
@@ -181,9 +182,9 @@ export default function PaginaProspectos() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {cargando ? (
-                <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">Cargando prospectos...</td></tr>
+                <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-400">Cargando prospectos...</td></tr>
               ) : prospectos.length === 0 ? (
-                <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">No hay prospectos registrados.</td></tr>
+                <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-400">No hay prospectos registrados.</td></tr>
               ) : prospectos.map((prospecto, indice) => (
                 <tr key={prospecto.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-5">

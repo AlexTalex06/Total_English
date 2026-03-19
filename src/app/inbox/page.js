@@ -202,13 +202,22 @@ export default function PaginaInbox() {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[12px] text-slate-400">Edad</span>
-                    <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.edad || 'Indeterminada'}</span>
+                    <p className="text-slate-900 font-semibold">
+                      {(chatActivo.prospectos?.edad !== null && chatActivo.prospectos?.edad !== undefined) ? `${chatActivo.prospectos?.edad} años` : 'Indeterminada'}
+                      {chatActivo.prospectos?.categoria_edad && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{chatActivo.prospectos?.categoria_edad}</span>}
+                    </p>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[12px] text-slate-400">Nivel / Horario</span>
-                    <span className="text-[14px] font-semibold text-[#1e293b]">
-                      {chatActivo.prospectos?.nivel || 'N/A'} - {chatActivo.prospectos?.horario || 'N/A'}
-                    </span>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <span className="text-[12px] text-slate-400">Nivel / Horario</span>
+                      <span className="text-[14px] font-semibold text-[#1e293b]">
+                        {chatActivo.prospectos?.nivel || 'N/A'} - {chatActivo.prospectos?.horario || 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[12px] text-slate-400">Preferencia</span>
+                      <span className="text-[14px] font-semibold text-blue-600 font-bold">{chatActivo.prospectos?.modalidad_interes || 'No especificada'}</span>
+                    </div>
                   </div>
                </div>
             </div>
