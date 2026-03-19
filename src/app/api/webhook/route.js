@@ -86,28 +86,33 @@ export async function POST(solicitud) {
         
         // 5. Actualizar CRM
         if (datos && Object.keys(datos).length > 0) {
-           // Volvemos a consultar para tener datos frescos (notas, etc)
-           const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
-           const updateData = { actualizado_en: new Date().toISOString() };
-           
-           if (datos.nombre && (!freshPros.nombre || freshPros.nombre === 'Prospecto' || freshPros.nombre.length < 4)) {
-             updateData.nombre = datos.nombre;
+           try {
+             const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
+             const updateData = { actualizado_en: new Date().toISOString() };
+             
+             if (datos.nombre && datos.nombre !== freshPros.nombre) {
+               updateData.nombre = datos.nombre;
+             }
+             if (datos.edad !== undefined && datos.edad !== null) {
+               updateData.edad = parseInt(datos.edad) || freshPros.edad;
+             }
+             if (datos.nivel) updateData.nivel = datos.nivel;
+             
+             if (datos.categoria_edad) {
+               updateData.categoria_edad = datos.categoria_edad;
+             }
+             if (datos.interes) {
+               updateData.modalidad_interes = datos.interes;
+             }
+             if (datos.lead_score) updateData.lead_score = datos.lead_score;
+             if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+             
+             const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
+             if (crmError) console.error('❌ CRM Sync Error:', crmError.message);
+             else console.log('✅ CRM Actualizado correctamente');
+           } catch (errSync) {
+             console.error('❌ Error fatal en sync:', errSync.message);
            }
-           if (datos.edad !== undefined && datos.edad !== null) {
-              updateData.edad = parseInt(datos.edad) || freshPros.edad;
-           }
-           if (datos.nivel) updateData.nivel = datos.nivel;
-           
-           if (datos.categoria_edad) {
-             updateData.categoria_edad = datos.categoria_edad;
-           }
-           if (datos.interes) {
-             updateData.modalidad_interes = datos.interes;
-           }
-           if (datos.lead_score) updateData.lead_score = datos.lead_score;
-           if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
-           
-           await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
         }
 
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)

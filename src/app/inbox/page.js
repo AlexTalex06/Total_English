@@ -192,31 +192,31 @@ export default function PaginaInbox() {
             <div>
                <h4 className="text-[11px] font-bold text-slate-400 uppercase mb-2">Datos del CRM</h4>
                <div className="space-y-4">
-                  <div className="flex flex-col">
-                    <span className="text-[12px] text-slate-400">Estado</span>
-                    <span className="text-[14px] font-semibold uppercase text-blue-600">{chatActivo.prospectos?.estado || 'NUEVO'}</span>
+                  <div className="flex flex-col border-b border-slate-50 pb-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</span>
+                    <span className="text-[14px] font-bold uppercase text-blue-600">{chatActivo.prospectos?.estado || 'NUEVO'}</span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[12px] text-slate-400">Curso de Interés</span>
+                  <div className="flex flex-col border-b border-slate-50 pb-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Curso de Interés</span>
                     <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.curso_interes || 'No especificado'}</span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[12px] text-slate-400">Edad</span>
-                    <p className="text-slate-900 font-semibold">
-                      {(chatActivo.prospectos?.edad !== null && chatActivo.prospectos?.edad !== undefined) ? `${chatActivo.prospectos?.edad} años` : 'Indeterminada'}
-                      {chatActivo.prospectos?.categoria_edad && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{chatActivo.prospectos?.categoria_edad}</span>}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <span className="text-[12px] text-slate-400">Nivel / Horario</span>
-                      <span className="text-[14px] font-semibold text-[#1e293b]">
-                        {chatActivo.prospectos?.nivel || 'N/A'} - {chatActivo.prospectos?.horario || 'N/A'}
-                      </span>
+                  <div className="flex flex-col border-b border-slate-50 pb-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Edad y Categoría</span>
+                    <div className="flex items-center gap-2">
+                       <p className="text-slate-900 font-semibold">
+                         {(chatActivo.prospectos?.edad !== null && chatActivo.prospectos?.edad !== undefined) ? `${chatActivo.prospectos?.edad} años` : 'Indeterminada'}
+                       </p>
+                       {chatActivo.prospectos?.categoria_edad && <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">{chatActivo.prospectos?.categoria_edad}</span>}
                     </div>
-                    <div>
-                      <span className="text-[12px] text-slate-400">Preferencia</span>
-                      <span className="text-[14px] font-semibold text-blue-600 font-bold">{chatActivo.prospectos?.modalidad_interes || 'No especificada'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nivel</span>
+                      <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.nivel || 'N/A'}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Preferencia</span>
+                      <span className="text-[14px] font-black text-amber-600 uppercase">{chatActivo.prospectos?.modalidad_interes || 'N/A'}</span>
                     </div>
                   </div>
                </div>
