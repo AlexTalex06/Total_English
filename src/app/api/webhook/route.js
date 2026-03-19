@@ -51,13 +51,19 @@ export async function POST(solicitud) {
         const { data: existeMsg } = await supabase.from('mensajes').select('id').eq('id_mensaje_meta', mensajeObj.id).maybeSingle()
         if (existeMsg) return NextResponse.json({ estado: 'ya_procesado' }, { status: 200 })
 
-        await supabase.from('mensajes').insert({ 
+        const mensajeInsert = { 
             conversacion_id: convExist.id, 
             remitente: 'usuario', 
             contenido: texto, 
-            id_mensaje_meta: mensajeObj.id 
-        })
-        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: texto }).eq('id', convExist.id)
+            id_mensaje_meta: mensajeObj.id,
+            tipo: mensajeObj.type === 'image' ? 'imagen' : 'texto'
+        }
+        if (mensajeObj.type === 'image') {
+          mensajeInsert.url_archivo = mensajeObj.image?.url || '' // Note: Meta requires a separate GET to fetch the media URL, but for now we store what we have or a placeholder
+          mensajeInsert.contenido = mensajeObj.image?.caption || 'Imagen recibida'
+        }
+        await supabase.from('mensajes').insert(mensajeInsert)
+        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: mensajeInsert.contenido }).eq('id', convExist.id)
 
         // 4. Consultar AlexIA
         const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(10)
@@ -71,21 +77,37 @@ export async function POST(solicitud) {
         
         // 5. Actualizar CRM
         if (datos && Object.keys(datos).length > 0) {
-           await supabase.from('prospectos').update(datos).eq('id', prosExist.id)
+           const updateData = { actualizado_en: new Date().toISOString() };
+           
+           if (datos.nombre) updateData.nombre = datos.nombre;
+           if (datos.edad) updateData.edad = datos.edad;
+           if (datos.nivel) updateData.nivel = datos.nivel;
+           if (datos.categoria_edad) {
+             updateData.notas = (prosExist.notas ? prosExist.notas + '\n' : '') + `Categoría: ${datos.categoria_edad}`;
+           }
+           if (datos.lead_score) updateData.lead_score = datos.lead_score;
+           if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+           
+           await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
         }
 
         // 6. Enviar a Meta (CON LÓGICA DE REINTENTO DE MÉXICO 🇲🇽)
-        // Construir URL base para las imágenes si hay una en los datos
         let imagenUrl = null
         if (datos && datos.imagen) {
           const origin = new URL(solicitud.url).origin
           imagenUrl = `${origin}/cursos/${datos.imagen}`
         }
 
-        const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl)
+        const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, datos?.opciones)
         
         if (enviadoCorrectamente) {
-           await supabase.from('mensajes').insert({ conversacion_id: convExist.id, remitente: 'bot', contenido: respuesta })
+           await supabase.from('mensajes').insert({ 
+             conversacion_id: convExist.id, 
+             remitente: 'bot', 
+             contenido: respuesta,
+             tipo: imagenUrl ? 'imagen' : 'texto',
+             url_archivo: imagenUrl || null
+           })
            await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
         }
       }
@@ -97,7 +119,7 @@ export async function POST(solicitud) {
   }
 }
 
-async function enviarMensajeWhatsApp(to, mensaje, imagen = null) {
+async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null) {
   const token = process.env.META_WHATSAPP_TOKEN
   const phoneId = process.env.META_PHONE_NUMBER_ID
   const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`
@@ -109,9 +131,18 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null) {
 
   if (imagen) {
     payload.type = "image"
-    payload.image = {
-      link: imagen,
-      caption: mensaje
+    payload.image = { link: imagen, caption: mensaje }
+  } else if (opciones && opciones.length > 0) {
+    payload.type = "interactive"
+    payload.interactive = {
+      type: "button",
+      body: { text: mensaje },
+      action: {
+        buttons: opciones.slice(0, 3).map((opt, i) => ({
+          type: "reply",
+          reply: { id: `btn_${i}`, title: opt.substring(0, 20) }
+        }))
+      }
     }
   } else {
     payload.type = "text"

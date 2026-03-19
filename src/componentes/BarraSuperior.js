@@ -28,8 +28,8 @@ export default function BarraSuperior() {
 
   const titulosDeRutas = {
     '/': 'Panel Principal',
-    '/crm': 'CRM y Prospectos',
-    '/calendario': 'Calendario de Citas',
+    '/prospectos': 'CRM y Prospectos',
+    '/citas': 'Calendario de Citas',
     '/cursos': 'Gestión de Cursos',
     '/campanas': 'Campañas de Marketing',
     '/configuracion': 'Configuración de Canales',

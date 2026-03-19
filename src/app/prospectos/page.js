@@ -9,6 +9,8 @@ const camposProspecto = [
   { nombre: 'correo', etiqueta: 'Correo electrónico', tipo: 'email', placeholder: 'ejemplo@correo.com', requerido: false },
   { nombre: 'telefono', etiqueta: 'Teléfono', tipo: 'tel', placeholder: '+52 555 123 4567', requerido: false },
   { nombre: 'curso_interes', etiqueta: 'Curso de interés', tipo: 'text', placeholder: 'Ej: Inglés de Negocios', requerido: false },
+  { nombre: 'edad', etiqueta: 'Edad (años)', tipo: 'number', placeholder: 'Ej: 12', requerido: false },
+  { nombre: 'nivel', etiqueta: 'Nivel', tipo: 'text', placeholder: 'Ej: Básico A1', requerido: false },
   {
     nombre: 'estado', etiqueta: 'Estado', tipo: 'select', requerido: false,
     opciones: [
@@ -171,15 +173,18 @@ export default function PaginaProspectos() {
               <tr className="bg-slate-50/50">
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Identidad</th>
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Contacto</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Curso de Interés</th>
+                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Perfil / Interés</th>
+                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Lead Score</th>
                 <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Estado</th>
                 <th className="px-6 py-5 text-right text-[11px] font-bold uppercase tracking-widest text-slate-400">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {cargando ? (
-                <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">Cargando prospectos...</td></tr>
-              ) : datosMostrar.map((prospecto, indice) => (
+                <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">Cargando prospectos...</td></tr>
+              ) : prospectos.length === 0 ? (
+                <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">No hay prospectos registrados.</td></tr>
+              ) : prospectos.map((prospecto, indice) => (
                 <tr key={prospecto.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-4 border-l-4 border-transparent group-hover:border-blue-200 pl-2 transition-all">
@@ -201,9 +206,27 @@ export default function PaginaProspectos() {
                     </div>
                   </td>
                   <td className="px-6 py-5">
-                    <div className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold">
-                      {prospecto.curso_interes || 'Sin especificar'}
+                    <div className="flex flex-col gap-1">
+                      <div className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold w-fit">
+                        {prospecto.curso_interes || 'Sin especificar'}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">
+                        {prospecto.edad || '??'} años • {prospecto.nivel || '??'}
+                      </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    {prospecto.lead_score ? (
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-black ${
+                        prospecto.lead_score === 'CALIENTE' ? 'bg-red-100 text-red-600' :
+                        prospecto.lead_score === 'TIBIO' ? 'bg-amber-100 text-amber-600' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {prospecto.lead_score}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300 text-xs">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-5">
                     <Etiqueta estado={prospecto.estado} />

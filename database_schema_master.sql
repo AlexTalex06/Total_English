@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS prospectos (
   telefono TEXT,
   estado TEXT DEFAULT 'nuevo' CHECK (estado IN ('nuevo','en_proceso','contactado','agendado','cerrado')),
   curso_interes TEXT,
+  edad TEXT,
+  nivel TEXT,
+  horario TEXT,
+  lead_score TEXT,
+  categoria_urgencia TEXT,
   notas TEXT,
   creado_en TIMESTAMPTZ DEFAULT NOW(),
   actualizado_en TIMESTAMPTZ DEFAULT NOW()

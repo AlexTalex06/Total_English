@@ -97,15 +97,8 @@ export default function PaginaCitas() {
   const mesAnterior = () => setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() - 1))
   const mesSiguiente = () => setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() + 1))
 
-  // Citas de ejemplo
-  const citasEjemplo = [
-    { id: '1', prospectos: { nombre: 'Sara García' }, fecha: new Date().toISOString().split('T')[0], hora: '09:30', tipo: 'Preparación IELTS Intensiva', estado: 'confirmada' },
-    { id: '2', prospectos: { nombre: 'Marcos Torres' }, fecha: new Date().toISOString().split('T')[0], hora: '11:15', tipo: 'Inglés de Negocios Avanzado', estado: 'confirmada' },
-    { id: '3', prospectos: { nombre: 'Juliana Méndez' }, fecha: new Date().toISOString().split('T')[0], hora: '14:00', tipo: 'Inglés General (Examen de Ubicación)', estado: 'pendiente' },
-    { id: '4', prospectos: { nombre: 'David Chen' }, fecha: new Date().toISOString().split('T')[0], hora: '16:45', tipo: 'Sesión Estrategia TOEFL', estado: 'confirmada' },
-  ]
-
-  const datosMostrar = citas.length > 0 ? citas : citasEjemplo
+  // Datos a mostrar
+  const datosMostrar = citas
 
   const citasHoy = datosMostrar.filter(c => c.fecha === new Date().toISOString().split('T')[0])
 

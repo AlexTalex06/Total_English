@@ -146,10 +146,18 @@ export default function PaginaInbox() {
           <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
             {mensajes.map((msj) => {
               const soyYo = msj.remitente === 'humano' || msj.remitente === 'bot'
+              const esImagen = msj.tipo === 'imagen' || msj.url_archivo
               return (
                 <div key={msj.id} className={`flex w-full ${soyYo ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-[14px] shadow-sm ${soyYo ? 'bg-[#00a884] text-white rounded-tr-none' : 'bg-slate-100 text-slate-700 rounded-tl-none'}`}>
-                    <p className="whitespace-pre-wrap">{msj.contenido}</p>
+                    {esImagen ? (
+                      <div className="flex flex-col gap-2">
+                        <img src={msj.url_archivo} alt="Imagen" className="rounded-lg max-w-full h-auto cursor-pointer border border-white/20" onClick={() => window.open(msj.url_archivo)} />
+                        {msj.contenido && <p className="whitespace-pre-wrap">{msj.contenido}</p>}
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msj.contenido}</p>
+                    )}
                     <span className="text-[9px] block text-right mt-1 opacity-60">{new Date(msj.creado_en).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
                   </div>
                 </div>
@@ -174,6 +182,11 @@ export default function PaginaInbox() {
             <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-4xl text-slate-300 font-bold mb-4 uppercase">{chatActivo.prospectos?.nombre?.[0] || '?'}</div>
             <h3 className="text-[20px] font-bold text-[#1e293b]">{chatActivo.prospectos?.nombre || 'Prospecto'}</h3>
             <p className="text-[13px] text-slate-400">{chatActivo.id_plataforma}</p>
+            {chatActivo.prospectos?.lead_score && (
+              <div className={`mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase ${chatActivo.prospectos.lead_score === 'CALIENTE' ? 'bg-red-100 text-red-600' : chatActivo.prospectos.lead_score === 'TIBIO' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'}`}>
+                Lead {chatActivo.prospectos.lead_score}
+              </div>
+            )}
           </div>
           <div className="p-6 space-y-6">
             <div>
@@ -188,8 +201,14 @@ export default function PaginaInbox() {
                     <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.curso_interes || 'No especificado'}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[12px] text-slate-400">Edad detectada</span>
+                    <span className="text-[12px] text-slate-400">Edad</span>
                     <span className="text-[14px] font-semibold text-[#1e293b]">{chatActivo.prospectos?.edad || 'Indeterminada'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[12px] text-slate-400">Nivel / Horario</span>
+                    <span className="text-[14px] font-semibold text-[#1e293b]">
+                      {chatActivo.prospectos?.nivel || 'N/A'} - {chatActivo.prospectos?.horario || 'N/A'}
+                    </span>
                   </div>
                </div>
             </div>

@@ -28,23 +28,16 @@ export default function PaginaPanel() {
     cargarDatos()
   }, [])
 
-  const prospectosNuevos = prospectos.filter(p => p.estado === 'nuevo').length
-  const citasHoy = citas.filter(c => c.fecha === new Date().toISOString().split('T')[0]).length
-
-  const actividadReciente = prospectos.slice(0, 4).map(p => ({
-    nombre: p.nombre,
-    detalle: `Interesado en ${p.curso_interes || 'curso general'}`,
+  const actividadReciente = prospectos.slice(0, 5).map(p => ({
+    nombre: `Nuevo prospecto: ${p.nombre}`,
+    detalle: p.curso_interes ? `Interesado en ${p.curso_interes}` : 'Interesado en cursos de inglés',
     tiempo: obtenerTiempoRelativo(p.creado_en),
-    icono: 'person',
+    icono: 'person_add',
     color: 'blue'
   }))
 
-  // Actividad de ejemplo si no hay datos reales
   const actividadMostrar = actividadReciente.length > 0 ? actividadReciente : [
-    { nombre: 'Nuevo prospecto: María López', detalle: 'Interesada en Inglés de Negocios', tiempo: 'Hace 2 min', icono: 'person', color: 'blue' },
-    { nombre: 'Cita confirmada: Juan Pérez', detalle: 'Examen de ubicación oral', tiempo: 'Hace 45 min', icono: 'check_circle', color: 'green' },
-    { nombre: 'Consulta recibida: Ana García', detalle: 'Pregunta sobre programas intensivos de verano', tiempo: 'Hace 1 hora', icono: 'mail', color: 'orange' },
-    { nombre: 'Nueva sesión de chat: Elena Rossi', detalle: 'Solicita soporte técnico para acceso LMS', tiempo: 'Hace 2 horas', icono: 'chat', color: 'slate' },
+    { nombre: 'Sin actividad reciente', detalle: 'Los nuevos prospectos aparecerán aquí', tiempo: '', icono: 'info', color: 'slate' }
   ]
 
   return (
