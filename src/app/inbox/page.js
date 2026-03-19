@@ -12,9 +12,7 @@ export default function PaginaInbox() {
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [cargando, setCargando] = useState(true)
   const [modalNuevoChat, setModalNuevoChat] = useState(false)
-  const [modalEditarCRM, setModalEditarCRM] = useState(false)
 
-  // Referencias para evitar re-suscripciones constantes
   const chatActivoRef = useRef(null)
   const cargarMensajesRef = useRef(null)
   const cargarConversacionesRef = useRef(null)
@@ -44,36 +42,44 @@ export default function PaginaInbox() {
     setCargando(false)
   }, [cargarMensajes])
 
-  // Sincronizar funciones en refs
   useEffect(() => {
     cargarMensajesRef.current = cargarMensajes
     cargarConversacionesRef.current = cargarConversaciones
   })
 
-  // SUSCRIPCIÓN ÚNICA Y PERSISTENTE
+  // 📡 SISTEMA HÍBRIDO: Realtime + Polling (Respaldo)
   useEffect(() => {
     cargarConversacionesRef.current?.()
 
-    console.log("📡 Suscribiendo canal persistente...")
-    const channel = supabase.channel('global_chat_channel')
+    // 1. Realtime
+    const channel = supabase.channel('inbox_master')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversaciones' }, () => {
-        console.log("🔄 Actualizando conversaciones (Realtime)")
         cargarConversacionesRef.current?.()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, (payload) => {
-        console.log("📩 Nuevo mensaje (Realtime):", payload.new.contenido)
         cargarConversacionesRef.current?.()
         if (chatActivoRef.current && payload.new.conversacion_id === chatActivoRef.current.id) {
           cargarMensajesRef.current?.(chatActivoRef.current.id)
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log("📶 Status Realtime:", status)
+      })
+
+    // 2. Polling Fallback (Cada 5 segundos por si el socket falla)
+    const interval = setInterval(() => {
+      console.log("⏱️ Polling de seguridad...")
+      cargarConversacionesRef.current?.()
+      if (chatActivoRef.current) {
+        cargarMensajesRef.current?.(chatActivoRef.current.id)
+      }
+    }, 5000)
 
     return () => {
-      console.log("🛑 Limpiando canal persistente")
       supabase.removeChannel(channel)
+      clearInterval(interval)
     }
-  }, []) // SIN DEPENDENCIAS: No se reinicia nunca
+  }, [])
 
   const enviarMensaje = async (e) => {
     e.preventDefault()
@@ -100,13 +106,14 @@ export default function PaginaInbox() {
   }
 
   const conversacionesFiltradas = conversaciones.filter(c => 
-    (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || c.id_plataforma.includes(filtroBusqueda)
+    (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
+    c.id_plataforma.includes(filtroBusqueda)
   )
 
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2 h-full"><span className="material-symbols-outlined animate-spin">refresh</span> Conectando Inbox...</div>
 
   return (
-    <div className="h-[calc(100vh-65px)] w-full flex overflow-hidden bg-white font-sans">
+    <div className="h-[calc(100vh-65px)] w-full flex overflow-hidden bg-white font-sans border-t border-slate-100">
       {/* Sidebar */}
       <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[420px] bg-white border-r border-slate-200 flex-col h-full shrink-0 shadow-sm`}>
         <div className="p-4 flex items-center justify-between border-b border-slate-50">
@@ -129,18 +136,18 @@ export default function PaginaInbox() {
         </div>
       </div>
 
-      {/* Main Area */}
+      {/* Main AREA */}
       {chatActivo ? (
         <div className="flex-1 flex flex-col h-full bg-[#efeae2]">
-          <div className="h-[65px] flex items-center justify-between px-6 bg-white border-b border-slate-100 shadow-sm z-10">
+          <div className="h-[65px] flex items-center justify-between px-6 bg-white border-b border-slate-100 shadow-sm z-10 transition-all">
             <div className="flex items-center gap-3">
               <button onClick={() => setChatActivo(null)} className="md:hidden material-symbols-outlined">arrow_back</button>
               <div className="flex flex-col">
                 <span className="font-bold text-[#1e293b]">{chatActivo.prospectos?.nombre || chatActivo.id_plataforma}</span>
-                <span className="text-[11px] text-green-500 font-bold uppercase tracking-widest">En Línea</span>
+                <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">● En Línea</span>
               </div>
             </div>
-            <button onClick={() => setChatActivo(null)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold text-white ${chatActivo.asignado_a_humano ? 'bg-amber-500' : 'bg-green-600'}`}>
+            <button className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold text-white shadow-sm ${chatActivo.asignado_a_humano ? 'bg-amber-500' : 'bg-green-600'}`}>
               {chatActivo.asignado_a_humano ? 'ASESOR HUMANO' : 'IA ALEX ACTIVA'}
             </button>
           </div>
@@ -157,18 +164,18 @@ export default function PaginaInbox() {
                 </div>
               )
             })}
-            <div ref={x => { if(x) x.scrollIntoView({behavior:'smooth'}) }}></div>
+            <div ref={el => { if(el) el.scrollIntoView({behavior:'smooth'}) }}></div>
           </div>
 
           <form onSubmit={enviarMensaje} className="p-4 bg-white flex gap-3 items-center border-t border-slate-50">
-             <textarea value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }} placeholder="Escribe un mensaje..." className="flex-1 bg-slate-50 rounded-2xl p-3 outline-none resize-none text-[14px]" rows={1} />
-             <button type="submit" className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center material-symbols-outlined">send</button>
+             <textarea value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }} placeholder="Escribe un mensaje..." className="flex-1 bg-slate-50 rounded-3xl p-3 px-5 outline-none resize-none text-[14px] shadow-inner" rows={1} />
+             <button type="submit" className="w-11 h-11 rounded-full bg-[#00a884] text-white flex items-center justify-center material-symbols-outlined shadow-lg hover:scale-105 transition-transform">send</button>
           </form>
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-          <span className="material-symbols-outlined text-6xl mb-4">forum</span>
-          <p>Selecciona una conversación para comenzar</p>
+          <span className="material-symbols-outlined text-7xl mb-4 opacity-20">chat_bubble</span>
+          <p className="font-medium">Selecciona un chat para comenzar</p>
         </div>
       )}
     </div>
