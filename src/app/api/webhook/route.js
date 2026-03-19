@@ -74,6 +74,14 @@ export async function POST(solicitud) {
         }))
 
         const { respuesta, datos, intencion } = await consultarAlex(historialFormat, nombrePerfil, 'WhatsApp')
+        
+        // Evitar bucles: si la respuesta es idéntica a la última del bot, no enviarla o pedir variación
+        const ultimaRespuestaBot = (historialRaw || []).find(m => m.remitente === 'bot')?.contenido;
+        if (respuesta === ultimaRespuestaBot && intencion !== 'CIERRE') {
+          console.log(`⚠️ Respuesta repetida detectada para ${remitenteId}. Ignorando para evitar bucle.`);
+          return NextResponse.json({ estado: 'repetido' }, { status: 200 });
+        }
+
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
         
         // 5. Actualizar CRM
