@@ -190,10 +190,10 @@ export default function PaginaProspectos() {
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-4 border-l-4 border-transparent group-hover:border-blue-200 pl-2 transition-all">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${coloresAvatar[indice % coloresAvatar.length]}`}>
-                        {obtenerIniciales(prospecto.nombre)}
+                        {obtenerIniciales(prospecto.nombre_alumno || prospecto.nombre)}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-[#191c1d]">{prospecto.nombre}</span>
+                        <span className="text-sm font-bold text-[#191c1d]">{prospecto.nombre_alumno || prospecto.nombre}</span>
                         <span className="text-[11px] text-slate-400 uppercase tracking-tighter">
                           {prospecto.creado_en ? `Registrado ${obtenerTiempoRelativo(prospecto.creado_en)}` : ''}
                         </span>

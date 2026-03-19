@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 const elementosNavegacion = [
   { nombre: 'Panel', ruta: '/', icono: 'dashboard' },
@@ -15,6 +17,22 @@ const elementosNavegacion = [
 
 export default function BarraLateral() {
   const rutaActual = usePathname()
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+       const { count } = await supabase.from('mensajes').select('*', { count: 'exact', head: true }).eq('leido', false).eq('remitente', 'prospecto')
+       setMensajesNoLeidos(count || 0)
+    }
+    fetchUnread()
+    
+    const channel = supabase.channel('global_unread')
+       .on('postgres_changes', { event: '*', schema: 'public', table: 'mensajes' }, () => {
+          fetchUnread()
+       }).subscribe()
+       
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   return (
     <>
@@ -49,7 +67,12 @@ export default function BarraLateral() {
                 >
                   {elemento.icono}
                 </span>
-                <span>{elemento.nombre}</span>
+                <span className="flex-1">{elemento.nombre}</span>
+                {elemento.nombre === 'Inbox' && mensajesNoLeidos > 0 && (
+                   <span className="bg-[#25D366] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-sm">
+                      {mensajesNoLeidos}
+                   </span>
+                )}
               </Link>
             )
           })}
@@ -80,7 +103,14 @@ export default function BarraLateral() {
                   : 'text-slate-400'
               }`}
             >
-              <span className="material-symbols-outlined text-xl">{elemento.icono}</span>
+              <span className="material-symbols-outlined text-xl relative">
+                 {elemento.icono}
+                 {elemento.nombre === 'Inbox' && mensajesNoLeidos > 0 && (
+                    <span className="absolute -top-1 -right-2 bg-[#25D366] text-white text-[8px] font-bold px-1 py-0.5 rounded-full shadow-sm">
+                       {mensajesNoLeidos}
+                    </span>
+                 )}
+              </span>
               <span className="text-[9px] font-semibold uppercase tracking-wider">{elemento.nombre}</span>
             </Link>
           )
