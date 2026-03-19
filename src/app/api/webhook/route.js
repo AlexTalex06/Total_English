@@ -108,8 +108,8 @@ export async function POST(solicitud) {
            await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
         }
 
-        // 6. Lógica de Citas (Si la intención es CIERRE)
-        if (intencion === 'CIERRE') {
+        // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
+        if (intencion === 'CIERRE_CITA') {
           await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
           // Crear cita tentativa para hoy + 1 hora
           const fechaCita = new Date()
