@@ -136,12 +136,39 @@ export async function POST(solicitud) {
           
           try {
             let respuestaIA = await consultarAlex(historialOrdenado, nombrePerfil, 'WhatsApp')
-            console.log(`✨ Respuesta de Alex: "${respuestaIA.substring(0, 50)}..."`)
-            
             let tipoEnvio = 'text'
             let imageUrl = null
 
-            // Parseo de los Secret Tokens
+            // --- EXTRACCIÓN DE METADATOS PARA CRM ---
+            const regexMetadata = /\[\[EXTRACTED_DATA:\s*({.*?})\]\]/gs
+            const matchMetadata = regexMetadata.exec(respuestaIA)
+            
+            if (matchMetadata) {
+              try {
+                const jsonStr = matchMetadata[1]
+                const dataExtraida = JSON.parse(jsonStr)
+                console.log('📊 Datos detectados por Alex:', dataExtraida)
+
+                // Limpiar valores null o "null" para no sobreescribir con basura
+                const updates = {}
+                if (dataExtraida.nombre && dataExtraida.nombre !== 'null' && dataExtraida.nombre !== 'valor o null') updates.nombre = dataExtraida.nombre
+                if (dataExtraida.edad && !isNaN(dataExtraida.edad)) updates.edad = parseInt(dataExtraida.edad)
+                if (dataExtraida.curso_interes && dataExtraida.curso_interes !== 'null') updates.curso_interes = dataExtraida.curso_interes
+                if (dataExtraida.nivel && dataExtraida.nivel !== 'null') updates.nivel = dataExtraida.nivel
+
+                if (Object.keys(updates).length > 0) {
+                  await supabase.from('prospectos').update(updates).eq('id', conversacion.prospecto_id)
+                  console.log('✅ CRM Actualizado automáticamente.')
+                }
+              } catch (e) {
+                console.error('❌ Error parseando metadatos de Alex:', e)
+              }
+              // Limpiar la etiqueta del mensaje final
+              respuestaIA = respuestaIA.replace(regexMetadata, '').trim()
+            }
+            // ----------------------------------------
+
+            // Parseo de los Secret Tokens (Imágenes)
             const originHost = solicitud.headers.get('host')
             const protocolo = originHost?.includes('localhost') ? 'http' : 'https'
             const baseUrl = `${protocolo}://${originHost}`

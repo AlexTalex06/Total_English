@@ -142,6 +142,7 @@ export default function PaginaCursos() {
           <div key={curso.id} className="group bg-white rounded-3xl overflow-hidden shadow-[0_24px_48px_-12px_rgba(0,35,111,0.08)] hover:translate-y-[-4px] transition-all duration-300">
             <div className="relative h-48 overflow-hidden bg-slate-200">
               {curso.imagen_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   alt={curso.nombre}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"

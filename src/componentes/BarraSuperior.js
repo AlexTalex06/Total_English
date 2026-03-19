@@ -77,7 +77,7 @@ export default function BarraSuperior() {
               <div className="px-4 py-3 pb-2 text-xs font-bold uppercase text-slate-400">Resultados</div>
               <div className="px-4 py-6 flex flex-col items-center justify-center text-center">
                 <span className="material-symbols-outlined text-slate-300 text-3xl mb-2">search_off</span>
-                <p className="text-sm text-slate-500 font-medium">No se encontraron resultados para "{busqueda}"</p>
+                <p className="text-sm text-slate-500 font-medium">No se encontraron resultados para &quot;{busqueda}&quot;</p>
                 <p className="text-xs text-slate-400 mt-1">Intenta con otro nombre o teléfono</p>
               </div>
             </div>

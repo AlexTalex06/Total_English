@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import ModalFormulario from '@/componentes/ModalFormulario'
 
@@ -13,6 +13,7 @@ export default function PaginaInbox() {
   const [modalNuevoChat, setModalNuevoChat] = useState(false)
   const [modalEditarCRM, setModalEditarCRM] = useState(false)
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todos')
   const [mostrandoPerfil, setMostrandoPerfil] = useState(true)
   const [simulandoIA, setSimulandoIA] = useState(false)
   const [cargando, setCargando] = useState(true)
@@ -64,16 +65,15 @@ export default function PaginaInbox() {
       supabase.removeChannel(suscripcionRealtime)
       clearInterval(intervalId)
     }
-  }, []) // Solo al montar
+  }, [cargarConversaciones, cargarMensajes]) // Solo al montar
 
-  // Otro efecto para cargar mensajes cuando cambia el chat activo
   useEffect(() => {
     if (chatActivo) {
       cargarMensajes(chatActivo.id)
     }
-  }, [chatActivo?.id])
+  }, [chatActivo, cargarMensajes])
 
-  const cargarConversaciones = async () => {
+  const cargarConversaciones = useCallback(async () => {
     const { data: convs, error } = await supabase
       .from('conversaciones')
       .select('*, prospectos(*)')
@@ -81,18 +81,18 @@ export default function PaginaInbox() {
 
     if (!error && convs) {
       setConversaciones(convs)
-      if (!chatActivo && convs.length > 0) {
+      if (!chatActivoRef.current && convs.length > 0) {
         setChatActivo(convs[0])
         cargarMensajes(convs[0].id)
-      } else if (chatActivo) {
-        const actualizado = convs.find(c => c.id === chatActivo.id)
+      } else if (chatActivoRef.current) {
+        const actualizado = convs.find(c => c.id === chatActivoRef.current.id)
         if (actualizado) setChatActivo(actualizado)
       }
     }
     setCargando(false)
-  }
+  }, [cargarMensajes]) // Dependencias mínimas
 
-  const cargarMensajes = async (conversacionId) => {
+  const cargarMensajes = useCallback(async (conversacionId) => {
     const { data: msjs } = await supabase
       .from('mensajes')
       .select('*')
@@ -100,7 +100,7 @@ export default function PaginaInbox() {
       .order('creado_en', { ascending: true })
 
     if (msjs) setMensajes(msjs)
-  }
+  }, [])
 
   useEffect(() => {
     if (finalChatRef.current) {
@@ -291,10 +291,12 @@ export default function PaginaInbox() {
     }
   }
 
-  const conversacionesFiltradas = conversaciones.filter(c => 
-    (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
-    c.id_plataforma.includes(filtroBusqueda)
-  )
+  const conversacionesFiltradas = conversaciones.filter(c => {
+    const cumpleBusqueda = (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
+                           c.id_plataforma.includes(filtroBusqueda)
+    const cumpleEstado = filtroEstado === 'todos' || c.prospectos?.estado === filtroEstado
+    return cumpleBusqueda && cumpleEstado
+  })
 
   if (cargando) return <div className="p-10 flex text-[#1e3a8a] items-center gap-2 h-full"><span className="material-symbols-outlined animate-spin">refresh</span> Reconectando Inbox...</div>
 
@@ -327,6 +329,22 @@ export default function PaginaInbox() {
               onChange={(e) => setFiltroBusqueda(e.target.value)}
             />
           </div>
+          
+          {/* Pastillas de filtro por estado */}
+          <div className="flex gap-2 overflow-x-auto mt-3 pb-1 no-scrollbar scroll-smooth">
+            {['todos', 'nuevo', 'interesado', 'agendado'].map(estado => {
+              const activo = filtroEstado === estado
+              return (
+                <button 
+                  key={estado}
+                  onClick={() => setFiltroEstado(estado)}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap border transition-all shadow-sm ${activo ? 'bg-[#00a884] text-white border-transparent' : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'}`}
+                >
+                  {estado}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto bg-white">
@@ -349,7 +367,11 @@ export default function PaginaInbox() {
                     <p className="text-[14px] truncate text-[#667781] leading-tight pr-4">
                       {conv.ultimo_mensaje || 'Sin mensajes aún'}
                     </p>
-                    {conv.estado === 'cerrado' && <span className="bg-red-50 text-red-500 border border-red-100 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">Cerrado</span>}
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm border border-white ${
+                      conv.prospectos?.estado === 'nuevo' ? 'bg-blue-400' : 
+                      conv.prospectos?.estado === 'interesado' ? 'bg-amber-400' : 
+                      conv.prospectos?.estado === 'agendado' ? 'bg-green-400' : 'bg-slate-200'
+                    }`}></div>
                   </div>
                 </div>
               </div>
@@ -380,15 +402,6 @@ export default function PaginaInbox() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={simularRespuestaAI} 
-                  disabled={simulandoIA}
-                  className="p-2 rounded-full hover:bg-blue-50 text-blue-400 transition-all material-symbols-outlined text-[20px]"
-                  title="Simular mensaje entrante"
-                >
-                  {simulandoIA ? 'sync' : 'science'}
-                </button>
-
                 <button onClick={cambiarEstadoBot} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-bold transition-all shadow-lg active:scale-95 ${chatActivo.asignado_a_humano ? 'bg-amber-500 text-white shadow-amber-100' : 'bg-[#00a884] text-white shadow-green-100'}`}>
                   <span className="material-symbols-outlined text-[18px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
                   {chatActivo.asignado_a_humano ? 'ASESOR HUMANO' : 'IA ALEX ACTIVA'}
@@ -419,6 +432,7 @@ export default function PaginaInbox() {
                       </div>
 
                       {msj.tipo === 'imagen' && msj.url_archivo && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <div className="mt-2 mb-4 rounded-xl border-2 border-white/20 overflow-hidden shadow-lg"><img src={msj.url_archivo} alt="Adjunto" className="max-w-xs h-auto cursor-zoom-in" onClick={()=>window.open(msj.url_archivo, '_blank')}/></div>
                       )}
                     </div>
@@ -500,7 +514,7 @@ export default function PaginaInbox() {
       ) : (
         <div className="flex-1 hidden md:flex flex-col items-center justify-center bg-[#f0f2f5] p-10 text-center border-l border-[#d1d7db]">
           <h2 className="text-[32px] font-light text-[#41525d] mb-4">Total English Inbox</h2>
-          <p className="text-[#667781] text-[14px] leading-relaxed max-w-[400px]">Envía y recibe mensajes de prospectos conectando directamente tu teléfono o redes sociales.<br/>Aprovecha el "Cerebro de Alex" para auto-responder.</p>
+          <p className="text-[#667781] text-[14px] leading-relaxed max-w-[400px]">Envía y recibe mensajes de prospectos conectando directamente tu teléfono o redes sociales.<br/>Aprovecha el &quot;Cerebro de Alex&quot; para auto-responder.</p>
           <div className="mt-10 flex items-center gap-2 text-[#8696a0] text-[13px]">
             <span className="material-symbols-outlined text-[16px]">lock</span>
             Cifrado de extremo a extremo
@@ -512,11 +526,11 @@ export default function PaginaInbox() {
         <ModalFormulario 
           titulo="Nuevo Mensaje de WhatsApp"
           campos={[
-            { id: 'nombre', label: 'Nombre del prospecto', tipo: 'text', placeholder: 'Ej. Juan Pérez' },
-            { id: 'telefono', label: 'Número de WhatsApp (ej. 521234567890)', tipo: 'text', placeholder: 'Ej. 525512345678' },
-            { id: 'usa_plantilla', label: '¿Forzar plantilla aprobada? (Regla de 24 horas de Meta Meta)', tipo: 'select', opciones: ['no', 'si'] },
-            { id: 'nombre_plantilla', label: 'Nombre de plantilla (Solo si eligió "si" arriba)', tipo: 'text', placeholder: 'Ej. bienvenida_curso' },
-            { id: 'mensaje_inicial', label: 'Mensaje libre (Solo si eligió "no" arriba)', tipo: 'textarea', placeholder: '¡Hola! Te escribimos de Total English...' }
+            { nombre: 'nombre', etiqueta: 'Nombre del prospecto', tipo: 'text', placeholder: 'Ej. Juan Pérez' },
+            { nombre: 'telefono', etiqueta: 'Número de WhatsApp (ej. 521234567890)', tipo: 'text', placeholder: 'Ej. 525512345678' },
+            { nombre: 'usa_plantilla', etiqueta: '¿Forzar plantilla aprobada? (Regla de 24 horas de Meta Meta)', tipo: 'select', opciones: [{valor: 'no', etiqueta: 'No'}, {valor: 'si', etiqueta: 'Sí'}] },
+            { nombre: 'nombre_plantilla', etiqueta: 'Nombre de plantilla (Solo si eligió "si" arriba)', tipo: 'text', placeholder: 'Ej. bienvenida_curso' },
+            { nombre: 'mensaje_inicial', etiqueta: 'Mensaje libre (Solo si eligió "no" arriba)', tipo: 'textarea', placeholder: '¡Hola! Te escribimos de Total English...' }
           ]}
           alEnviar={iniciarNuevoChat}
           alCerrar={() => setModalNuevoChat(false)}
@@ -527,9 +541,9 @@ export default function PaginaInbox() {
         <ModalFormulario 
           titulo="Actualizar Ficha (CRM)"
           campos={[
-            { id: 'nombre', label: 'Nombre Completo', tipo: 'text', valorInicial: chatActivo.prospectos?.nombre },
-            { id: 'curso_interes', label: 'Curso de Interés', tipo: 'select', opciones: ['Diplomado Children', 'Diplomado Pre-Teens', 'Young & Professionals', 'My Time English', 'Otro'], valorInicial: chatActivo.prospectos?.curso_interes },
-            { id: 'estado', label: 'Fase de Venta', tipo: 'select', opciones: ['nuevo', 'en_proceso', 'contactado', 'agendado', 'cerrado'], valorInicial: chatActivo.prospectos?.estado }
+            { nombre: 'nombre', etiqueta: 'Nombre Completo', tipo: 'text', valorInicial: chatActivo.prospectos?.nombre },
+            { nombre: 'curso_interes', etiqueta: 'Curso de Interés', tipo: 'select', opciones: [{valor: 'Diplomado Children', etiqueta: 'Diplomado Children'}, {valor: 'Diplomado Pre-Teens', etiqueta: 'Diplomado Pre-Teens'}, {valor: 'Young & Professionals', etiqueta: 'Young & Professionals'}, {valor: 'My Time English', etiqueta: 'My Time English'}, {valor: 'Otro', etiqueta: 'Otro'}], valorInicial: chatActivo.prospectos?.curso_interes },
+            { nombre: 'estado', etiqueta: 'Fase de Venta', tipo: 'select', opciones: [{valor: 'nuevo', etiqueta: 'Nuevo'}, {valor: 'en_proceso', etiqueta: 'En Proceso'}, {valor: 'contactado', etiqueta: 'Contactado'}, {valor: 'agendado', etiqueta: 'Agendado'}, {valor: 'cerrado', etiqueta: 'Cerrado'}], valorInicial: chatActivo.prospectos?.estado }
           ]}
           alEnviar={guardarEdicionCRM}
           alCerrar={() => setModalEditarCRM(false)}

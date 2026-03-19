@@ -105,7 +105,7 @@ export default function PaginaConfiguracion() {
                 {instagramConectado && <span className="text-[10px] uppercase font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">Conectado</span>}
               </div>
               <p className="text-sm text-slate-500 max-w-lg">
-                Atiende a las personas que te mandan DM's o responden a tus historias en la cuenta de Instagram.
+                Atiende a las personas que te mandan DM&apos;s o responden a tus historias en la cuenta de Instagram.
               </p>
             </div>
           </div>

@@ -48,6 +48,7 @@ export default function PaginaProspectos() {
 
   useEffect(() => {
     cargarProspectos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado])
 
   const crearProspecto = async (datos) => {
