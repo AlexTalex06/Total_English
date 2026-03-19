@@ -28,7 +28,7 @@ export default function PaginaInbox() {
   }, [])
 
   const cargarConversaciones = useCallback(async () => {
-    const { data, error } = await supabase.from('conversaciones').select('*, prospectos(*)').order('actualizado_en', { ascending: false })
+    const { data, error } = await supabase.from('conversaciones').select('*, prospectos(*), mensajes(id, leido, remitente)').order('actualizado_en', { ascending: false })
     if (!error && data) {
       setConversaciones(data)
       if (!chatActivoRef.current && data.length > 0) {
@@ -57,6 +57,13 @@ export default function PaginaInbox() {
         cargarConversacionesRef.current?.()
         if (chatActivoRef.current && payload.new.conversacion_id === chatActivoRef.current.id) {
           cargarMensajesRef.current?.(chatActivoRef.current.id)
+          if (payload.new.remitente === 'prospecto') {
+            fetch('/api/mensajes/leer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prospecto_id: chatActivoRef.current.prospectos?.id })
+            }).then(() => cargarConversacionesRef.current?.()).catch(console.error)
+          }
         }
       })
       .subscribe()
@@ -87,9 +94,20 @@ export default function PaginaInbox() {
     } catch (err) { console.error(err) }
   }
 
-  const cambiarChat = (c) => {
+  const cambiarChat = async (c) => {
     setChatActivo(c)
     cargarMensajes(c.id)
+    if (c.prospectos?.id) {
+       try {
+         await fetch('/api/mensajes/leer', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ prospecto_id: c.prospectos.id })
+         });
+         // Refrescar para limpiar contador
+         cargarConversacionesRef.current?.();
+       } catch (err) { console.error('Error marcando leido:', err) }
+    }
   }
 
   const conversacionesFiltradas = conversaciones.filter(c => 
@@ -119,7 +137,13 @@ export default function PaginaInbox() {
             <div key={conv.id} onClick={() => cambiarChat(conv)} className={`flex items-center gap-3 px-4 py-4 border-b border-slate-50 cursor-pointer ${chatActivo?.id === conv.id ? 'bg-[#f0f2f5]' : 'hover:bg-slate-50'}`}>
               <div className="w-12 h-12 rounded-full bg-[#1e293b] text-white flex items-center justify-center font-bold uppercase">{conv.prospectos?.nombre?.[0] || '?'}</div>
               <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline mb-0.5"><h3 className="text-[15px] font-semibold text-[#111b21] truncate">{conv.prospectos?.nombre || conv.id_plataforma}</h3></div>
+                <div className="flex justify-between items-baseline mb-0.5">
+                  <h3 className="text-[15px] font-semibold text-[#111b21] truncate">{conv.prospectos?.nombre || conv.id_plataforma}</h3>
+                  {(()=>{ 
+                    const unreadCount = conv.mensajes?.filter(m => !m.leido && m.remitente === 'prospecto').length || 0;
+                    return unreadCount > 0 ? <span className="bg-[#25D366] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-sm">{unreadCount}</span> : null;
+                  })()}
+                </div>
                 <p className="text-[13px] truncate text-slate-500">{conv.ultimo_mensaje || 'Conversación vacía'}</p>
               </div>
             </div>
