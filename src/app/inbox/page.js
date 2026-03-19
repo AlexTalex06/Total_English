@@ -21,6 +21,44 @@ export default function PaginaInbox() {
   const finalChatRef = useRef(null)
   const chatActivoRef = useRef(chatActivo)
 
+  // --- 1. DEFINICIÓN DE FUNCIONES (Hoisted safe area) ---
+
+  const cargarMensajes = useCallback(async (conversacionId) => {
+    const { data: msjs } = await supabase
+      .from('mensajes')
+      .select('*')
+      .eq('conversacion_id', conversacionId)
+      .order('creado_en', { ascending: true })
+
+    if (msjs) setMensajes(msjs)
+  }, [])
+
+  const cargarConversaciones = useCallback(async () => {
+    const { data: convs, error } = await supabase
+      .from('conversaciones')
+      .select('*, prospectos(*)')
+      .order('actualizado_en', { ascending: false })
+
+    if (!error && convs) {
+      setConversaciones(convs)
+      if (!chatActivoRef.current && convs.length > 0) {
+        setChatActivo(convs[0])
+        cargarMensajes(convs[0].id)
+      } else if (chatActivoRef.current) {
+        const actualizado = convs.find(c => c.id === chatActivoRef.current.id)
+        if (actualizado) setChatActivo(actualizado)
+      }
+    }
+    setCargando(false)
+  }, [cargarMensajes])
+
+  const cambiarChat = (conv) => {
+    setChatActivo(conv)
+    cargarMensajes(conv.id)
+  }
+
+  // --- 2. EFECTOS (Uso de funciones ya definidas) ---
+
   // Mantener la referencia actualizada para Realtime
   useEffect(() => {
     chatActivoRef.current = chatActivo
@@ -51,7 +89,6 @@ export default function PaginaInbox() {
         console.log('📡 Estado suscripción Supabase:', status)
       })
 
-    // Polling de seguridad cada 10 segundos (respaldo al Realtime)
     const intervalId = setInterval(() => {
       console.log('🔄 Ejecutando polling de seguridad...')
       cargarConversaciones()
@@ -65,7 +102,7 @@ export default function PaginaInbox() {
       supabase.removeChannel(suscripcionRealtime)
       clearInterval(intervalId)
     }
-  }, [cargarConversaciones, cargarMensajes]) // Solo al montar
+  }, [cargarConversaciones, cargarMensajes])
 
   useEffect(() => {
     if (chatActivo) {
@@ -73,45 +110,13 @@ export default function PaginaInbox() {
     }
   }, [chatActivo, cargarMensajes])
 
-  const cargarConversaciones = useCallback(async () => {
-    const { data: convs, error } = await supabase
-      .from('conversaciones')
-      .select('*, prospectos(*)')
-      .order('actualizado_en', { ascending: false })
-
-    if (!error && convs) {
-      setConversaciones(convs)
-      if (!chatActivoRef.current && convs.length > 0) {
-        setChatActivo(convs[0])
-        cargarMensajes(convs[0].id)
-      } else if (chatActivoRef.current) {
-        const actualizado = convs.find(c => c.id === chatActivoRef.current.id)
-        if (actualizado) setChatActivo(actualizado)
-      }
-    }
-    setCargando(false)
-  }, [cargarMensajes]) // Dependencias mínimas
-
-  const cargarMensajes = useCallback(async (conversacionId) => {
-    const { data: msjs } = await supabase
-      .from('mensajes')
-      .select('*')
-      .eq('conversacion_id', conversacionId)
-      .order('creado_en', { ascending: true })
-
-    if (msjs) setMensajes(msjs)
-  }, [])
-
   useEffect(() => {
     if (finalChatRef.current) {
       finalChatRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [mensajes])
 
-  const cambiarChat = (conv) => {
-    setChatActivo(conv)
-    cargarMensajes(conv.id)
-  }
+  // --- 3. LÓGICA DE INTERACCIÓN ---
 
   const enviarMensaje = async (e) => {
     e.preventDefault()
@@ -125,7 +130,6 @@ export default function PaginaInbox() {
     }
 
     try {
-      // 1. Enviar a Meta HTTP POST PRIMERO
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -133,25 +137,17 @@ export default function PaginaInbox() {
       })
 
       const datos = await res.json()
-      
-      if (!res.ok) {
-        throw new Error(datos.error || 'Fallo desconocido al contactar Meta')
-      }
+      if (!res.ok) throw new Error(datos.error || 'Fallo al contactar Meta')
 
-      // 2. Guardar localmente SOLO si Meta lo envió con éxito
       await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
 
-      // 3. Actualizar timestamp y último mensaje de conversación
       await supabase.from('conversaciones')
-        .update({ 
-          actualizado_en: new Date().toISOString(),
-          ultimo_mensaje: texto
-        })
+        .update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: texto })
         .eq('id', chatActivo.id)
       
     } catch (error) {
       console.error('Error enviando mensaje:', error)
-      alert(`Error al enviar mensaje a WhatsApp.\nCausa probable: ${error.message}\n(Revisa tus llaves de Vercel y recuerda la regla de 24 horas de Meta).`)
+      alert(`Error al enviar mensaje a WhatsApp: ${error.message}`)
     }
   }
 
@@ -175,9 +171,8 @@ export default function PaginaInbox() {
 
   const iniciarNuevoChat = async (datos) => {
     try {
-      // 1. Buscar si el prospecto ya existe para no chocar con Unique constraints
       let idProspecto = null;
-      const { data: prosExistente, error: errExist } = await supabase.from('prospectos').select('id').eq('telefono', datos.telefono).maybeSingle()
+      const { data: prosExistente } = await supabase.from('prospectos').select('id').eq('telefono', datos.telefono).maybeSingle()
       
       if (prosExistente) {
         idProspecto = prosExistente.id;
@@ -190,15 +185,13 @@ export default function PaginaInbox() {
         idProspecto = nuevoProspecto.id
       }
 
-      // 2. Buscar si la conversación ya existe
       let idConversacion = null;
       let convActual = null;
-      const { data: convExistente, error: errConvExist } = await supabase.from('conversaciones').select('*, prospectos(*)').eq('plataforma', 'whatsapp').eq('id_plataforma', datos.telefono).maybeSingle()
+      const { data: convExistente } = await supabase.from('conversaciones').select('*, prospectos(*)').eq('plataforma', 'whatsapp').eq('id_plataforma', datos.telefono).maybeSingle()
 
       if (convExistente) {
         idConversacion = convExistente.id;
         convActual = convExistente;
-        // Asignar a humano
         await supabase.from('conversaciones').update({ asignado_a_humano: true }).eq('id', idConversacion)
       } else {
         const { data: nuevaConv, error: errConv } = await supabase
@@ -210,7 +203,6 @@ export default function PaginaInbox() {
         convActual = nuevaConv
       }
 
-      // 3. Enviar a Meta PRIMERO
       const payloadMeta = {
         to: datos.telefono, 
         text: datos.usa_plantilla === 'si' ? undefined : datos.mensaje_inicial, 
@@ -227,11 +219,8 @@ export default function PaginaInbox() {
       const respuestaApi = await res.json()
       if (!res.ok) throw new Error(respuestaApi.error || 'Error de Meta API')
       
-      // 4. Si se envió con éxito, guardar en DB
       const textoMensaje = datos.usa_plantilla === 'si' ? `[Plantilla Meta]: ${datos.nombre_plantilla}` : datos.mensaje_inicial
       await supabase.from('mensajes').insert({ conversacion_id: idConversacion, remitente: 'humano', contenido: textoMensaje })
-      
-      // Actualizar último mensaje en la conversación
       await supabase.from('conversaciones').update({ ultimo_mensaje: textoMensaje }).eq('id', idConversacion)
       
       setModalNuevoChat(false)
@@ -263,34 +252,6 @@ export default function PaginaInbox() {
     }
   }
 
-  const simularRespuestaAI = async () => {
-    if (!chatActivo) return
-    setSimulandoIA(true)
-    try {
-      // Llamamos al webhook localmente con un fetch interno
-      await fetch('/api/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          object: 'whatsapp_business_account',
-          entry: [{
-            changes: [{
-              value: {
-                messages: [{ from: chatActivo.id_plataforma, text: { body: "Simulando interés" }, type: 'text', id: 'SIM_' + Date.now() }],
-                contacts: [{ profile: { name: chatActivo.prospectos?.nombre || 'Test' } }]
-              }
-            }]
-          }]
-        })
-      })
-      alert("Simulación enviada. Espera unos segundos a que Alex procese y recarga o espera el Realtime.")
-    } catch (err) {
-      alert("Error en simulación: " + err.message)
-    } finally {
-      setSimulandoIA(false)
-    }
-  }
-
   const conversacionesFiltradas = conversaciones.filter(c => {
     const cumpleBusqueda = (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
                            c.id_plataforma.includes(filtroBusqueda)
@@ -303,7 +264,7 @@ export default function PaginaInbox() {
   return (
     <div className="h-[calc(100vh-140px)] md:h-[calc(100vh-65px)] w-full flex overflow-hidden bg-[#f8f9fa] border-t border-slate-100 relative font-sans">
       
-      {/* 1. Lista Chats (Barra Izquierda Estilizada) */}
+      {/* 1. Lista Chats */}
       <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] lg:w-[420px] bg-white border-r border-slate-200 flex-col h-full z-10 shrink-0 shadow-sm`}>
         <div className="p-4 bg-white shrink-0 flex items-center justify-between border-b border-slate-50">
           <div className="flex items-center gap-3">
@@ -311,13 +272,10 @@ export default function PaginaInbox() {
              <h2 className="text-[18px] font-bold text-[#1e293b] tracking-tight">Inbox Alex</h2>
           </div>
           <div className="flex items-center gap-2 text-slate-500">
-            <button className="p-2 rounded-full hover:bg-slate-50 transition-colors material-symbols-outlined text-[20px]">data_usage</button>
             <button onClick={() => setModalNuevoChat(true)} className="p-2 rounded-full hover:bg-slate-50 transition-colors material-symbols-outlined text-[20px]">add_comment</button>
-            <button className="p-2 rounded-full hover:bg-slate-50 transition-colors material-symbols-outlined text-[20px]">more_vert</button>
           </div>
         </div>
         
-        {/* Buscador In-Chat */}
         <div className="p-2 border-b border-[#f2f2f2] bg-white">
           <div className="bg-[#f0f2f5] rounded-lg flex items-center px-3 py-1.5 h-9">
             <span className="material-symbols-outlined text-[18px] text-[#54656f]">search</span>
@@ -330,7 +288,6 @@ export default function PaginaInbox() {
             />
           </div>
           
-          {/* Pastillas de filtro por estado */}
           <div className="flex gap-2 overflow-x-auto mt-3 pb-1 no-scrollbar scroll-smooth">
             {['todos', 'nuevo', 'interesado', 'agendado'].map(estado => {
               const activo = filtroEstado === estado
@@ -380,13 +337,10 @@ export default function PaginaInbox() {
         </div>
       </div>
 
-      {/* 2 y 3. Ventana Principal WhatsApp Web */}
+      {/* 2 y 3. Ventana Principal */}
       {chatActivo ? (
         <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-white w-full">
-          {/* Central: Chat Area */}
           <div className="flex-1 flex flex-col h-full border-r border-[#d1d7db] min-w-0 bg-[#efeae2] relative w-full">
-            
-            {/* Header del Chat con Glassmorphism suave */}
             <div className="h-[65px] shrink-0 px-6 flex items-center justify-between bg-white/80 backdrop-blur-md border-b border-slate-100 z-10 w-full relative">
               <div className="flex items-center gap-4">
                 <button onClick={() => setChatActivo(null)} className="md:hidden p-2 -ml-2 hover:bg-slate-50 rounded-full material-symbols-outlined text-slate-500">arrow_back</button>
@@ -406,34 +360,25 @@ export default function PaginaInbox() {
                   <span className="material-symbols-outlined text-[18px]">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
                   {chatActivo.asignado_a_humano ? 'ASESOR HUMANO' : 'IA ALEX ACTIVA'}
                 </button>
-                <div className="h-4 w-px bg-slate-200 mx-1"></div>
                 <button onClick={() => setMostrandoPerfil(!mostrandoPerfil)} className="p-2 rounded-full hover:bg-slate-50 text-slate-400 material-symbols-outlined text-[22px]">info</button>
               </div>
             </div>
 
-            {/* Burbujas de Chat con diseño moderno */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 z-10 scroll-smooth bg-white custom-scrollbar">
-              <div className="flex justify-center mb-6">
-                <span className="px-4 py-1.5 bg-slate-50 text-slate-400 text-[11px] font-bold rounded-full uppercase tracking-widest border border-slate-100">Cifrado con AlexIA</span>
-              </div>
-              {mensajes.map((msj, idx) => {
+              {mensajes.map((msj) => {
                 const soyYo = msj.remitente === 'humano' || msj.remitente === 'bot'
                 return (
                   <div key={msj.id} className={`flex w-full mb-2 ${soyYo ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] md:max-w-[60%] flex flex-col relative px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm transition-all hover:shadow-md ${soyYo ? 'bg-gradient-to-br from-[#00a884] to-[#008a6e] text-white rounded-tr-none' : 'bg-slate-100 text-[#1e293b] rounded-tl-none'}`}>
-                      {msj.remitente === 'bot' && <div className="flex items-center gap-1 mb-1 opacity-70"><span className="material-symbols-outlined text-[14px]">smart_toy</span> <span className="text-[10px] font-bold uppercase tracking-tighter">Alex</span></div>}
-                      {msj.remitente === 'humano' && <div className="flex items-center gap-1 mb-1 opacity-70"><span className="material-symbols-outlined text-[14px]">support_agent</span> <span className="text-[10px] font-bold uppercase tracking-tighter">Asesor</span></div>}
-                      
+                    <div className={`max-w-[75%] md:max-w-[60%] flex flex-col relative px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm ${soyYo ? 'bg-gradient-to-br from-[#00a884] to-[#008a6e] text-white rounded-tr-none' : 'bg-slate-100 text-[#1e293b] rounded-tl-none'}`}>
                       <span className="pb-3 whitespace-pre-wrap">{msj.contenido}</span>
-                      
-                      <div className={`absolute bottom-1.5 right-3 flex items-center gap-1 opacity-60`}>
-                        <span className="text-[10px] font-bold leading-none">{new Date(msj.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        {soyYo && <span className="material-symbols-outlined text-[14px] leading-none">done_all</span>}
+                      <div className="absolute bottom-1.5 right-3 flex items-center gap-1 opacity-60">
+                        <span className="text-[10px] font-bold">{new Date(msj.creado_en).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        {soyYo && <span className="material-symbols-outlined text-[14px]">done_all</span>}
                       </div>
-
                       {msj.tipo === 'imagen' && msj.url_archivo && (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <div className="mt-2 mb-4 rounded-xl border-2 border-white/20 overflow-hidden shadow-lg"><img src={msj.url_archivo} alt="Adjunto" className="max-w-xs h-auto cursor-zoom-in" onClick={()=>window.open(msj.url_archivo, '_blank')}/></div>
+                        <div className="mt-2 mb-4 rounded-xl border-2 border-white/20 overflow-hidden shadow-lg">
+                          <img src={msj.url_archivo} alt="Adjunto" className="max-w-xs h-auto cursor-zoom-in" onClick={()=>window.open(msj.url_archivo, '_blank')}/>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -442,36 +387,21 @@ export default function PaginaInbox() {
               <div ref={finalChatRef}></div>
             </div>
 
-            {/* Barra Inferior Premium */}
             <div className="p-4 bg-white border-t border-slate-50">
               <form onSubmit={enviarMensaje} className="flex items-end gap-3 max-w-5xl mx-auto">
-                <div className="flex items-center gap-1 pb-1">
-                  <button type="button" onClick={() => alert("Emojis próximamente")} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-50 rounded-full transition-all material-symbols-outlined">mood</button>
-                  <button type="button" onClick={() => alert("Arrastra archivos aquí")} className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-50 rounded-full transition-all material-symbols-outlined rotate-45">attach_file</button>
-                </div>
-                <div className="flex-1 relative group">
-                  <textarea 
-                    value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }}
-                    placeholder="Escribe un mensaje para continuar el flujo..."
-                    className="w-full bg-slate-50 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-green-100 transition-all resize-none max-h-32 min-h-[48px] py-3 text-[14.5px] outline-none text-slate-700 px-5 shadow-inner"
-                    rows={1}
-                  />
-                </div>
-                <div className="pb-1">
-                  {nuevoMensaje.trim() ? (
-                    <button type="submit" className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center shadow-lg shadow-green-100 active:scale-90 transition-all material-symbols-outlined">send</button>
-                  ) : (
-                    <button type="button" className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-slate-200 transition-all material-symbols-outlined">mic</button>
-                  )}
-                </div>
+                <textarea 
+                  value={nuevoMensaje} onChange={(e) => setNuevoMensaje(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }}
+                  placeholder="Escribe un mensaje..."
+                  className="w-full bg-slate-50 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-green-100 transition-all resize-none max-h-32 min-h-[48px] py-3 text-[14.5px] outline-none text-slate-700 px-5 shadow-inner"
+                  rows={1}
+                />
+                <button type="submit" className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center shadow-lg active:scale-90 transition-all material-symbols-outlined">send</button>
               </form>
             </div>
           </div>
 
-          {/* Derecho: Perfil del Contacto (Sidebar Estilizada) */}
           <div className={`${mostrandoPerfil ? 'w-[320px]' : 'w-0 overflow-hidden'} bg-white h-full overflow-y-auto hidden xl:block border-l border-slate-100 transition-all`}>
-            {/* Header sidebar */}
             <div className="h-[65px] flex items-center px-6 border-b border-slate-50 gap-4">
               <button onClick={() => setMostrandoPerfil(false)} className="p-1 hover:bg-slate-50 rounded-full material-symbols-outlined text-slate-400">close</button>
               <h3 className="text-[#111b21] text-[16px] font-semibold">Info. del contacto</h3>
@@ -482,7 +412,7 @@ export default function PaginaInbox() {
                 {chatActivo.prospectos?.nombre ? chatActivo.prospectos.nombre.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase() : '?'}
               </div>
               <h2 className="text-[24px] text-[#111b21]">{chatActivo.prospectos?.nombre}</h2>
-              <p className="text-[16px] text-[#667781]">{chatActivo.id_plataforma}</p>
+              <p className="text-[#667781]">{chatActivo.id_plataforma}</p>
             </div>
 
             <div className="bg-white p-5 mb-2 shadow-sm space-y-4">
@@ -491,22 +421,14 @@ export default function PaginaInbox() {
                 <span className="material-symbols-outlined text-[20px]">edit</span>
               </div>
               <div className="pt-2 text-[14px] text-[#111b21] space-y-1">
-                <p><span className="text-[#667781]">Interés:</span> {chatActivo.prospectos?.curso_interes || 'Indeterminado'}</p>
-                <p><span className="text-[#667781]">Estado Pipeline:</span> {chatActivo.prospectos?.estado?.toUpperCase()}</p>
+                <p><span className="text-[#667781]">Interés:</span> {chatActivo.prospectos?.curso_interes || 'Indeterminado'}</p>\n                <p><span className="text-[#667781]">Estado:</span> {chatActivo.prospectos?.estado?.toUpperCase()}</p>
               </div>
             </div>
 
             <div className="bg-white p-2 mb-2 shadow-sm">
-              <button onClick={forzarAgendamiento} className="w-full flex items-center gap-4 px-4 py-3 text-[#111b21] hover:bg-[#f5f6f6] transition-colors rounded-lg">
+              <button onClick={forzarAgendamiento} className="w-full flex items-center gap-4 px-4 py-3 text-[#111b21] hover:bg-[#f5f6f6] rounded-lg">
                 <span className="material-symbols-outlined text-[#54656f]">edit_calendar</span>
-                <span className="text-[16px]">Agendar Lección / Cita</span>
-              </button>
-            </div>
-
-            <div className="bg-white p-2 pb-6 shadow-sm">
-              <button onClick={cerrarConversacion} className="w-full flex items-center gap-4 px-4 py-3 text-[#ea0038] hover:bg-[#f5f6f6] transition-colors rounded-lg">
-                <span className="material-symbols-outlined text-[#ea0038]">delete</span>
-                <span className="text-[16px]">Cerrar chat</span>
+                <span className="text-[16px]">Agendar Cita</span>
               </button>
             </div>
           </div>
@@ -514,23 +436,17 @@ export default function PaginaInbox() {
       ) : (
         <div className="flex-1 hidden md:flex flex-col items-center justify-center bg-[#f0f2f5] p-10 text-center border-l border-[#d1d7db]">
           <h2 className="text-[32px] font-light text-[#41525d] mb-4">Total English Inbox</h2>
-          <p className="text-[#667781] text-[14px] leading-relaxed max-w-[400px]">Envía y recibe mensajes de prospectos conectando directamente tu teléfono o redes sociales.<br/>Aprovecha el &quot;Cerebro de Alex&quot; para auto-responder.</p>
-          <div className="mt-10 flex items-center gap-2 text-[#8696a0] text-[13px]">
-            <span className="material-symbols-outlined text-[16px]">lock</span>
-            Cifrado de extremo a extremo
-          </div>
+          <p className="text-[#667781] text-[14px] leading-relaxed max-w-[400px]">Selecciona un chat para comenzar a gestionar tus prospectos.</p>
         </div>
       )}
 
       {modalNuevoChat && (
         <ModalFormulario 
-          titulo="Nuevo Mensaje de WhatsApp"
+          titulo="Nuevo Mensaje"
           campos={[
-            { nombre: 'nombre', etiqueta: 'Nombre del prospecto', tipo: 'text', placeholder: 'Ej. Juan Pérez' },
-            { nombre: 'telefono', etiqueta: 'Número de WhatsApp (ej. 521234567890)', tipo: 'text', placeholder: 'Ej. 525512345678' },
-            { nombre: 'usa_plantilla', etiqueta: '¿Forzar plantilla aprobada? (Regla de 24 horas de Meta Meta)', tipo: 'select', opciones: [{valor: 'no', etiqueta: 'No'}, {valor: 'si', etiqueta: 'Sí'}] },
-            { nombre: 'nombre_plantilla', etiqueta: 'Nombre de plantilla (Solo si eligió "si" arriba)', tipo: 'text', placeholder: 'Ej. bienvenida_curso' },
-            { nombre: 'mensaje_inicial', etiqueta: 'Mensaje libre (Solo si eligió "no" arriba)', tipo: 'textarea', placeholder: '¡Hola! Te escribimos de Total English...' }
+            { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'text' },
+            { nombre: 'telefono', etiqueta: 'WhatsApp (521...)', tipo: 'text' },
+            { nombre: 'mensaje_inicial', etiqueta: 'Mensaje', tipo: 'textarea' }
           ]}
           alEnviar={iniciarNuevoChat}
           alCerrar={() => setModalNuevoChat(false)}
@@ -539,11 +455,11 @@ export default function PaginaInbox() {
 
       {modalEditarCRM && chatActivo && (
         <ModalFormulario 
-          titulo="Actualizar Ficha (CRM)"
+          titulo="Actualizar CRM"
           campos={[
-            { nombre: 'nombre', etiqueta: 'Nombre Completo', tipo: 'text', valorInicial: chatActivo.prospectos?.nombre },
-            { nombre: 'curso_interes', etiqueta: 'Curso de Interés', tipo: 'select', opciones: [{valor: 'Diplomado Children', etiqueta: 'Diplomado Children'}, {valor: 'Diplomado Pre-Teens', etiqueta: 'Diplomado Pre-Teens'}, {valor: 'Young & Professionals', etiqueta: 'Young & Professionals'}, {valor: 'My Time English', etiqueta: 'My Time English'}, {valor: 'Otro', etiqueta: 'Otro'}], valorInicial: chatActivo.prospectos?.curso_interes },
-            { nombre: 'estado', etiqueta: 'Fase de Venta', tipo: 'select', opciones: [{valor: 'nuevo', etiqueta: 'Nuevo'}, {valor: 'en_proceso', etiqueta: 'En Proceso'}, {valor: 'contactado', etiqueta: 'Contactado'}, {valor: 'agendado', etiqueta: 'Agendado'}, {valor: 'cerrado', etiqueta: 'Cerrado'}], valorInicial: chatActivo.prospectos?.estado }
+            { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'text', valorInicial: chatActivo.prospectos?.nombre },
+            { nombre: 'curso_interes', etiqueta: 'Curso', tipo: 'select', opciones: [{valor: 'Diplomado Children', etiqueta: 'Children'}, {valor: 'Diplomado Pre-Teens', etiqueta: 'Pre-Teens'}, {valor: 'Young & Professionals', etiqueta: 'Young & Professionals'}, {valor: 'My Time English', etiqueta: 'My Time English'}], valorInicial: chatActivo.prospectos?.curso_interes },
+            { nombre: 'estado', etiqueta: 'Estado', tipo: 'select', opciones: [{valor: 'nuevo', etiqueta: 'Nuevo'}, {valor: 'interesado', etiqueta: 'Interesado'}, {valor: 'agendado', etiqueta: 'Agendado'}, {valor: 'cerrado', etiqueta: 'Cerrado'}], valorInicial: chatActivo.prospectos?.estado }
           ]}
           alEnviar={guardarEdicionCRM}
           alCerrar={() => setModalEditarCRM(false)}
