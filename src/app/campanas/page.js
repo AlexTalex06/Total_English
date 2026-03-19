@@ -55,13 +55,21 @@ export default function PaginaCampanas() {
   }, [])
 
   const crearCampana = async (datos) => {
-    const respuesta = await fetch('/api/campanas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos),
-    })
-    if (respuesta.ok) {
-      cargarCampanas()
+    try {
+      const respuesta = await fetch('/api/campanas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos),
+      })
+      if (respuesta.ok) {
+        cargarCampanas()
+        setModalAbierto(false)
+      } else {
+        const errorData = await respuesta.json()
+        alert('Error del Servidor: ' + (errorData.error || 'Desconocido'))
+      }
+    } catch (e) {
+      alert('Error al conectar: ' + e.message)
     }
   }
 

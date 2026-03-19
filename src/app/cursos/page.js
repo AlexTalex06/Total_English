@@ -67,13 +67,21 @@ export default function PaginaCursos() {
   }, [])
 
   const crearCurso = async (datos) => {
-    const respuesta = await fetch('/api/cursos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos),
-    })
-    if (respuesta.ok) {
-      cargarCursos()
+    try {
+      const respuesta = await fetch('/api/cursos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos),
+      })
+      if (respuesta.ok) {
+        cargarCursos()
+        setModalAbierto(false)
+      } else {
+        const errorData = await respuesta.json()
+        alert('Error del Servidor: ' + (errorData.error || 'Desconocido'))
+      }
+    } catch (e) {
+      alert('Error al conectar: ' + e.message)
     }
   }
 
