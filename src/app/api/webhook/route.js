@@ -184,16 +184,16 @@ export async function POST(solicitud) {
 
         const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, datos?.opciones)
         
-        if (enviadoCorrectamente) {
-           await supabase.from('mensajes').insert({ 
-             conversacion_id: convExist.id, 
-             remitente: 'bot', 
-             contenido: respuesta,
-             tipo: imagenUrl ? 'imagen' : 'texto',
-             url_archivo: imagenUrl || null
-           })
-           await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
-        }
+        const respuestaFinal = enviadoCorrectamente ? respuesta : `[⚠️ WHATSAPP BLOQUEÓ EL ENVÍO (Número No Autorizado)]\n${respuesta}`
+
+        await supabase.from('mensajes').insert({ 
+          conversacion_id: convExist.id, 
+          remitente: 'bot', 
+          contenido: respuestaFinal,
+          tipo: imagenUrl ? 'imagen' : 'texto',
+          url_archivo: imagenUrl || null
+        })
+        await supabase.from('conversaciones').update({ ultimo_mensaje: respuestaFinal }).eq('id', convExist.id)
       }
     }
     return NextResponse.json({ estado: 'procesado' }, { status: 200 })
