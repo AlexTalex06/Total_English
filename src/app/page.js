@@ -28,6 +28,9 @@ export default function PaginaPanel() {
     cargarDatos()
   }, [])
 
+  const prospectosNuevos = prospectos.filter(p => p.estado === 'nuevo').length
+  const citasHoy = citas.filter(c => c.fecha === new Date().toISOString().split('T')[0]).length
+
   const actividadReciente = prospectos.slice(0, 5).map(p => ({
     nombre: `Nuevo prospecto: ${p.nombre}`,
     detalle: p.curso_interes ? `Interesado en ${p.curso_interes}` : 'Interesado en cursos de inglés',
