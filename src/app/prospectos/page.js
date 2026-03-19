@@ -212,7 +212,7 @@ export default function PaginaProspectos() {
                         {prospecto.curso_interes || 'Sin especificar'}
                       </div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase">
-                        {prospecto.edad || '??'} años • {prospecto.nivel || '??'}
+                        {prospecto.edad || '??'} años {prospecto.categoria_edad && `• ${prospecto.categoria_edad}`} • {prospecto.nivel || '??'}
                       </div>
                     </div>
                   </td>

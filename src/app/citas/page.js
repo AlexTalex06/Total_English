@@ -139,22 +139,30 @@ export default function PaginaCitas() {
               {diasSemana.map(dia => (
                 <div key={dia} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{dia}</div>
               ))}
-              {obtenerDiasMes().map((dia, indice) => (
-                <div
-                  key={indice}
-                  onClick={() => dia.actual && setDiaSeleccionado(dia.numero)}
-                  className={`text-sm py-2 font-medium rounded-lg cursor-pointer transition-colors relative ${
-                    !dia.actual ? 'text-slate-300' :
-                    dia.numero === diaSeleccionado ? 'font-bold text-blue-700 bg-blue-50' :
-                    'hover:bg-blue-50'
-                  }`}
-                >
-                  {dia.numero}
-                  {dia.actual && dia.numero === new Date().getDate() && mesActual.getMonth() === new Date().getMonth() && (
-                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-700 rounded-full"></div>
-                  )}
-                </div>
-              ))}
+              {obtenerDiasMes().map((dia, indice) => {
+                const fechaDia = dia.actual ? new Date(mesActual.getFullYear(), mesActual.getMonth(), dia.numero).toISOString().split('T')[0] : null
+                const tieneCita = dia.actual && citas.some(c => c.fecha === fechaDia)
+                
+                return (
+                  <div
+                    key={indice}
+                    onClick={() => dia.actual && setDiaSeleccionado(dia.numero)}
+                    className={`text-sm py-2 font-medium rounded-lg cursor-pointer transition-colors relative ${
+                      !dia.actual ? 'text-slate-300' :
+                      dia.numero === diaSeleccionado ? 'font-bold text-blue-700 bg-blue-50' :
+                      'hover:bg-blue-50'
+                    }`}
+                  >
+                    {dia.numero}
+                    {tieneCita && (
+                      <div className="absolute top-1 right-1 w-1 h-1 bg-amber-500 rounded-full"></div>
+                    )}
+                    {dia.actual && dia.numero === new Date().getDate() && mesActual.getMonth() === new Date().getMonth() && (
+                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-700 rounded-full"></div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
 

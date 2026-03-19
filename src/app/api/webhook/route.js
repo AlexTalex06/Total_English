@@ -105,14 +105,14 @@ export async function POST(solicitud) {
              if (datos.nivel) updateData.nivel = datos.nivel;
              if (datos.horario) updateData.horario = datos.horario;
              if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+             if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
 
              // Intento de actualización directa
              const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
              
              if (crmError) {
                console.error('⚠️ Error en update (posible falta de columnas):', crmError.message);
-               // Si fallan columnas específicas, guardamos en notas para no perder la info
-               const msgNotas = `[Sync Fallido] Datos extraídos: Edad:${datos.edad}, Nivel:${datos.nivel}, Horario:${datos.horario}, Interés:${datos.curso_interes}`;
+               const msgNotas = `[Sync Fallido] Datos extraídos: Edad:${datos.edad}, Cat:${datos.categoria_edad}, Nivel:${datos.nivel}, Horario:${datos.horario}, Interés:${datos.curso_interes}`;
                await supabase.from('prospectos').update({ 
                  notas: (freshPros.notas ? freshPros.notas + '\n' : '') + msgNotas 
                }).eq('id', prosExist.id);
@@ -123,23 +123,27 @@ export async function POST(solicitud) {
              console.error('❌ Error fatal en sync:', errSync.message);
            }
         }
+
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
         if (intencion === 'CIERRE_CITA') {
-          await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
+          // Evitar duplicados si ya tiene una cita pendiente
+          const { data: citaExistente } = await supabase.from('citas').select('id').eq('prospecto_id', prosExist.id).eq('estado', 'pendiente').maybeSingle()
           
-          const fechaDefecto = new Date()
-          fechaDefecto.setDate(fechaDefecto.getDate() + 1) // Mañana por defecto
-          
-          const insertCita = {
-            prospecto_id: prosExist.id,
-            fecha: datos.fecha_cita || fechaDefecto.toISOString().split('T')[0],
-            hora: datos.hora_cita || '16:00',
-            tipo: 'Inscripción / Sesión Informativa',
-            estado: 'pendiente'
+          if (!citaExistente) {
+            await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
+            const fechaDefecto = new Date()
+            fechaDefecto.setDate(fechaDefecto.getDate() + 1)
+            
+            const insertCita = {
+              prospecto_id: prosExist.id,
+              fecha: datos.fecha_cita || fechaDefecto.toISOString().split('T')[0],
+              hora: datos.hora_cita || '16:00',
+              tipo: 'Inscripción / Sesión Informativa',
+              estado: 'pendiente'
+            }
+            console.log('📅 Creando cita:', insertCita);
+            await supabase.from('citas').insert(insertCita)
           }
-          
-          console.log('📅 Creando cita:', insertCita);
-          await supabase.from('citas').insert(insertCita)
         }
 
         // 7. Enviar a Meta
