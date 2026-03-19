@@ -19,15 +19,17 @@ export async function GET() {
 export async function POST(solicitud) {
   const cuerpo = await solicitud.json()
 
+  const datosInsertar = {
+    nombre: cuerpo.nombre,
+    mensaje: cuerpo.mensaje || null,
+    estado: cuerpo.estado || 'borrador',
+    canal: cuerpo.canal || 'whatsapp',
+    imagen_url: cuerpo.imagen_url || null
+  }
+
   const { data: campana, error } = await supabase
     .from('campanas')
-    .insert([{
-      nombre: cuerpo.nombre,
-      mensaje: cuerpo.mensaje,
-      estado: cuerpo.estado || 'borrador',
-      canal: cuerpo.canal || 'whatsapp',
-      imagen_url: cuerpo.imagen_url
-    }])
+    .insert([datosInsertar])
     .select()
     .single()
 

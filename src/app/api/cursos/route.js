@@ -19,18 +19,20 @@ export async function GET() {
 export async function POST(solicitud) {
   const cuerpo = await solicitud.json()
 
+  const datosInsertar = {
+    nombre: cuerpo.nombre,
+    descripcion: cuerpo.descripcion || null,
+    beneficios: cuerpo.beneficios || null,
+    duracion: cuerpo.duracion || null,
+    nivel: cuerpo.nivel || null,
+    imagen_url: cuerpo.imagen_url || null,
+    precio: cuerpo.precio ? Number(cuerpo.precio) : null,
+    capacidad: cuerpo.capacidad ? Number(cuerpo.capacidad) : null
+  }
+
   const { data: curso, error } = await supabase
     .from('cursos')
-    .insert([{
-      nombre: cuerpo.nombre,
-      descripcion: cuerpo.descripcion,
-      beneficios: cuerpo.beneficios,
-      duracion: cuerpo.duracion,
-      nivel: cuerpo.nivel,
-      imagen_url: cuerpo.imagen_url,
-      precio: cuerpo.precio,
-      capacidad: cuerpo.capacidad
-    }])
+    .insert([datosInsertar])
     .select()
     .single()
 
