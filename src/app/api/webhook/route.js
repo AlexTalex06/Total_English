@@ -29,11 +29,24 @@ export async function POST(solicitud) {
         const contactoMeta = valor.contacts?.[0]
         const remitenteId = mensajeObj.from 
         const nombrePerfil = contactoMeta?.profile?.name || 'Prospecto'
-        const texto = mensajeObj.type === 'text' ? mensajeObj.text?.body : ''
+        
+        // Soportar texto de botones interactivos y texto normal
+        let texto = ''
+        if (mensajeObj.type === 'text') {
+          texto = mensajeObj.text?.body || ''
+        } else if (mensajeObj.type === 'interactive') {
+          texto = mensajeObj.interactive?.button_reply?.title || mensajeObj.interactive?.list_reply?.title || ''
+        } else if (mensajeObj.type === 'button') {
+          texto = mensajeObj.button?.text || ''
+        }
 
-        if (mensajeObj.type !== 'text') return NextResponse.json({ estado: 'ignorado' }, { status: 200 })
+        // Ignorar tipos no soportados (imagen, audio, etc.)
+        if (!texto) {
+          console.log(`📎 Tipo no soportado: ${mensajeObj.type} de ${remitenteId}`)
+          return NextResponse.json({ estado: 'tipo_no_soportado' }, { status: 200 })
+        }
 
-        // 1 & 2. Conversación y Prospecto: Buscar o Crear de forma segura sin UNIQUE en teléfono
+        // 1 & 2. Conversación y Prospecto: Buscar o Crear
         let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).eq('plataforma', 'whatsapp').maybeSingle()
         let prosExist = null;
 
@@ -41,7 +54,6 @@ export async function POST(solicitud) {
           const { data: pData } = await supabase.from('prospectos').select('id').eq('id', convExist.prospecto_id).single()
           prosExist = pData;
         } else {
-          // Si no hay conversación, creamos el prospecto titular y la conversación
           const { data: nuevoP } = await supabase.from('prospectos').insert({ nombre: nombrePerfil, telefono: remitenteId, estado: 'nuevo' }).select('id').single()
           prosExist = nuevoP
           const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
@@ -57,14 +69,10 @@ export async function POST(solicitud) {
             remitente: 'usuario', 
             contenido: texto, 
             id_mensaje_meta: mensajeObj.id,
-            tipo: mensajeObj.type === 'image' ? 'imagen' : 'texto'
-        }
-        if (mensajeObj.type === 'image') {
-          mensajeInsert.url_archivo = mensajeObj.image?.url || '' // Note: Meta requires a separate GET to fetch the media URL, but for now we store what we have or a placeholder
-          mensajeInsert.contenido = mensajeObj.image?.caption || 'Imagen recibida'
+            tipo: 'texto'
         }
         await supabase.from('mensajes').insert(mensajeInsert)
-        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: mensajeInsert.contenido }).eq('id', convExist.id)
+        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: texto }).eq('id', convExist.id)
         
         // 4. Consultar AlexIA
         const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(30)
@@ -75,26 +83,40 @@ export async function POST(solicitud) {
           content: m.contenido
         }))
 
-        // Inyectar contexto de lo que YA sabemos para que no repita preguntas
+        // Inyectar contexto de lo que YA sabemos
         const fechaActualTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' });
         const contextoCrm = `CONTEXTO ACTUAL DEL PROSPECTO:
         Fecha de Hoy: ${fechaActualTexto}
+        Nombre Alumno: ${freshPros.nombre_alumno || 'Desconocido'}
         Edad: ${freshPros.edad || 'Desconocida'}
         Categoría: ${freshPros.categoria_edad || 'Desconocida'}
         Nivel: ${freshPros.nivel || 'Desconocido'}
         Horario: ${freshPros.horario || 'Desconocido'}
-        IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo avanza.`;
+        Curso de Interés: ${freshPros.curso_interes || 'Desconocido'}
+        IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo avanza al siguiente paso del flujo.`;
 
         const { respuesta, datos, intencion } = await consultarAlex([
           { role: 'system', content: contextoCrm },
           ...historialFormat
         ], nombrePerfil, 'WhatsApp')
         
-        // Evitar bucles
-        const ultimaRespuestaBot = (historialRaw || []).find(m => m.remitente === 'bot')?.contenido;
-        if (respuesta === ultimaRespuestaBot && intencion !== 'CIERRE_CITA') {
-          console.log(`⚠️ Respuesta repetida detectada para ${remitenteId}. Ignorando.`);
-          return NextResponse.json({ estado: 'repetido' }, { status: 200 });
+        // Evitar bucles - comparar con los últimos 2 mensajes del bot
+        const mensajesBot = (historialRaw || []).filter(m => m.remitente === 'bot');
+        const ultimasRespuestasBot = mensajesBot.slice(0, 2).map(m => m.contenido?.trim());
+        const respuestaTrimmed = respuesta?.trim();
+        
+        if (ultimasRespuestasBot.includes(respuestaTrimmed) && intencion !== 'CIERRE_CITA') {
+          console.log(`⚠️ Respuesta repetida detectada para ${remitenteId}. Reformulando...`);
+          // En vez de ignorar, enviamos un mensaje genérico de avance
+          const respuestaAlternativa = "¡Gracias por tu respuesta! 😊 ¿Me puedes dar un poco más de detalle para poder ayudarte mejor?";
+          await supabase.from('mensajes').insert({ 
+            conversacion_id: convExist.id, 
+            remitente: 'bot', 
+            contenido: respuestaAlternativa,
+            tipo: 'texto'
+          })
+          await enviarMensajeWhatsApp(remitenteId, respuestaAlternativa)
+          return NextResponse.json({ estado: 'reformulado' }, { status: 200 });
         }
 
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
@@ -119,7 +141,7 @@ export async function POST(solicitud) {
                  if (nuevoHijo) {
                      await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
                      idTarget = nuevoHijo.id;
-                     prosExist.id = nuevoHijo.id; // Actualizar local para las citas
+                     prosExist.id = nuevoHijo.id;
                  }
              } else {
                  const updateData = { actualizado_en: new Date().toISOString() };
@@ -140,12 +162,11 @@ export async function POST(solicitud) {
 
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
         if (intencion === 'CIERRE_CITA') {
-          // Evitar duplicados usando .limit(1) para evadir errores 500
           const { data: citasExistentes } = await supabase.from('citas')
             .select('id, fecha, hora')
             .eq('prospecto_id', prosExist.id)
             .eq('estado', 'pendiente')
-            .order('timestamp', { ascending: false })
+            .order('creado_en', { ascending: false })
             .limit(1);
             
           const citaExistente = citasExistentes && citasExistentes.length > 0 ? citasExistentes[0] : null;
@@ -177,12 +198,17 @@ export async function POST(solicitud) {
 
         // 7. Enviar a Meta
         let imagenUrl = null
-        if (datos && datos.imagen) {
+        if (datos && datos.imagen && datos.imagen !== 'null') {
           const origin = new URL(solicitud.url).origin
           imagenUrl = `${origin}/cursos/${datos.imagen}`
         }
 
-        const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, datos?.opciones)
+        // Preparar opciones (sanitizar)
+        const opcionesLimpias = (datos?.opciones && Array.isArray(datos.opciones) && datos.opciones.length > 0) 
+          ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '') 
+          : null;
+
+        const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, opcionesLimpias)
         
         const respuestaFinal = enviadoCorrectamente ? respuesta : `[⚠️ WHATSAPP BLOQUEÓ EL ENVÍO (Número No Autorizado)]\n${respuesta}`
 
@@ -198,8 +224,9 @@ export async function POST(solicitud) {
     }
     return NextResponse.json({ estado: 'procesado' }, { status: 200 })
   } catch (error) {
-    console.error('❌ Error Webhook:', error.message)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    console.error('❌ Error Webhook:', error.message, error.stack)
+    // Siempre responder 200 a Meta para evitar que reintente infinitamente
+    return NextResponse.json({ error: 'Error interno' }, { status: 200 })
   }
 }
 
@@ -238,7 +265,6 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
   }
 
   try {
-    // Intento 1
     await axios.post(url, payload, headers)
     return true
   } catch (error) {

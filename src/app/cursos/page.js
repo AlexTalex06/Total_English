@@ -35,19 +35,12 @@ const coloresNivel = {
   'Abierto': 'bg-green-600/90',
 }
 
-const imagenesDefecto = [
-  'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1529070538774-1843cb3265df?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=400&h=300&fit=crop',
-]
-
 export default function PaginaCursos() {
   const [cursos, setCursos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [filtroActivo, setFiltroActivo] = useState('Todos')
+  const [cursoEditando, setCursoEditando] = useState(null)
 
   const cargarCursos = async () => {
     setCargando(true)
@@ -85,12 +78,42 @@ export default function PaginaCursos() {
     }
   }
 
+  const editarCurso = async (datos) => {
+    try {
+      const respuesta = await fetch('/api/cursos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: cursoEditando.id, ...datos }),
+      })
+      if (respuesta.ok) {
+        cargarCursos()
+        setModalAbierto(false)
+        setCursoEditando(null)
+      } else {
+        const errorData = await respuesta.json()
+        alert('Error al actualizar: ' + (errorData.error || 'Desconocido'))
+      }
+    } catch (e) {
+      alert('Error al conectar: ' + e.message)
+    }
+  }
+
   const eliminarCurso = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este curso?')) return
     const respuesta = await fetch(`/api/cursos?id=${id}`, { method: 'DELETE' })
     if (respuesta.ok) {
       cargarCursos()
     }
+  }
+
+  const abrirEditar = (curso) => {
+    setCursoEditando(curso)
+    setModalAbierto(true)
+  }
+
+  const cerrarModal = () => {
+    setModalAbierto(false)
+    setCursoEditando(null)
   }
 
   const datosMostrar = cursos;
@@ -108,7 +131,7 @@ export default function PaginaCursos() {
           </p>
         </div>
         <button
-          onClick={() => setModalAbierto(true)}
+          onClick={() => { setCursoEditando(null); setModalAbierto(true); }}
           className="bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 active:scale-95 transition-transform"
         >
           <span className="material-symbols-outlined text-lg">add</span>
@@ -137,7 +160,7 @@ export default function PaginaCursos() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
         {cargando ? (
           <div className="col-span-full text-center py-12 text-slate-400">Cargando cursos...</div>
-        ) : datosMostrar.map((curso, indice) => (
+        ) : datosMostrar.map((curso) => (
           <div key={curso.id} className="group bg-white rounded-3xl overflow-hidden shadow-[0_24px_48px_-12px_rgba(0,35,111,0.08)] hover:translate-y-[-4px] transition-all duration-300">
             <div className="relative h-48 overflow-hidden bg-slate-200">
               {curso.imagen_url ? (
@@ -153,7 +176,10 @@ export default function PaginaCursos() {
                 </div>
               )}
               <div className="absolute top-4 right-4 flex gap-2">
-                <button className="w-8 h-8 rounded-full bg-white/70 backdrop-blur-sm text-blue-900 flex items-center justify-center hover:bg-white transition-colors">
+                <button
+                  onClick={() => abrirEditar(curso)}
+                  className="w-8 h-8 rounded-full bg-white/70 backdrop-blur-sm text-blue-900 flex items-center justify-center hover:bg-white transition-colors"
+                >
                   <span className="material-symbols-outlined text-sm">edit</span>
                 </button>
                 <button
@@ -202,7 +228,7 @@ export default function PaginaCursos() {
 
         {/* Tarjeta para agregar */}
         <div
-          onClick={() => setModalAbierto(true)}
+          onClick={() => { setCursoEditando(null); setModalAbierto(true); }}
           className="group border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center p-8 hover:bg-slate-100/50 transition-colors cursor-pointer min-h-[400px]"
         >
           <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform">
@@ -215,11 +241,21 @@ export default function PaginaCursos() {
       {/* Modal */}
       <ModalFormulario
         abierto={modalAbierto}
-        alCerrar={() => setModalAbierto(false)}
-        titulo="Nuevo Curso"
+        alCerrar={cerrarModal}
+        titulo={cursoEditando ? 'Editar Curso' : 'Nuevo Curso'}
         campos={camposCurso}
-        alEnviar={crearCurso}
-        textoBoton="Crear Curso"
+        alEnviar={cursoEditando ? editarCurso : crearCurso}
+        textoBoton={cursoEditando ? 'Guardar Cambios' : 'Crear Curso'}
+        datosIniciales={cursoEditando ? {
+          nombre: cursoEditando.nombre,
+          descripcion: cursoEditando.descripcion,
+          beneficios: cursoEditando.beneficios,
+          duracion: cursoEditando.duracion,
+          nivel: cursoEditando.nivel,
+          precio: cursoEditando.precio,
+          capacidad: cursoEditando.capacidad,
+          imagen_url: cursoEditando.imagen_url,
+        } : null}
       />
     </div>
   )

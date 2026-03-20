@@ -68,6 +68,14 @@ export default function PaginaCitas() {
     }
   }
 
+  const eliminarCita = async (id) => {
+    if (!confirm('¿Estás seguro de eliminar esta cita?')) return
+    const respuesta = await fetch(`/api/citas?id=${id}`, { method: 'DELETE' })
+    if (respuesta.ok) {
+      cargarDatos()
+    }
+  }
+
   // Calendario
   const nombresMes = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
   const diasSemana = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do']
@@ -232,12 +240,19 @@ export default function PaginaCitas() {
                       <select
                         className="text-xs border-none bg-transparent focus:ring-0 text-slate-400 cursor-pointer w-6"
                         value=""
-                        onChange={(e) => e.target.value && actualizarEstadoCita(cita.id, e.target.value)}
+                        onChange={(e) => {
+                          if (e.target.value === '_eliminar') {
+                            eliminarCita(cita.id)
+                          } else if (e.target.value) {
+                            actualizarEstadoCita(cita.id, e.target.value)
+                          }
+                        }}
                       >
                         <option value="">⋮</option>
                         <option value="confirmada">Confirmar</option>
                         <option value="cancelada">Cancelar</option>
                         <option value="completada">Completar</option>
+                        <option value="_eliminar" className="text-red-600">🗑 Eliminar</option>
                       </select>
                     </div>
                   </div>

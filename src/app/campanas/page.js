@@ -25,17 +25,12 @@ const camposCampana = [
   { nombre: 'imagen_url', etiqueta: 'URL de imagen', tipo: 'url', placeholder: 'https://...', requerido: false },
 ]
 
-const imagenesCampana = [
-  'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=300&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=300&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=300&h=200&fit=crop',
-]
-
 export default function PaginaCampanas() {
   const [campanas, setCampanas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [enviando, setEnviando] = useState(null)
+  const [campanaEditando, setCampanaEditando] = useState(null)
 
   const cargarCampanas = async () => {
     setCargando(true)
@@ -73,33 +68,58 @@ export default function PaginaCampanas() {
     }
   }
 
+  const editarCampana = async (datos) => {
+    try {
+      const respuesta = await fetch('/api/campanas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: campanaEditando.id, ...datos }),
+      })
+      if (respuesta.ok) {
+        cargarCampanas()
+        setModalAbierto(false)
+        setCampanaEditando(null)
+      } else {
+        const errorData = await respuesta.json()
+        alert('Error al actualizar: ' + (errorData.error || 'Desconocido'))
+      }
+    } catch (e) {
+      alert('Error al conectar: ' + e.message)
+    }
+  }
+
+  const eliminarCampana = async (id) => {
+    if (!confirm('¿Estás seguro de eliminar esta campaña?')) return
+    try {
+      const respuesta = await fetch(`/api/campanas?id=${id}`, { method: 'DELETE' })
+      if (respuesta.ok) {
+        cargarCampanas()
+      } else {
+        const errorData = await respuesta.json()
+        alert('Error al eliminar: ' + (errorData.error || 'Desconocido'))
+      }
+    } catch (e) {
+      alert('Error al conectar: ' + e.message)
+    }
+  }
+
+  const abrirEditar = (campana) => {
+    setCampanaEditando(campana)
+    setModalAbierto(true)
+  }
+
+  const cerrarModal = () => {
+    setModalAbierto(false)
+    setCampanaEditando(null)
+  }
+
   const simularEnvio = async (id) => {
     setEnviando(id)
-    // Simular envío de 3 segundos
     setTimeout(() => {
       setEnviando(null)
       alert('✅ Simulación completada: La campaña se ha enviado correctamente (simulación)')
     }, 3000)
   }
-
-  // Campañas de ejemplo
-  const campanasEjemplo = [
-    {
-      id: '1', nombre: 'Intensivo de Verano 2024', estado: 'activa', canal: 'whatsapp',
-      mensaje: '¡Desbloquea tu fluidez este verano! Únete a nuestro programa de 4 semanas de inmersión. Lugares limitados para nivel B1+.',
-      alcance: 12540, engagement: 8.2, clics: 1024, imagen_url: imagenesCampana[0]
-    },
-    {
-      id: '2', nombre: 'Semana de Prueba Gratis', estado: 'programada', canal: 'email',
-      mensaje: '¿No sabes por dónde empezar? Prueba Total English por 7 días, completamente gratis. Sin tarjeta de crédito. ¡Experimenta sesiones en vivo hoy!',
-      alcance: 0, engagement: 0, clics: 0, imagen_url: imagenesCampana[1]
-    },
-    {
-      id: '3', nombre: 'Masterclass IELTS Abril', estado: 'completada', canal: 'whatsapp',
-      mensaje: 'Obtén el puntaje que necesitas. Taller exclusivo con examinadores certificados. Regístrate antes del 15 de abril para descuento anticipado.',
-      alcance: 28900, engagement: 12.5, clics: 4210, imagen_url: imagenesCampana[2]
-    },
-  ]
 
   const datosMostrar = campanas;
 
@@ -139,7 +159,7 @@ export default function PaginaCampanas() {
           <p className="text-slate-500 text-sm">Gestiona tus programas de difusión de cursos de inglés</p>
         </div>
         <button
-          onClick={() => setModalAbierto(true)}
+          onClick={() => { setCampanaEditando(null); setModalAbierto(true); }}
           className="flex items-center justify-center gap-2 rounded-xl h-12 px-6 bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/20 hover:bg-[#1e3a8a]/90 transition-all font-bold"
         >
           <span className="material-symbols-outlined">add</span>
@@ -171,6 +191,8 @@ export default function PaginaCampanas() {
       <div className="space-y-4">
         {cargando ? (
           <div className="text-center py-12 text-slate-400">Cargando campañas...</div>
+        ) : datosMostrar.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">No hay campañas creadas aún. ¡Crea la primera!</div>
         ) : datosMostrar.map((campana) => (
           <div key={campana.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 flex flex-col md:flex-row">
             <div
@@ -190,7 +212,11 @@ export default function PaginaCampanas() {
                   <h3 className="text-[#191c1d] text-xl font-bold mt-1">{campana.nombre}</h3>
                 </div>
                 <div className="flex gap-1">
-                  <button className="p-2 text-slate-400 hover:text-[#1e3a8a] transition-colors" title="Editar">
+                  <button
+                    onClick={() => abrirEditar(campana)}
+                    className="p-2 text-slate-400 hover:text-[#1e3a8a] transition-colors"
+                    title="Editar"
+                  >
                     <span className="material-symbols-outlined text-xl">edit</span>
                   </button>
                   <button
@@ -202,7 +228,11 @@ export default function PaginaCampanas() {
                       {enviando === campana.id ? 'hourglass_top' : 'send'}
                     </span>
                   </button>
-                  <button className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Eliminar">
+                  <button
+                    onClick={() => eliminarCampana(campana.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                    title="Eliminar"
+                  >
                     <span className="material-symbols-outlined text-xl">delete</span>
                   </button>
                 </div>
@@ -241,11 +271,18 @@ export default function PaginaCampanas() {
       {/* Modal */}
       <ModalFormulario
         abierto={modalAbierto}
-        alCerrar={() => setModalAbierto(false)}
-        titulo="Nueva Campaña"
+        alCerrar={cerrarModal}
+        titulo={campanaEditando ? 'Editar Campaña' : 'Nueva Campaña'}
         campos={camposCampana}
-        alEnviar={crearCampana}
-        textoBoton="Crear Campaña"
+        alEnviar={campanaEditando ? editarCampana : crearCampana}
+        textoBoton={campanaEditando ? 'Guardar Cambios' : 'Crear Campaña'}
+        datosIniciales={campanaEditando ? {
+          nombre: campanaEditando.nombre,
+          mensaje: campanaEditando.mensaje,
+          canal: campanaEditando.canal,
+          estado: campanaEditando.estado,
+          imagen_url: campanaEditando.imagen_url,
+        } : null}
       />
     </div>
   )

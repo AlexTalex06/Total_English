@@ -1,10 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
-export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alEnviar, textoBoton = 'Guardar' }) {
+export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alEnviar, textoBoton = 'Guardar', datosIniciales = null }) {
   const [datosFormulario, setDatosFormulario] = useState({})
   const [cargando, setCargando] = useState(false)
+
+  // Sincronizar datos iniciales cuando se abre en modo edición
+  useEffect(() => {
+    if (abierto && datosIniciales) {
+      setDatosFormulario({ ...datosIniciales })
+    } else if (abierto && !datosIniciales) {
+      setDatosFormulario({})
+    }
+  }, [abierto, datosIniciales])
 
   if (!abierto) return null
 
@@ -18,7 +27,6 @@ export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alE
     try {
       await alEnviar(datosFormulario)
       setDatosFormulario({})
-      alCerrar()
     } catch (error) {
       console.error('Error al enviar formulario:', error)
     } finally {
