@@ -50,14 +50,23 @@ export async function POST(solicitud) {
         let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).eq('plataforma', 'whatsapp').maybeSingle()
         let prosExist = null;
 
-        if (convExist) {
+        if (convExist && convExist.prospecto_id) {
           const { data: pData } = await supabase.from('prospectos').select('id').eq('id', convExist.prospecto_id).single()
-          prosExist = pData;
-        } else {
+          if (pData) {
+            prosExist = pData;
+          }
+        }
+        
+        // Si no existe la conversación, o si existe pero el prospecto fue eliminado (prospecto_id nulo)
+        if (!prosExist) {
           const { data: nuevoP } = await supabase.from('prospectos').insert({ nombre: nombrePerfil, telefono: remitenteId, estado: 'nuevo' }).select('id').single()
           prosExist = nuevoP
-          const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
-          convExist = nuevaC
+          if (convExist) {
+             await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
+          } else {
+             const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
+             convExist = nuevaC
+          }
         }
 
         // 3. Guardar Mensaje de Usuario (Evitar duplicados si Meta reintenta)
@@ -136,6 +145,8 @@ export async function POST(solicitud) {
                  propObj.nivel = datos.nivel || null;
                  propObj.horario = datos.horario || null;
                  propObj.categoria_edad = datos.categoria_edad || null;
+                 propObj.estado = 'nuevo';
+                 propObj.lead_score = null;
 
                  const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('id').single();
                  if (nuevoHijo) {

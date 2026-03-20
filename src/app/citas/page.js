@@ -191,7 +191,7 @@ export default function PaginaCitas() {
               <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-1">Carga de Hoy</p>
               <h4 className="text-3xl font-bold">{citasHoy.length} Sesiones</h4>
               <p className="text-blue-200 text-sm mt-4">
-                {citasHoy.length > 0 ? `Próxima: ${citasHoy[0].prospectos?.nombre} a las ${citasHoy[0].hora}` : 'Sin citas programadas'}
+                {citasHoy.length > 0 ? `Próxima: ${citasHoy[0].prospectos?.nombre_alumno || citasHoy[0].prospectos?.nombre} a las ${citasHoy[0].hora}` : 'Sin citas programadas'}
               </p>
             </div>
             <div className="absolute -right-4 -bottom-4 opacity-10">
@@ -224,7 +224,7 @@ export default function PaginaCitas() {
                       </div>
                       <div>
                         <h4 className="font-bold text-blue-900 group-hover:text-[#00236f] transition-colors">
-                          {cita.prospectos?.nombre || 'Sin nombre'}
+                          {cita.prospectos?.nombre_alumno || cita.prospectos?.nombre || 'Sin nombre'}
                         </h4>
                         <p className="text-xs text-slate-500 flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">school</span>
