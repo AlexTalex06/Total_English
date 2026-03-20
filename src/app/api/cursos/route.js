@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 // GET - Obtener todos los cursos
 export async function GET() {
   const { data: cursos, error } = await supabase

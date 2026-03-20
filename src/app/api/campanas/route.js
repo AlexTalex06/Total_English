@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 // GET - Obtener todas las campañas
 export async function GET() {
   const { data: campanas, error } = await supabase

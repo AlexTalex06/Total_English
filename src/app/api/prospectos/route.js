@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 // GET - Obtener todos los prospectos
 export async function GET(solicitud) {
   const { searchParams } = new URL(solicitud.url)
