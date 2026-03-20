@@ -168,7 +168,6 @@ export default function PaginaInbox() {
 
   const conversacionesFiltradas = conversaciones.filter(c => 
     (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
-    (c.prospectos?.nombre_alumno || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
     c.id_plataforma.includes(filtroBusqueda)
   )
 
@@ -260,7 +259,7 @@ export default function PaginaInbox() {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-0.5">
                     <h3 className={`text-[14px] truncate ${isActive ? 'font-bold text-[#1e3a8a]' : 'font-semibold text-[#111b21]'}`}>
-                      {conv.prospectos?.nombre_alumno || conv.prospectos?.nombre || conv.id_plataforma}
+                      {conv.prospectos?.nombre || conv.id_plataforma}
                     </h3>
                     <span className="text-[11px] text-slate-400 shrink-0 ml-2">
                       {obtenerTiempoRelativo(conv.actualizado_en)}
@@ -286,7 +285,7 @@ export default function PaginaInbox() {
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-[#1e293b] text-[15px]">
-                  {chatActivo.prospectos?.nombre_alumno || chatActivo.prospectos?.nombre || chatActivo.id_plataforma}
+                  {chatActivo.prospectos?.nombre || chatActivo.id_plataforma}
                 </span>
                 <span className="text-[11px] text-slate-400 font-medium">
                   {chatActivo.id_plataforma} • {chatActivo.prospectos?.estado?.toUpperCase() || 'NUEVO'}
@@ -513,11 +512,13 @@ export default function PaginaInbox() {
                     {p.citas && p.citas.filter(c => c.estado === 'pendiente' || c.estado === 'confirmada').length > 0 && (
                       <div className="mt-2 pt-2 border-t border-slate-200/50">
                         {p.citas.filter(c => c.estado === 'pendiente' || c.estado === 'confirmada').map(cita => (
-                          <div key={cita.id} className="flex items-center gap-1.5 text-[10px]">
-                            <span className="material-symbols-outlined text-[12px] text-[#1e3a8a]">event</span>
-                            <span className="text-slate-600 font-medium">
-                              {cita.fecha} a las {cita.hora}
-                            </span>
+                          <div key={cita.id} className="flex items-center justify-between text-[10px] bg-white rounded p-1.5 border border-slate-100">
+                            <div className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[12px] text-[#1e3a8a]">event</span>
+                              <span className="text-slate-600 font-medium">
+                                Cita para <span className="font-bold text-blue-900">{p.nombre_alumno || p.nombre}</span> el {cita.fecha} a las {cita.hora}
+                              </span>
+                            </div>
                             <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ${
                               cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                             }`}>
@@ -544,6 +545,9 @@ export default function PaginaInbox() {
                 {prospectosRelacionados[0].citas.map(cita => (
                   <div key={cita.id} className="bg-slate-50 rounded-lg p-2.5 flex items-center justify-between border border-slate-100">
                     <div className="text-[12px]">
+                      <span className="block text-[#1e3a8a] font-bold mb-0.5" style={{fontSize: '10px'}}>
+                        {prospectosRelacionados[0].nombre_alumno || prospectosRelacionados[0].nombre}
+                      </span>
                       <span className="font-semibold text-slate-700">{cita.fecha}</span>
                       <span className="text-slate-400 ml-1">{cita.hora}</span>
                     </div>
