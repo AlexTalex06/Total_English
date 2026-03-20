@@ -3,18 +3,18 @@ import { NextResponse } from 'next/server'
 
 export async function POST(req) {
   try {
-    const { prospecto_id } = await req.json()
+    const { conversacion_id } = await req.json()
 
-    if (!prospecto_id) {
-      return NextResponse.json({ error: 'Falta prospecto_id' }, { status: 400 })
+    if (!conversacion_id) {
+      return NextResponse.json({ error: 'Falta conversacion_id' }, { status: 400 })
     }
 
-    // Actualizar todos los mensajes no leídos del prospecto a leído = true
+    // Actualizar todos los mensajes no leídos de esta conversación a leído = true
     const { error } = await supabase
       .from('mensajes')
       .update({ leido: true })
-      .eq('prospecto_id', prospecto_id)
-      .eq('remitente', 'prospecto')
+      .eq('conversacion_id', conversacion_id)
+      .eq('remitente', 'usuario')
       .eq('leido', false)
 
     if (error) {

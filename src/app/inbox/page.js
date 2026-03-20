@@ -76,6 +76,14 @@ export default function PaginaInbox() {
         cargarConversacionesRef.current?.()
         if (chatActivoRef.current && payload.new.conversacion_id === chatActivoRef.current.id) {
           cargarMensajesRef.current?.(chatActivoRef.current.id)
+          // Si el mensaje nuevo es del usuario y estamos en este chat, marcarlo como leído automáticamente
+          if (payload.new.remitente === 'usuario') {
+            fetch('/api/mensajes/leer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ conversacion_id: chatActivoRef.current.id })
+            }).then(() => cargarConversacionesRef.current?.()).catch(console.error)
+          }
         }
       })
       .subscribe()
@@ -115,6 +123,19 @@ export default function PaginaInbox() {
     cargarMensajes(c.id)
     cargarProspectosRelacionados(c.id_plataforma)
     setMostrarEmojis(false)
+
+    // Marcar como leídos
+    const unreadCount = c.mensajes?.filter(m => !m.leido && m.remitente === 'usuario').length || 0;
+    if (unreadCount > 0) {
+      try {
+        await fetch('/api/mensajes/leer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversacion_id: c.id })
+        });
+        cargarConversacionesRef.current?.();
+      } catch (err) { console.error('Error marcando leido:', err) }
+    }
   }
 
   const insertarEmoji = (emoji) => {
