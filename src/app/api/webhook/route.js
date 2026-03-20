@@ -180,7 +180,7 @@ export async function POST(solicitud) {
           }
 
           if (!citaExistente) {
-            await supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', prosExist.id)
+            await supabase.from('prospectos').update({ estado: 'agendado', lead_score: 'CALIENTE' }).eq('id', prosExist.id)
             const insertCita = { prospecto_id: prosExist.id, fecha: fCitaStr, hora: datos.hora_cita || '16:00', tipo: 'Inscripción / Sesión Informativa', estado: 'pendiente' };
             console.log('📅 Creando cita:', insertCita);
             await supabase.from('citas').insert(insertCita);
@@ -192,6 +192,7 @@ export async function POST(solicitud) {
               };
               console.log('📅 Actualizando cita existente:', updateCita);
               await supabase.from('citas').update(updateCita).eq('id', citaExistente.id);
+              await supabase.from('prospectos').update({ lead_score: 'CALIENTE' }).eq('id', prosExist.id);
             }
           }
         }
