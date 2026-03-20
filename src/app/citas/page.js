@@ -16,8 +16,8 @@ export default function PaginaCitas() {
     setCargando(true)
     try {
       const [respCitas, respProspectos] = await Promise.all([
-        fetch('/api/citas'),
-        fetch('/api/prospectos')
+        fetch(`/api/citas?t=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/prospectos?t=${Date.now()}`, { cache: 'no-store' })
       ])
       const datosCitas = await respCitas.json()
       const datosProspectos = await respProspectos.json()

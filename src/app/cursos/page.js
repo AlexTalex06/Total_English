@@ -45,7 +45,7 @@ export default function PaginaCursos() {
   const cargarCursos = async () => {
     setCargando(true)
     try {
-      const respuesta = await fetch('/api/cursos')
+      const respuesta = await fetch(`/api/cursos?t=${Date.now()}`, { cache: 'no-store' })
       const datos = await respuesta.json()
       setCursos(Array.isArray(datos) ? datos : [])
     } catch (error) {

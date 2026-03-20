@@ -35,7 +35,7 @@ export default function PaginaCampanas() {
   const cargarCampanas = async () => {
     setCargando(true)
     try {
-      const respuesta = await fetch('/api/campanas')
+      const respuesta = await fetch(`/api/campanas?t=${Date.now()}`, { cache: 'no-store' })
       const datos = await respuesta.json()
       setCampanas(Array.isArray(datos) ? datos : [])
     } catch (error) {
