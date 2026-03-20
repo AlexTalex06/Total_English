@@ -65,21 +65,30 @@ export async function PATCH(solicitud) {
 
 // DELETE - Eliminar una campaña
 export async function DELETE(solicitud) {
-  const { searchParams } = new URL(solicitud.url)
-  const id = searchParams.get('id')
+  try {
+    const url = solicitud.nextUrl || new URL(solicitud.url)
+    const id = url.searchParams.get('id')
 
-  if (!id) {
-    return NextResponse.json({ error: 'Se requiere el ID de la campaña' }, { status: 400 })
+    console.log('🗑️ DELETE campaña - ID recibido:', id, '- URL:', solicitud.url)
+
+    if (!id) {
+      return NextResponse.json({ error: 'Se requiere el ID de la campaña' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('campanas')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('❌ Error eliminando campaña:', error.message)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    console.log('✅ Campaña eliminada:', id)
+    return NextResponse.json({ mensaje: 'Campaña eliminada correctamente' })
+  } catch (e) {
+    console.error('❌ Error fatal DELETE campaña:', e.message)
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
-
-  const { error } = await supabase
-    .from('campanas')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ mensaje: 'Campaña eliminada correctamente' })
 }

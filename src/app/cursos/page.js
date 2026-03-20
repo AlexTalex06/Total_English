@@ -100,9 +100,21 @@ export default function PaginaCursos() {
 
   const eliminarCurso = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este curso?')) return
-    const respuesta = await fetch(`/api/cursos?id=${id}`, { method: 'DELETE' })
-    if (respuesta.ok) {
-      cargarCursos()
+    try {
+      console.log('Eliminando curso con ID:', id)
+      const respuesta = await fetch(`/api/cursos?id=${id}`, { method: 'DELETE' })
+      console.log('Respuesta DELETE curso:', respuesta.status, respuesta.statusText)
+      if (respuesta.ok) {
+        console.log('✅ Curso eliminado exitosamente')
+        await cargarCursos()
+      } else {
+        const errorData = await respuesta.json()
+        console.error('❌ Error del servidor:', errorData)
+        alert('Error al eliminar: ' + (errorData.error || 'Desconocido'))
+      }
+    } catch (e) {
+      console.error('❌ Error de conexión:', e)
+      alert('Error al conectar: ' + e.message)
     }
   }
 

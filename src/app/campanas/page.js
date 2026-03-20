@@ -91,14 +91,19 @@ export default function PaginaCampanas() {
   const eliminarCampana = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta campaña?')) return
     try {
+      console.log('Eliminando campaña con ID:', id)
       const respuesta = await fetch(`/api/campanas?id=${id}`, { method: 'DELETE' })
+      console.log('Respuesta DELETE campaña:', respuesta.status, respuesta.statusText)
       if (respuesta.ok) {
-        cargarCampanas()
+        console.log('✅ Campaña eliminada exitosamente')
+        await cargarCampanas()
       } else {
         const errorData = await respuesta.json()
+        console.error('❌ Error del servidor:', errorData)
         alert('Error al eliminar: ' + (errorData.error || 'Desconocido'))
       }
     } catch (e) {
+      console.error('❌ Error de conexión:', e)
       alert('Error al conectar: ' + e.message)
     }
   }
