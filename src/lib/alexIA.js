@@ -191,14 +191,37 @@ REGLAS DEL JSON:
 - RESPONDE ÚNICAMENTE EL JSON, sin texto adicional ni bloques de código
 `
 
+import { supabaseAdmin as supabase } from '@/lib/supabase'
+
 export async function consultarAlex(mensajes, nombreUsuario = '', plataforma = 'WhatsApp') {
   try {
-    const systemMsg = MEGA_SYSTEM_PROMPT.replace('{nombre del usuario}', nombreUsuario || 'amigo/a')
+    // 1. OBTENER CURSOS DESDE LA BASE DE DATOS
+    const { data: cursosActivos } = await supabase.from('cursos').select('*')
+    
+    let baseConocimientoDinamica = ''
+    if (cursosActivos && cursosActivos.length > 0) {
+      baseConocimientoDinamica = cursosActivos.map(c => `
+CASO DINÁMICO - CURSO: ${c.nombre}
+- Rango de Edades: ${c.edad_minima || 0} a ${c.edad_maxima || 99} años
+- Nivel: ${c.nivel || 'Abierto'}
+- Beneficios Condensados: ${c.beneficios || 'Beneficios Generales de la Escuela'}
+- Precio Ancla (USD): $${c.precio || 'Consultar'}
+- Imagen Promocional: ${c.imagen_url || 'N/A'}
+      `).join('\n')
+    } else {
+      baseConocimientoDinamica = "Actualmente no hay cursos registrados."
+    }
+
+    // 2. MEGA PROMPT ORIGINAL CON INYECCIÓN DINÁMICA
+    const MEGA_SYSTEM_PROMPT_DINAMICO = MEGA_SYSTEM_PROMPT
+      .replace('{nombre del usuario}', nombreUsuario || 'amigo/a')
+      .replace('${BASE_CONOCIMIENTO}', 'Usa la información general de la escuela y los cursos de Supabase.')
+      .replace('${TABLA_LOGICA_CURSOS}', baseConocimientoDinamica)
 
     const { text } = await generateText({
       model: openai('gpt-4o-mini'),
       messages: [
-        { role: 'system', content: systemMsg },
+        { role: 'system', content: MEGA_SYSTEM_PROMPT_DINAMICO },
         ...mensajes
       ],
       temperature: 0.7,

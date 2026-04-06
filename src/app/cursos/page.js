@@ -22,6 +22,8 @@ const camposCurso = [
   },
   { nombre: 'precio', etiqueta: 'Precio (USD)', tipo: 'number', placeholder: 'Ej: 599', requerido: false },
   { nombre: 'capacidad', etiqueta: 'Capacidad (alumnos)', tipo: 'number', placeholder: 'Ej: 10', requerido: false },
+  { nombre: 'edad_minima', etiqueta: 'Edad Mínima', tipo: 'number', placeholder: 'Ej: 6', requerido: true },
+  { nombre: 'edad_maxima', etiqueta: 'Edad Máxima', tipo: 'number', placeholder: 'Ej: 13', requerido: true },
   { nombre: 'imagen_url', etiqueta: 'URL de imagen', tipo: 'url', placeholder: 'https://...', requerido: false },
 ]
 

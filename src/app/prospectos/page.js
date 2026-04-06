@@ -1,306 +1,255 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Etiqueta from '@/componentes/Etiqueta'
-import ModalFormulario from '@/componentes/ModalFormulario'
-
-const camposProspecto = [
-  { nombre: 'nombre', etiqueta: 'Nombre completo', tipo: 'text', placeholder: 'Ej: María López García', requerido: true },
-  { nombre: 'correo', etiqueta: 'Correo electrónico', tipo: 'email', placeholder: 'ejemplo@correo.com', requerido: false },
-  { nombre: 'telefono', etiqueta: 'Teléfono', tipo: 'tel', placeholder: '+52 555 123 4567', requerido: false },
-  { nombre: 'curso_interes', etiqueta: 'Curso de interés', tipo: 'text', placeholder: 'Ej: Inglés de Negocios', requerido: false },
-  { nombre: 'edad', etiqueta: 'Edad (años)', tipo: 'number', placeholder: 'Ej: 12', requerido: false },
-  { nombre: 'nivel', etiqueta: 'Nivel', tipo: 'text', placeholder: 'Ej: Básico A1', requerido: false },
-  {
-    nombre: 'estado', etiqueta: 'Estado', tipo: 'select', requerido: false,
-    opciones: [
-      { valor: 'nuevo', etiqueta: 'Nuevo' },
-      { valor: 'en_proceso', etiqueta: 'En Proceso' },
-      { valor: 'contactado', etiqueta: 'Contactado' },
-      { valor: 'agendado', etiqueta: 'Agendado' },
-      { valor: 'cerrado', etiqueta: 'Cerrado' },
-    ]
-  },
-  { nombre: 'notas', etiqueta: 'Notas', tipo: 'textarea', placeholder: 'Notas adicionales...', requerido: false },
-]
+import { supabase } from '@/lib/supabase'
 
 export default function PaginaProspectos() {
   const [prospectos, setProspectos] = useState([])
   const [cargando, setCargando] = useState(true)
-  const [modalAbierto, setModalAbierto] = useState(false)
-  const [filtroEstado, setFiltroEstado] = useState('todos')
-  const [busqueda, setBusqueda] = useState('')
-
+  const [filtroEstado, setFiltroEstado] = useState('Todos')
+  const [prospectoSeleccionado, setProspectoSeleccionado] = useState(null)
+  
   const cargarProspectos = async () => {
     setCargando(true)
-    try {
-      const parametros = new URLSearchParams()
-      if (filtroEstado !== 'todos') parametros.set('estado', filtroEstado)
-      if (busqueda) parametros.set('busqueda', busqueda)
-
-      const respuesta = await fetch(`/api/prospectos?${parametros}`)
-      const datos = await respuesta.json()
-      setProspectos(Array.isArray(datos) ? datos : [])
-    } catch (error) {
-      console.error('Error al cargar prospectos:', error)
-    } finally {
-      setCargando(false)
+    const { data, error } = await supabase
+      .from('prospectos')
+      .select('*, citas(id, fecha, hora, estado), conversaciones(id_plataforma, ultimo_mensaje)')
+      .order('creado_en', { ascending: false })
+      
+    if (!error && data) {
+      setProspectos(data)
     }
+    setCargando(false)
   }
 
   useEffect(() => {
     cargarProspectos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado])
+  }, [])
 
-  const crearProspecto = async (datos) => {
-    const respuesta = await fetch('/api/prospectos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos),
-    })
-    if (respuesta.ok) {
-      cargarProspectos()
-    }
+  const exportarCSV = () => {
+    const csvHeader = 'Alumno,Contacto/Tutor,Teléfono,Curso,Edad,Nivel,Estado,Lead Score,Creado\n'
+    const csvRows = prospectos.map(p => 
+      `"${p.nombre_alumno || ''}","${p.nombre || ''}","${p.telefono || ''}","${p.curso_interes || ''}","${p.edad || ''}","${p.nivel || ''}","${p.estado || ''}","${p.lead_score || ''}","${p.creado_en || ''}"`
+    ).join('\n')
+    const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `prospectos_totalenglish_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
-  const actualizarEstado = async (id, nuevoEstado) => {
-    const respuesta = await fetch('/api/prospectos', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, estado: nuevoEstado }),
-    })
-    if (respuesta.ok) {
-      cargarProspectos()
-    }
-  }
-
-  const eliminarProspecto = async (id) => {
-    if (!confirm('¿Estás seguro de eliminar este prospecto?')) return
-    const respuesta = await fetch(`/api/prospectos?id=${id}`, { method: 'DELETE' })
-    if (respuesta.ok) {
-      cargarProspectos()
-    }
-  }
-
-  const obtenerIniciales = (nombre) => {
-    return nombre.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-  }
-
-  const coloresAvatar = ['bg-blue-100 text-blue-700', 'bg-orange-100 text-orange-700', 'bg-green-100 text-green-700', 'bg-red-100 text-red-700', 'bg-purple-100 text-purple-700']
-
-  const estados = [
-    { valor: 'todos', etiqueta: 'Todos' },
-    { valor: 'nuevo', etiqueta: 'Nuevos' },
-    { valor: 'en_proceso', etiqueta: 'En Proceso' },
-    { valor: 'contactado', etiqueta: 'Contactados' },
-    { valor: 'agendado', etiqueta: 'Agendados' },
-    { valor: 'cerrado', etiqueta: 'Cerrados' },
-  ]
-
-  // Datos de ejemplo
-  const prospectosEjemplo = [
-    { id: '1', nombre: 'Julianne Smith', correo: 'julianne.s@outlook.com', telefono: '+1 (555) 902-3412', curso_interes: 'Inglés de Negocios I', estado: 'nuevo', creado_en: new Date().toISOString() },
-    { id: '2', nombre: 'Marko Kovac', correo: 'm.kovac@techglobal.hr', telefono: '+385 91 223 4455', curso_interes: 'Gramática Avanzada', estado: 'en_proceso', creado_en: new Date().toISOString() },
-    { id: '3', nombre: 'Amina Latif', correo: 'amina.lat@university.ae', telefono: '+971 50 123 4567', curso_interes: 'Preparación IELTS', estado: 'agendado', creado_en: new Date().toISOString() },
-    { id: '4', nombre: 'Roberto Rossi', correo: 'robert.rossi@mail.it', telefono: '+39 344 1234567', curso_interes: 'Fluidez Conversacional', estado: 'cerrado', creado_en: new Date().toISOString() },
-  ]
-
-  const datosMostrar = prospectos.length > 0 ? prospectos : prospectosEjemplo
+  const prospectosFiltrados = filtroEstado === 'Todos' 
+    ? prospectos 
+    : prospectos.filter(p => p.estado === filtroEstado.toLowerCase())
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
-      {/* Encabezado */}
-      <section className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-3xl font-extrabold text-[#191c1d] tracking-tight">Gestión de Prospectos</h2>
-            <p className="text-slate-500 text-sm max-w-md">
-              Administra tus prospectos a lo largo del embudo académico. Total de {datosMostrar.length} prospectos activos.
+    <div className="p-6 md:p-10 max-w-7xl mx-auto flex h-[calc(100vh-65px)] gap-6">
+      
+      {/* Columna Principal - Lista */}
+      <div className={`flex-1 flex flex-col ${prospectoSeleccionado ? 'hidden lg:flex' : 'flex'}`}>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-3xl font-extrabold text-[#191c1d] tracking-tight">Directorio de Prospectos</h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Gestiona a los alumnos y sus tutores de contacto.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => {
-                const csvHeader = 'Nombre,Alumno,Email,Teléfono,Curso,Edad,Nivel,Estado,Lead Score,Creado\n'
-                const csvRows = prospectos.map(p => 
-                  `"${p.nombre || ''}","${p.nombre_alumno || ''}","${p.correo || ''}","${p.telefono || ''}","${p.curso_interes || ''}","${p.edad || ''}","${p.nivel || ''}","${p.estado || ''}","${p.lead_score || ''}","${p.creado_en || ''}"`
-                ).join('\n')
-                const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' })
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = `prospectos_totalenglish_${new Date().toISOString().split('T')[0]}.csv`
-                link.click()
-                URL.revokeObjectURL(url)
-              }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-[#191c1d] text-sm font-semibold rounded-xl transition-all active:scale-95"
-            >
+            <button onClick={exportarCSV} className="flex items-center gap-2 px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-[#191c1d] text-sm font-semibold rounded-xl transition-all active:scale-95">
               <span className="material-symbols-outlined text-lg">file_download</span>
-              Exportar CSV
-            </button>
-            <button
-              onClick={() => setModalAbierto(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-900/20 hover:opacity-90 transition-all active:scale-95"
-            >
-              <span className="material-symbols-outlined text-lg">add</span>
-              Nuevo Prospecto
+              Exportar
             </button>
           </div>
         </div>
 
         {/* Filtros */}
-        <div className="bg-[#f3f4f5] rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center">
-          <div className="relative w-full md:w-96">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-            <input
-              className="w-full bg-white border-none rounded-xl py-3 pl-12 pr-4 text-sm ring-1 ring-slate-200/50 focus:ring-2 focus:ring-blue-300 transition-all placeholder:text-slate-400"
-              placeholder="Buscar por nombre, correo o teléfono..."
-              type="text"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && cargarProspectos()}
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
-            {estados.map(est => (
-              <button
-                key={est.valor}
-                onClick={() => setFiltroEstado(est.valor)}
-                className={`px-4 py-2 text-sm font-medium rounded-xl transition-all ${
-                  filtroEstado === est.valor
-                    ? 'bg-[#00236f] text-white'
-                    : 'bg-white text-[#444651] ring-1 ring-slate-200/50 hover:bg-slate-50'
-                }`}
-              >
-                {est.etiqueta}
-              </button>
-            ))}
-          </div>
+        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6 overflow-x-auto shrink-0 w-fit">
+          {['Todos', 'Nuevo', 'En_proceso', 'Contactado', 'Agendado'].map(estado => (
+            <button
+              key={estado}
+              onClick={() => setFiltroEstado(estado)}
+              className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition-all ${
+                filtroEstado === estado 
+                  ? 'bg-white text-blue-900 shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+              }`}
+            >
+              {estado.replace('_', ' ')}
+            </button>
+          ))}
         </div>
-      </section>
 
-      {/* Tabla */}
-      <section className="bg-white rounded-3xl overflow-hidden shadow-2xl shadow-blue-900/5 ring-1 ring-slate-100">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Identidad</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Contacto</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Perfil</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Interés</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Lead Score</th>
-                <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400">Estado</th>
-                <th className="px-6 py-5 text-right text-[11px] font-bold uppercase tracking-widest text-slate-400">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {cargando ? (
-                <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-400">Cargando prospectos...</td></tr>
-              ) : prospectos.length === 0 ? (
-                <tr><td colSpan="7" className="px-6 py-12 text-center text-slate-400">No hay prospectos registrados.</td></tr>
-              ) : prospectos.map((prospecto, indice) => (
-                <tr key={prospecto.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4 border-l-4 border-transparent group-hover:border-blue-200 pl-2 transition-all">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${coloresAvatar[indice % coloresAvatar.length]}`}>
-                        {obtenerIniciales(prospecto.nombre_alumno || prospecto.nombre)}
+        {/* Tabla/Lista */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-[#f8f9fa] sticky top-0 z-10 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Alumno (Prospecto)</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Contacto Origen</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Curso / Interés</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Estado</th>
+                  <th className="px-6 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">Score</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cargando ? (
+                  <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400"><span className="material-symbols-outlined animate-spin align-middle mr-2">refresh</span>Cargando...</td></tr>
+                ) : prospectosFiltrados.length === 0 ? (
+                  <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">No hay prospectos.</td></tr>
+                ) : prospectosFiltrados.map(p => (
+                  <tr 
+                    key={p.id} 
+                    onClick={() => setProspectoSeleccionado(p)}
+                    className={`hover:bg-blue-50/50 cursor-pointer transition-colors ${prospectoSeleccionado?.id === p.id ? 'bg-blue-50/80' : ''}`}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-[#191c1d]">
+                        {p.nombre_alumno || p.nombre}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-[#191c1d]">{prospecto.nombre_alumno || prospecto.nombre}</span>
-                        <span className="text-[11px] text-slate-400 uppercase tracking-tighter">
-                          {prospecto.creado_en ? `Registrado ${obtenerTiempoRelativo(prospecto.creado_en)}` : ''}
-                        </span>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {p.edad ? `${p.edad} años` : 'Edad no def.'} • Nivel {p.nivel || '?'}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex flex-col text-sm text-slate-600">
-                      <span className="text-xs">{prospecto.telefono || '-'}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex flex-col gap-1">
-                      <div className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-xs font-semibold w-fit">
-                        {prospecto.curso_interes || 'Sin especificar'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px] text-green-600">message</span>
+                        {p.telefono}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">
-                        {prospecto.edad || '??'} años {prospecto.categoria_edad && `• ${prospecto.categoria_edad}`} • {prospecto.nivel || '??'}
+                      <div className="text-[11px] text-slate-400 mt-0.5 ml-5">
+                        De: {p.nombre}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    {prospecto.lead_score ? (
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-black ${
-                        prospecto.lead_score === 'CALIENTE' ? 'bg-red-100 text-red-600' :
-                        prospecto.lead_score === 'TIBIO' ? 'bg-amber-100 text-amber-600' :
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-700 font-medium">
+                        {p.curso_interes || 'Por definir'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
+                        p.estado === 'agendado' ? 'bg-green-100 text-green-700' :
+                        p.estado === 'en_proceso' ? 'bg-blue-100 text-blue-700' :
+                        p.estado === 'contactado' ? 'bg-amber-100 text-amber-700' :
                         'bg-slate-100 text-slate-600'
                       }`}>
-                        {prospecto.lead_score}
+                        {p.estado}
                       </span>
-                    ) : (
-                      <span className="text-slate-300 text-xs">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-5">
-                    <Etiqueta estado={prospecto.estado} />
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <select
-                        className="text-xs border-none bg-transparent focus:ring-0 text-slate-400 cursor-pointer"
-                        value={prospecto.estado}
-                        onChange={(e) => actualizarEstado(prospecto.id, e.target.value)}
-                      >
-                        <option value="nuevo">Nuevo</option>
-                        <option value="en_proceso">En Proceso</option>
-                        <option value="contactado">Contactado</option>
-                        <option value="agendado">Agendado</option>
-                        <option value="cerrado">Cerrado</option>
-                      </select>
-                      <button
-                        onClick={() => eliminarProspecto(prospecto.id)}
-                        className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                      >
-                        <span className="material-symbols-outlined text-lg">delete</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-2 py-1 rounded inline-block text-[10px] font-black uppercase tracking-wider ${
+                        p.lead_score === 'CALIENTE' ? 'text-red-600 bg-red-50' : 
+                        p.lead_score === 'TIBIO' ? 'text-amber-600 bg-amber-50' : 
+                        'text-slate-400 bg-slate-50'
+                      }`}>
+                        {p.lead_score || 'N/A'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="px-6 py-4 bg-slate-50/30 flex items-center justify-between">
-          <span className="text-xs text-slate-500 font-medium tracking-wide">
-            Mostrando {datosMostrar.length} prospectos
-          </span>
-        </div>
-      </section>
+      </div>
 
-      {/* Modal */}
-      <ModalFormulario
-        abierto={modalAbierto}
-        alCerrar={() => setModalAbierto(false)}
-        titulo="Nuevo Prospecto"
-        campos={camposProspecto}
-        alEnviar={crearProspecto}
-        textoBoton="Crear Prospecto"
-      />
+      {/* Slide-over Detalles del Prospecto */}
+      {prospectoSeleccionado && (
+        <div className="w-full lg:w-[400px] shrink-0 bg-white border border-slate-200 shadow-2xl lg:shadow-sm rounded-2xl flex flex-col h-full animate-[fadeIn_0.2s_ease-out]">
+          {/* Header Modal */}
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
+            <h3 className="font-bold text-[#1e3a8a] flex items-center gap-2">
+              <span className="material-symbols-outlined">badge</span>
+              Expediente
+            </h3>
+            <button onClick={() => setProspectoSeleccionado(null)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 text-slate-400">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {/* Info Principal */}
+            <div className="p-6 text-center border-b border-slate-100 relative">
+              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-[#1e3a8a] to-[#0f172a] text-white flex items-center justify-center text-3xl font-bold shadow-md">
+                {(prospectoSeleccionado.nombre_alumno || prospectoSeleccionado.nombre)?.[0]?.toUpperCase()}
+              </div>
+              <h2 className="text-xl font-bold text-[#191c1d] mt-4">
+                {prospectoSeleccionado.nombre_alumno || prospectoSeleccionado.nombre}
+              </h2>
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                <span className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                  prospectoSeleccionado.estado === 'agendado' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {prospectoSeleccionado.estado}
+                </span>
+                {prospectoSeleccionado.lead_score && (
+                  <span className={`px-2.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                    prospectoSeleccionado.lead_score === 'CALIENTE' ? 'text-red-700 bg-red-100/50' : 'text-amber-700 bg-amber-100/50'
+                  }`}>
+                    {prospectoSeleccionado.lead_score}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Ficha Académica */}
+            <div className="p-6 border-b border-slate-100">
+              <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-4">Perfil Académico</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-500 block mb-1">Edad</span>
+                  <span className="font-bold text-slate-800">{prospectoSeleccionado.edad ? `${prospectoSeleccionado.edad} años` : '—'}</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-500 block mb-1">Nivel</span>
+                  <span className="font-bold text-slate-800">{prospectoSeleccionado.nivel || '—'}</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 col-span-2">
+                  <span className="text-[10px] text-slate-500 block mb-1">Curso de Interés</span>
+                  <span className="font-bold text-slate-800">{prospectoSeleccionado.curso_interes || '—'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Contacto y Citas */}
+            <div className="p-6">
+              <div className="mb-6">
+                <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Contacto Origen</h4>
+                <div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                  <span className="material-symbols-outlined text-green-600 text-3xl">chat</span>
+                  <div className="flex-1">
+                    <p className="font-bold text-[#191c1d] text-sm">{prospectoSeleccionado.nombre}</p>
+                    <p className="text-xs text-slate-500 font-medium">{prospectoSeleccionado.telefono}</p>
+                  </div>
+                </div>
+              </div>
+
+              {prospectoSeleccionado.citas && prospectoSeleccionado.citas.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Historial de Citas</h4>
+                  <div className="space-y-2">
+                    {prospectoSeleccionado.citas.map(cita => (
+                      <div key={cita.id} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-slate-400 text-lg">event</span>
+                          <div>
+                            <p className="text-sm font-bold text-slate-700">{cita.fecha}</p>
+                            <p className="text-[11px] text-slate-500">{cita.hora}</p>
+                          </div>
+                        </div>
+                        <span className={`text-[9px] px-2 py-1 rounded font-bold uppercase ${
+                          cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                        }`}>{cita.estado}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
-
-function obtenerTiempoRelativo(fecha) {
-  if (!fecha) return ''
-  const ahora = new Date()
-  const fechaCreacion = new Date(fecha)
-  const diferencia = ahora - fechaCreacion
-  const dias = Math.floor(diferencia / 86400000)
-  if (dias < 1) return 'hoy'
-  if (dias === 1) return 'ayer'
-  if (dias < 7) return `hace ${dias} días`
-  if (dias < 30) return `hace ${Math.floor(dias / 7)} semana(s)`
-  return `hace ${Math.floor(dias / 30)} mes(es)`
 }

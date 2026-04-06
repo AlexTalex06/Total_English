@@ -219,22 +219,26 @@ export default function PaginaCitas() {
                 ) : datosMostrar.map((cita) => (
                   <div key={cita.id} className="group flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border-l-4 border-transparent hover:border-[#00236f]">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-[#00236f] font-bold">
-                        {cita.prospectos?.nombre?.[0] || '?'}
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-[#00236f] font-bold text-xl uppercase shadow-inner">
+                        {cita.prospectos?.nombre_alumno?.[0] || cita.prospectos?.nombre?.[0] || '?'}
                       </div>
                       <div>
-                        <h4 className="font-bold text-blue-900 group-hover:text-[#00236f] transition-colors">
-                          {cita.prospectos?.nombre_alumno || cita.prospectos?.nombre || 'Sin nombre'}
+                        <h4 className="font-bold text-blue-900 group-hover:text-[#00236f] transition-colors flex items-center gap-1.5">
+                          {cita.prospectos?.nombre_alumno || 'Alumno Desconocido'}
                         </h4>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">school</span>
-                          {cita.tipo || 'Consulta general'}
+                        <p className="text-xs text-slate-500 font-medium">
+                          <span className="material-symbols-outlined text-[12px] inline-block mr-1">person</span>
+                          A cargo de: {cita.prospectos?.nombre}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 bg-slate-100 w-fit px-2 py-0.5 rounded-full">
+                          <span className="material-symbols-outlined text-[11px]">call</span>
+                          {cita.prospectos?.telefono || 'Sin teléfono'}
                         </p>
                       </div>
                     </div>
                     <div className="text-right flex items-center gap-3">
                       <div>
-                        <p className="font-bold text-blue-900">{cita.hora}</p>
+                        <p className="font-bold text-blue-900 text-lg">{cita.hora}</p>
                         <Etiqueta estado={cita.estado} />
                       </div>
                       <select
@@ -261,28 +265,49 @@ export default function PaginaCitas() {
             </div>
           </div>
 
-          {/* Notas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#f3f4f5] rounded-2xl p-6 border-l-8 border-[#6e2c00]">
-              <h4 className="font-bold text-[#6e2c00] mb-2">Notas de Preparación</h4>
-              <ul className="text-sm space-y-2 text-[#444651]">
-                <li className="flex items-start gap-2">
-                  <span className="material-symbols-outlined text-sm mt-1">check_circle</span>
-                  Revisar criterios de Speaking IELTS
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="material-symbols-outlined text-sm mt-1">check_circle</span>
-                  Enviar casos de estudio de negocios
-                </li>
-              </ul>
-            </div>
-            <div className="bg-[#f3f4f5] rounded-2xl p-6 border-l-8 border-[#1e3a8a]">
-              <h4 className="font-bold text-[#1e3a8a] mb-2">Cola de Recursos</h4>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className="bg-white/80 px-3 py-1 rounded-full text-[10px] font-bold text-[#1e3a8a] shadow-sm border border-blue-100">Examen_Ubicacion_V2.pdf</span>
-                <span className="bg-white/80 px-3 py-1 rounded-full text-[10px] font-bold text-[#1e3a8a] shadow-sm border border-blue-100">Rubrica_IELTS.xlsx</span>
+          {/* Expediente Rápido (reemplazo de notas estáticas) */}
+          <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+            <h4 className="font-bold text-[#1e3a8a] mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined">assignment_ind</span>
+              Expediente del Día ({citasHoy.length} citas hoy)
+            </h4>
+            
+            {citasHoy.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {citasHoy.map(cita => (
+                  <div key={'exp_'+cita.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-sm text-slate-800">{cita.prospectos?.nombre_alumno}</span>
+                      <span className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded-md text-slate-500">{cita.hora}</span>
+                    </div>
+                    <div className="space-y-1.5 mt-3">
+                      <div className="bg-white p-2 rounded-lg text-xs flex justify-between border border-slate-100 shadow-sm">
+                        <span className="text-slate-400 font-medium">Edad:</span>
+                        <span className="font-bold text-slate-700">{cita.prospectos?.edad ? `${cita.prospectos.edad} años` : 'No registra'}</span>
+                      </div>
+                      <div className="bg-white p-2 rounded-lg text-xs flex justify-between border border-slate-100 shadow-sm">
+                        <span className="text-slate-400 font-medium">Nivel:</span>
+                        <span className="font-bold text-slate-700">{cita.prospectos?.nivel || 'Desde cero'}</span>
+                      </div>
+                      <div className="bg-blue-50/50 p-2 rounded-lg text-xs mt-2 border border-blue-100">
+                        <span className="text-blue-500 font-bold block mb-0.5">Interés Principal:</span>
+                        <span className="font-medium text-slate-600">{cita.prospectos?.curso_interes || 'Por decidir'}</span>
+                      </div>
+                      {cita.notas && (
+                        <div className="bg-amber-50 p-2 rounded-lg text-xs mt-2 text-amber-800 border border-amber-100">
+                          <strong>Nota:</strong> {cita.notas}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 bg-slate-50 rounded-2xl">
+                <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">event_available</span>
+                <p className="text-slate-500 text-sm">No tienes citas programadas para hoy.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -29,7 +29,9 @@ export async function POST(solicitud) {
     nivel: cuerpo.nivel || null,
     imagen_url: cuerpo.imagen_url || null,
     precio: cuerpo.precio ? Number(cuerpo.precio) : null,
-    capacidad: cuerpo.capacidad ? Number(cuerpo.capacidad) : null
+    capacidad: cuerpo.capacidad ? Number(cuerpo.capacidad) : null,
+    edad_minima: cuerpo.edad_minima ? Number(cuerpo.edad_minima) : 0,
+    edad_maxima: cuerpo.edad_maxima ? Number(cuerpo.edad_maxima) : 99
   }
 
   const { data: curso, error } = await supabase
