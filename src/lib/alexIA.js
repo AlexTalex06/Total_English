@@ -231,17 +231,27 @@ CASO DINÁMICO - CURSO: ${c.nombre}
     // Parse JSON response
     let parsed
     try {
-      // Clean markdown code blocks if present
       let cleanText = text.trim()
-      if (cleanText.startsWith('```')) {
-        cleanText = cleanText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+      
+      // Inteligencia contra alucinaciones del LLM (si responde texto antes del JSON)
+      const firstBrace = cleanText.indexOf('{')
+      const lastBrace = cleanText.lastIndexOf('}')
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        cleanText = cleanText.substring(firstBrace, lastBrace + 1)
+      } else {
+         throw new Error("No se encontró estructura JSON válida en la respuesta")
       }
+      
       parsed = JSON.parse(cleanText)
     } catch {
       console.warn('⚠️ AlexIA no retornó JSON válido. Respuesta raw:', text.substring(0, 200))
-      // Fallback: use raw text as response
+      // Fallback: mandar el inicio del texto pero evitando mandar un bloque JSON visual feo
+      let textoSinJson = text.split('{')[0].trim() || text
+      textoSinJson = textoSinJson.replace(/```json\n?|\n?```/g, '')
+      
       return {
-        respuesta: text.replace(/```json\n?|\n?```/g, '').replace(/^{[\s\S]*}$/, text),
+        respuesta: textoSinJson,
         datos: {},
         intencion: 'SEGUIMIENTO'
       }
