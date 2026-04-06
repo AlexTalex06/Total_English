@@ -1,21 +1,27 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { useState, useRef, useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useAuth } from '@/componentes/AuthProvider'
+import { supabase } from '@/lib/supabase'
 
 export default function BarraSuperior() {
   const rutaActual = usePathname()
+  const router = useRouter()
+  const { usuario, logout } = useAuth()
   
   const [menuPerfilAbierto, setMenuPerfilAbierto] = useState(false)
   const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [resultados, setResultados] = useState([])
   const [mostrandoResultados, setMostrandoResultados] = useState(false)
+  const [notificaciones, setNotificaciones] = useState([])
+  const [notifCount, setNotifCount] = useState(0)
 
   const menuRef = useRef(null)
   const notifRef = useRef(null)
   const searchRef = useRef(null)
 
-  // Cerrar dropdowns al hacer click afuera
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) setMenuPerfilAbierto(false)
@@ -26,6 +32,81 @@ export default function BarraSuperior() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // Load notifications from DB
+  useEffect(() => {
+    const cargarNotificaciones = async () => {
+      const notifs = []
+      
+      // New prospects (last 24h)
+      const { data: newProspectos } = await supabase
+        .from('prospectos')
+        .select('id, nombre, nombre_alumno, creado_en')
+        .gte('creado_en', new Date(Date.now() - 24*60*60*1000).toISOString())
+        .order('creado_en', { ascending: false })
+        .limit(5)
+      
+      if (newProspectos) {
+        newProspectos.forEach(p => {
+          notifs.push({
+            id: 'p_' + p.id,
+            tipo: 'prospecto',
+            icono: 'person_add',
+            color: 'bg-blue-100 text-blue-600',
+            texto: `Nuevo prospecto: ${p.nombre_alumno || p.nombre}`,
+            tiempo: obtenerTiempoRelativo(p.creado_en)
+          })
+        })
+      }
+
+      // Pending appointments today
+      const hoy = new Date().toISOString().split('T')[0]
+      const { data: citasHoy } = await supabase
+        .from('citas')
+        .select('id, hora, prospectos(nombre, nombre_alumno)')
+        .eq('fecha', hoy)
+        .eq('estado', 'pendiente')
+        .limit(3)
+      
+      if (citasHoy) {
+        citasHoy.forEach(c => {
+          notifs.push({
+            id: 'c_' + c.id,
+            tipo: 'cita',
+            icono: 'event',
+            color: 'bg-orange-100 text-orange-600',
+            texto: `Cita pendiente: ${c.prospectos?.nombre_alumno || c.prospectos?.nombre || 'Sin nombre'} a las ${c.hora}`,
+            tiempo: 'Hoy'
+          })
+        })
+      }
+
+      // Unread messages
+      const { count } = await supabase
+        .from('mensajes')
+        .select('*', { count: 'exact', head: true })
+        .eq('leido', false)
+        .eq('remitente', 'usuario')
+      
+      if (count > 0) {
+        notifs.unshift({
+          id: 'msg_unread',
+          tipo: 'mensaje',
+          icono: 'forum',
+          color: 'bg-green-100 text-green-600',
+          texto: `${count} mensaje${count > 1 ? 's' : ''} sin leer en el Inbox`,
+          tiempo: 'Ahora'
+        })
+      }
+
+      setNotificaciones(notifs)
+      setNotifCount(notifs.length)
+    }
+
+    cargarNotificaciones()
+    const interval = setInterval(cargarNotificaciones, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   const titulosDeRutas = {
     '/': 'Panel Principal',
     '/prospectos': 'CRM y Prospectos',
@@ -33,31 +114,83 @@ export default function BarraSuperior() {
     '/cursos': 'Gestión de Cursos',
     '/campanas': 'Campañas de Marketing',
     '/configuracion': 'Configuración de Canales',
-    '/inbox': 'Inbox Multicanal'
+    '/inbox': 'Inbox Multicanal',
+    '/usuarios': 'Gestión de Usuarios'
   }
 
   const tituloActual = titulosDeRutas[rutaActual] || 'Panel Principal'
 
-  // Manejo de Búsqueda Falsa (muestra no resultados)
-  const manejarBusqueda = (e) => {
-    setBusqueda(e.target.value)
-    if (e.target.value.length > 0) {
-      setMostrandoResultados(true)
-    } else {
+  // Real search
+  const buscar = useCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setResultados([])
       setMostrandoResultados(false)
+      return
     }
+
+    const results = []
+
+    // Search prospectos
+    const { data: prospectos } = await supabase
+      .from('prospectos')
+      .select('id, nombre, nombre_alumno, telefono, estado')
+      .or(`nombre.ilike.%${query}%,nombre_alumno.ilike.%${query}%,telefono.ilike.%${query}%`)
+      .limit(5)
+
+    if (prospectos) {
+      prospectos.forEach(p => {
+        results.push({
+          tipo: 'prospecto',
+          icono: 'person',
+          nombre: p.nombre_alumno || p.nombre,
+          detalle: p.telefono || p.estado,
+          ruta: '/prospectos'
+        })
+      })
+    }
+
+    // Search conversations
+    const { data: convs } = await supabase
+      .from('conversaciones')
+      .select('id, id_plataforma, prospectos(nombre, nombre_alumno)')
+      .or(`id_plataforma.ilike.%${query}%`)
+      .limit(3)
+
+    if (convs) {
+      convs.forEach(c => {
+        results.push({
+          tipo: 'chat',
+          icono: 'chat',
+          nombre: c.prospectos?.nombre_alumno || c.prospectos?.nombre || c.id_plataforma,
+          detalle: c.id_plataforma,
+          ruta: '/inbox'
+        })
+      })
+    }
+
+    setResultados(results)
+    setMostrandoResultados(true)
+  }, [])
+
+  const manejarBusqueda = (e) => {
+    const val = e.target.value
+    setBusqueda(val)
+    buscar(val)
+  }
+
+  const handleLogout = () => {
+    logout()
+    setMenuPerfilAbierto(false)
   }
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20">
       
-      {/* Título de la vista actual */}
       <h1 className="text-xl font-bold text-[#191c1d]">{tituloActual}</h1>
 
-      {/* Controles del lado derecho */}
       <div className="flex items-center gap-4">
         
-        {/* Buscador Universal */}
+        {/* Universal Search */}
         <div className="relative group" ref={searchRef}>
           <div className="flex items-center bg-slate-100 rounded-full px-4 py-2 text-slate-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#1e3a8a] focus-within:shadow-sm transition-all w-64">
             <span className="material-symbols-outlined text-[20px] mr-2 text-slate-400 group-focus-within:text-[#1e3a8a]">search</span>
@@ -67,99 +200,105 @@ export default function BarraSuperior() {
               className="bg-transparent border-none outline-none text-sm w-full placeholder-slate-400"
               value={busqueda}
               onChange={manejarBusqueda}
-              onFocus={() => { if(busqueda) setMostrandoResultados(true) }}
+              onFocus={() => { if(busqueda.length >= 2) setMostrandoResultados(true) }}
             />
           </div>
 
-          {/* Resultados de búsqueda (Falso) */}
           {mostrandoResultados && (
-            <div className="absolute top-12 left-0 w-full bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden py-2 z-50 animate-in fade-in slide-in-from-top-2">
-              <div className="px-4 py-3 pb-2 text-xs font-bold uppercase text-slate-400">Resultados</div>
-              <div className="px-4 py-6 flex flex-col items-center justify-center text-center">
-                <span className="material-symbols-outlined text-slate-300 text-3xl mb-2">search_off</span>
-                <p className="text-sm text-slate-500 font-medium">No se encontraron resultados para &quot;{busqueda}&quot;</p>
-                <p className="text-xs text-slate-400 mt-1">Intenta con otro nombre o teléfono</p>
-              </div>
+            <div className="absolute top-12 left-0 w-full bg-white border border-slate-200 shadow-lg rounded-xl overflow-hidden py-2 z-50">
+              <div className="px-4 py-2 text-xs font-bold uppercase text-slate-400">Resultados</div>
+              {resultados.length === 0 ? (
+                <div className="px-4 py-6 flex flex-col items-center justify-center text-center">
+                  <span className="material-symbols-outlined text-slate-300 text-3xl mb-2">search_off</span>
+                  <p className="text-sm text-slate-500 font-medium">No se encontraron resultados</p>
+                </div>
+              ) : (
+                resultados.map((r, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { router.push(r.ruta); setMostrandoResultados(false); setBusqueda('') }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-slate-400">{r.icono}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{r.nombre}</p>
+                      <p className="text-[11px] text-slate-400">{r.detalle}</p>
+                    </div>
+                    <span className="text-[9px] font-bold uppercase text-slate-300 ml-auto shrink-0">{r.tipo}</span>
+                  </button>
+                ))
+              )}
             </div>
           )}
         </div>
 
         <div className="h-6 w-px bg-slate-200 mx-2"></div>
 
-        {/* Campana de Notificaciones */}
+        {/* Notifications */}
         <div className="relative" ref={notifRef}>
           <button 
             onClick={() => setNotificacionesAbiertas(!notificacionesAbiertas)}
             className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-500 hover:bg-slate-100 transition-colors relative"
           >
             <span className="material-symbols-outlined text-[22px]">notifications</span>
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+            {notifCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full ring-2 ring-white text-white text-[8px] font-bold flex items-center justify-center">
+                {notifCount > 9 ? '9+' : notifCount}
+              </span>
+            )}
           </button>
 
-          {/* Dropdown Notificaciones */}
           {notificacionesAbiertas && (
-            <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+            <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 className="font-bold text-[#191c1d]">Notificaciones</h3>
-                <button className="text-[#1e3a8a] text-xs font-bold hover:underline">Marcar leídas</button>
+                <span className="text-[#1e3a8a] text-xs font-bold">{notifCount} nuevas</span>
               </div>
               <div className="max-h-80 overflow-y-auto">
-                <div className="p-4 border-b border-slate-50 hover:bg-slate-50 flex gap-3 cursor-pointer">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-sm">forum</span>
+                {notificaciones.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-sm">Sin notificaciones nuevas</div>
+                ) : notificaciones.map(n => (
+                  <div key={n.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 flex gap-3 cursor-pointer">
+                    <div className={`w-8 h-8 rounded-full ${n.color} flex items-center justify-center shrink-0`}>
+                      <span className="material-symbols-outlined text-sm">{n.icono}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-800 truncate">{n.texto}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{n.tiempo}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-800"><span className="font-bold">WhatsApp:</span> Alex agendó cita con María G.</p>
-                    <p className="text-xs text-slate-400 mt-1">Hace 2 minutos</p>
-                  </div>
-                </div>
-                <div className="p-4 border-b border-slate-50 hover:bg-slate-50 flex gap-3 cursor-pointer">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-sm">system_update</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-800">Actualización del sistema Total English completada.</p>
-                    <p className="text-xs text-slate-400 mt-1">Ayer</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-3 text-center border-t border-slate-100">
-                <button className="text-sm font-semibold text-slate-500 hover:text-[#1e3a8a]">Ver todas</button>
+                ))}
               </div>
             </div>
           )}
         </div>
 
-        {/* Perfil de Usuario */}
+        {/* Profile */}
         <div className="relative" ref={menuRef}>
           <button 
             onClick={() => setMenuPerfilAbierto(!menuPerfilAbierto)}
             className="flex items-center gap-3 pl-2 pr-1 py-1 rounded-full hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all focus:outline-none"
           >
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-[#191c1d]">Admin Total</p>
-              <p className="text-xs text-slate-500">Director</p>
+              <p className="text-sm font-bold text-[#191c1d]">{usuario?.nombre || 'Usuario'}</p>
+              <p className="text-xs text-slate-500 capitalize">{usuario?.rol || 'Asesor'}</p>
             </div>
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-tr from-[#00236f] to-[#1e3a8a] flex items-center justify-center text-white shadow-sm ring-2 ring-white">
-              <span className="font-bold text-sm tracking-widest">TE</span>
+              <span className="font-bold text-sm">{usuario?.nombre?.[0]?.toUpperCase() || 'U'}</span>
             </div>
           </button>
 
-          {/* Dropdown del Perfil */}
           {menuPerfilAbierto && (
-            <div className="absolute right-0 top-14 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-              <div className="px-4 py-3 border-b border-slate-100 md:hidden">
-                <p className="text-sm font-bold text-[#191c1d]">Admin Total</p>
-                <p className="text-xs text-slate-500">Director</p>
+            <div className="absolute right-0 top-14 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
+              <div className="px-4 py-3 border-b border-slate-100">
+                <p className="text-sm font-bold text-[#191c1d]">{usuario?.nombre}</p>
+                <p className="text-xs text-slate-500">{usuario?.email}</p>
               </div>
-              <button onClick={()=> alert("Función Mi Perfil en desarrollo")} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px] text-slate-400">person</span> Mi Perfil
-              </button>
-              <button onClick={()=> window.location.href='/configuracion'} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+              <button onClick={() => { router.push('/configuracion'); setMenuPerfilAbierto(false) }} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px] text-slate-400">settings</span> Configuración
               </button>
               <div className="h-px bg-slate-100 my-1"></div>
-              <button onClick={()=> alert("Se cerraría la sesión.")} className="w-full text-left px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-3 group">
+              <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-3 group">
                 <span className="material-symbols-outlined text-[18px] text-red-400 group-hover:text-red-600">logout</span> Cerrar Sesión
               </button>
             </div>
@@ -169,4 +308,15 @@ export default function BarraSuperior() {
       </div>
     </header>
   )
+}
+
+function obtenerTiempoRelativo(fecha) {
+  if (!fecha) return ''
+  const diff = Date.now() - new Date(fecha).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Justo ahora'
+  if (mins < 60) return `Hace ${mins} min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `Hace ${hrs}h`
+  return `Hace ${Math.floor(hrs/24)}d`
 }

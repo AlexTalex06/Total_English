@@ -16,11 +16,6 @@ export async function GET(solicitud) {
 }
 
 export async function POST(solicitud) {
-  // --- PAUSA TEMPORAL DEL WEBHOOK ---
-  // Descomentar el 'return' de abajo pausará por completo este chatbot
-  return NextResponse.json({ estado: 'pausado', mensaje: 'Chatbot en mantenimiento temporal' }, { status: 200 })
-  // ----------------------------------
-
   try {
     const cuerpo = await solicitud.json()
 

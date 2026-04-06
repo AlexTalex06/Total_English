@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import TarjetaMetrica from '@/componentes/TarjetaMetrica'
+import { useAuth } from '@/componentes/AuthProvider'
+import Link from 'next/link'
 
 export default function PaginaPanel() {
+  const { usuario } = useAuth()
   const [prospectos, setProspectos] = useState([])
   const [citas, setCitas] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -48,7 +51,7 @@ export default function PaginaPanel() {
       {/* Bienvenida */}
       <section className="space-y-2">
         <h2 className="text-4xl font-extrabold text-[#191c1d] tracking-tight">
-          Bienvenido de vuelta, Administrador.
+          Bienvenido de vuelta, {usuario?.nombre?.split(' ')[0] || 'Administrador'}.
         </h2>
         <p className="text-[#444651] text-lg max-w-2xl leading-relaxed">
           Aquí está el pulso actual de Total English Academy. Los datos se sincronizan en todos los módulos.
@@ -89,7 +92,7 @@ export default function PaginaPanel() {
         <div className="lg:col-span-2 bg-[#f3f4f5] rounded-xl p-8 space-y-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xl font-bold text-[#191c1d]">Actividad Reciente</h3>
-            <button className="text-sm font-semibold text-[#00236f] hover:underline">Ver todo</button>
+            <Link href="/prospectos" className="text-sm font-semibold text-[#00236f] hover:underline">Ver todo</Link>
           </div>
           <div className="space-y-4">
             {actividadMostrar.map((item, indice) => (

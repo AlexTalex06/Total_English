@@ -120,7 +120,22 @@ export default function PaginaProspectos() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-[#191c1d] text-sm font-semibold rounded-xl transition-all active:scale-95">
+            <button 
+              onClick={() => {
+                const csvHeader = 'Nombre,Alumno,Email,Teléfono,Curso,Edad,Nivel,Estado,Lead Score,Creado\n'
+                const csvRows = prospectos.map(p => 
+                  `"${p.nombre || ''}","${p.nombre_alumno || ''}","${p.correo || ''}","${p.telefono || ''}","${p.curso_interes || ''}","${p.edad || ''}","${p.nivel || ''}","${p.estado || ''}","${p.lead_score || ''}","${p.creado_en || ''}"`
+                ).join('\n')
+                const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `prospectos_totalenglish_${new Date().toISOString().split('T')[0]}.csv`
+                link.click()
+                URL.revokeObjectURL(url)
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-[#191c1d] text-sm font-semibold rounded-xl transition-all active:scale-95"
+            >
               <span className="material-symbols-outlined text-lg">file_download</span>
               Exportar CSV
             </button>

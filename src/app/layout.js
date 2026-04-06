@@ -1,6 +1,8 @@
 import './globals.css'
 import BarraLateral from '@/componentes/BarraLateral'
 import BarraSuperior from '@/componentes/BarraSuperior'
+import { AuthProvider } from '@/componentes/AuthProvider'
+import AuthGuard from '@/componentes/AuthGuard'
 
 export const metadata = {
   title: 'Total English - Sistema de Gestión Académica',
@@ -17,11 +19,15 @@ export default function LayoutRaiz({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-[#f8f9fa] text-[#191c1d] min-h-screen">
-        <BarraLateral />
-        <main className="md:ml-72 min-h-screen pb-20 md:pb-0">
-          <BarraSuperior />
-          {children}
-        </main>
+        <AuthProvider>
+          <AuthGuard>
+            <BarraLateral />
+            <main className="md:ml-72 min-h-screen pb-20 md:pb-0">
+              <BarraSuperior />
+              {children}
+            </main>
+          </AuthGuard>
+        </AuthProvider>
       </body>
     </html>
   )
