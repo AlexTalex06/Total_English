@@ -4,25 +4,45 @@ import { useState, useEffect } from 'react'
 import ModalFormulario from '@/componentes/ModalFormulario'
 
 const camposCampana = [
-  { nombre: 'nombre', etiqueta: 'Nombre de la campaña', tipo: 'text', placeholder: 'Ej: Intensivo de Verano 2024', requerido: true },
-  { nombre: 'mensaje', etiqueta: 'Mensaje / Plantilla', tipo: 'textarea', placeholder: 'Escribe el mensaje de la campaña...', requerido: true },
+  { nombre: 'nombre', etiqueta: 'Nombre de la campaña', tipo: 'text', placeholder: 'Ej: Promoción Buen Fin', requerido: true },
+  { nombre: 'nombre_plantilla', etiqueta: 'Nombre Plantilla META (Template)', tipo: 'text', placeholder: 'Ej: promo_buen_fin_v1', requerido: true },
+  { nombre: 'mensaje', etiqueta: 'Referencia visual del mensaje', tipo: 'textarea', placeholder: 'Texto para recordar de qué trata la plantilla...', requerido: false },
   {
-    nombre: 'canal', etiqueta: 'Canal', tipo: 'select', requerido: false,
+    nombre: 'publico_estado', etiqueta: 'Público (Estado)', tipo: 'select', requerido: false,
     opciones: [
-      { valor: 'whatsapp', etiqueta: 'WhatsApp' },
-      { valor: 'email', etiqueta: 'Correo Electrónico' },
-      { valor: 'sms', etiqueta: 'SMS' },
+      { valor: 'Todos', etiqueta: 'Todos los Estados' },
+      { valor: 'nuevo', etiqueta: 'Nuevos' },
+      { valor: 'contactado', etiqueta: 'Contactados' },
+      { valor: 'en_proceso', etiqueta: 'En Proceso' },
+      { valor: 'agendado', etiqueta: 'Agendados' },
     ]
   },
   {
-    nombre: 'estado', etiqueta: 'Estado', tipo: 'select', requerido: false,
+    nombre: 'publico_curso', etiqueta: 'Público (Curso de Interés)', tipo: 'select', requerido: false,
+    opciones: [
+      { valor: 'Todos', etiqueta: 'Todos los Cursos' },
+      { valor: 'CHILDREN', etiqueta: 'Children' },
+      { valor: 'PRE-TEENS', etiqueta: 'Pre-Teens' },
+      { valor: 'YOUNG', etiqueta: 'Young & Adults' },
+      { valor: 'MY TIME', etiqueta: 'My Time English' },
+    ]
+  },
+  {
+    nombre: 'canal', etiqueta: 'Canal', tipo: 'select', requerido: false,
+    opciones: [
+      { valor: 'whatsapp', etiqueta: 'WhatsApp (API Meta)' }
+    ]
+  },
+  {
+    nombre: 'estado', etiqueta: 'Estado Visual', tipo: 'select', requerido: false,
     opciones: [
       { valor: 'borrador', etiqueta: 'Borrador' },
       { valor: 'programada', etiqueta: 'Programada' },
       { valor: 'activa', etiqueta: 'Activa' },
+      { valor: 'completada', etiqueta: 'Completada' },
     ]
   },
-  { nombre: 'imagen_url', etiqueta: 'URL de imagen', tipo: 'url', placeholder: 'https://...', requerido: false },
+  { nombre: 'imagen_url', etiqueta: 'URL de imagen (Opcional)', tipo: 'url', placeholder: 'https://...', requerido: false },
 ]
 
 export default function PaginaCampanas() {
@@ -91,20 +111,41 @@ export default function PaginaCampanas() {
   const eliminarCampana = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta campaña?')) return
     try {
-      console.log('Eliminando campaña con ID:', id)
       const respuesta = await fetch(`/api/campanas?id=${id}`, { method: 'DELETE' })
-      console.log('Respuesta DELETE campaña:', respuesta.status, respuesta.statusText)
       if (respuesta.ok) {
-        console.log('✅ Campaña eliminada exitosamente')
         await cargarCampanas()
       } else {
         const errorData = await respuesta.json()
-        console.error('❌ Error del servidor:', errorData)
         alert('Error al eliminar: ' + (errorData.error || 'Desconocido'))
       }
     } catch (e) {
-      console.error('❌ Error de conexión:', e)
       alert('Error al conectar: ' + e.message)
+    }
+  }
+
+  const dispararCampana = async (id) => {
+    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros. ¿Estás absolutamente seguro de continuar?')) return
+    
+    setEnviando(id)
+    try {
+      const respuesta = await fetch('/api/campanas/ejecutar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      
+      const resData = await respuesta.json()
+      
+      if (respuesta.ok) {
+        alert(`✅ ¡Campaña Disparada!\nAudiencia encontrada: ${resData.alcance_esperado}\nMensajes enviados: ${resData.envios_exitosos}`)
+        cargarCampanas()
+      } else {
+        alert('❌ Error al disparar: ' + (resData.error || 'Error desconocido'))
+      }
+    } catch (e) {
+      alert('❌ Error de conexión al disparar campaña: ' + e.message)
+    } finally {
+      setEnviando(null)
     }
   }
 
@@ -118,21 +159,12 @@ export default function PaginaCampanas() {
     setCampanaEditando(null)
   }
 
-  const simularEnvio = async (id) => {
-    setEnviando(id)
-    setTimeout(() => {
-      setEnviando(null)
-      alert('✅ Simulación completada: La campaña se ha enviado correctamente (simulación)')
-    }, 3000)
-  }
-
   const datosMostrar = campanas;
 
   const estadisticas = {
     alcanceTotal: datosMostrar.reduce((sum, c) => sum + (c.alcance || 0), 0),
-    tasaConversion: '3.8%',
     activas: datosMostrar.filter(c => c.estado === 'activa').length,
-    presupuesto: '$1.2k',
+    completadas: datosMostrar.filter(c => c.estado === 'completada').length,
   }
 
   const etiquetaEstado = (estado) => {
@@ -142,148 +174,128 @@ export default function PaginaCampanas() {
       completada: 'bg-slate-100 text-slate-600',
       borrador: 'bg-yellow-100 text-yellow-700',
     }
-    const textos = {
-      activa: 'Activa',
-      programada: 'Programada',
-      completada: 'Completada',
-      borrador: 'Borrador',
-    }
     return (
       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${estilos[estado] || estilos.borrador}`}>
-        {textos[estado] || estado}
+        {estado}
       </span>
     )
   }
 
   return (
     <div className="max-w-5xl mx-auto w-full p-4 md:p-6 space-y-6">
-      {/* Barra de acciones */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1d]">Promociones Activas</h1>
-          <p className="text-slate-500 text-sm">Gestiona tus programas de difusión de cursos de inglés</p>
+          <h1 className="text-2xl font-bold text-[#191c1d]">Motor de WhatsApp</h1>
+          <p className="text-slate-500 text-sm">Ejecuta plantillas de envío masivo para tus prospectos</p>
         </div>
         <button
           onClick={() => { setCampanaEditando(null); setModalAbierto(true); }}
           className="flex items-center justify-center gap-2 rounded-xl h-12 px-6 bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/20 hover:bg-[#1e3a8a]/90 transition-all font-bold"
         >
           <span className="material-symbols-outlined">add</span>
-          <span>Nueva Campaña</span>
+          <span>Configurar Envío</span>
         </button>
       </div>
 
       {/* Estadísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Alcance Total</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{(estadisticas.alcanceTotal / 1000).toFixed(1)}k</p>
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Alcance Real Acumulado</p>
+          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.alcanceTotal} Enviados</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Conversión</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.tasaConversion}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Activas</p>
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Configuradas / En pausa</p>
           <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.activas}</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Presupuesto</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.presupuesto}</p>
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Completadas</p>
+          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.completadas}</p>
         </div>
       </div>
 
       {/* Lista de Campañas */}
       <div className="space-y-4">
         {cargando ? (
-          <div className="text-center py-12 text-slate-400">Cargando campañas...</div>
+          <div className="text-center py-12 text-slate-400">Cargando motor...</div>
         ) : datosMostrar.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">No hay campañas creadas aún. ¡Crea la primera!</div>
+          <div className="text-center py-12 text-slate-400">No tienes envíos configurados. ¡Empieza creando uno!</div>
         ) : datosMostrar.map((campana) => (
-          <div key={campana.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 flex flex-col md:flex-row">
-            <div
-              className="w-full md:w-48 h-48 md:h-auto bg-center bg-no-repeat bg-cover shrink-0 bg-slate-200"
-              style={campana.imagen_url ? { backgroundImage: `url(${campana.imagen_url})` } : {}}
-            >
-              {!campana.imagen_url && (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="material-symbols-outlined text-4xl text-slate-400">campaign</span>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-1 flex-col p-5 gap-3">
+          <div key={campana.id} className={`bg-white rounded-xl overflow-hidden shadow-sm border ${campana.estado === 'completada' ? 'border-slate-200 opacity-80' : 'border-[#00236f]/30'} flex flex-col md:flex-row relative`}>
+            
+            {campana.estado === 'completada' && (
+              <div className="absolute inset-0 bg-slate-50/40 z-0 pointer-events-none"></div>
+            )}
+
+            <div className="flex flex-1 flex-col p-5 gap-3 relative z-10">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   {etiquetaEstado(campana.estado)}
                   <h3 className="text-[#191c1d] text-xl font-bold mt-1">{campana.nombre}</h3>
+                  <div className="flex gap-2 items-center mt-1 text-xs font-medium text-slate-500">
+                    <span className="bg-blue-50 text-blue-700 px-2 pointer-events-none py-0.5 rounded border border-blue-100">
+                      Plantilla META: {campana.nombre_plantilla || 'NO CONFIGURADA'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center bg-white/80 backdrop-blur rounded-lg shadow-sm border border-slate-100 p-1">
                   <button
                     onClick={() => abrirEditar(campana)}
-                    className="p-2 text-slate-400 hover:text-[#1e3a8a] transition-colors"
-                    title="Editar"
+                    className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-md hover:bg-slate-50"
                   >
                     <span className="material-symbols-outlined text-xl">edit</span>
                   </button>
                   <button
-                    onClick={() => simularEnvio(campana.id)}
-                    className={`p-2 transition-colors ${enviando === campana.id ? 'text-green-500 animate-pulse' : 'text-slate-400 hover:text-green-600'}`}
-                    title="Simular envío"
+                    onClick={() => dispararCampana(campana.id)}
+                    disabled={enviando === campana.id}
+                    className={`p-2 transition-colors rounded-md hover:bg-red-50 flex items-center gap-1 ${enviando === campana.id ? 'text-amber-500 animate-pulse' : 'text-red-500 hover:text-red-700'} font-bold px-3`}
                   >
                     <span className="material-symbols-outlined text-xl">
-                      {enviando === campana.id ? 'hourglass_top' : 'send'}
+                      {enviando === campana.id ? 'hourglass_top' : 'rocket_launch'}
                     </span>
+                    <span className="text-sm">FUEGO</span>
                   </button>
                   <button
                     onClick={() => eliminarCampana(campana.id)}
-                    className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                    title="Eliminar"
+                    className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-md hover:bg-slate-50"
                   >
                     <span className="material-symbols-outlined text-xl">delete</span>
                   </button>
                 </div>
               </div>
-              <p className="text-slate-600 text-sm line-clamp-2 italic border-l-4 border-slate-200 pl-3">
-                &quot;{campana.mensaje}&quot;
-              </p>
-              <div className={`grid grid-cols-3 gap-4 pt-2 border-t border-slate-50 ${campana.estado === 'programada' || campana.estado === 'borrador' ? 'opacity-60' : ''}`}>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold">Alcance</span>
-                  <div className="flex items-center gap-1 text-slate-800">
-                    <span className="material-symbols-outlined text-sm text-[#1e3a8a]">visibility</span>
-                    <span className="font-bold">{(campana.alcance || 0).toLocaleString()}</span>
-                  </div>
+              
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex gap-4 mt-2">
+                <div className="flex-1">
+                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Audiencia: Estado</p>
+                   <p className="text-sm font-semibold text-slate-700">{campana.publico_estado || 'Todos'}</p>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold">Interacción</span>
-                  <div className="flex items-center gap-1 text-slate-800">
-                    <span className="material-symbols-outlined text-sm text-[#1e3a8a]">touch_app</span>
-                    <span className="font-bold">{campana.engagement || 0}%</span>
-                  </div>
+                <div className="flex-1 border-l border-slate-200 pl-4">
+                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Audiencia: Cursos</p>
+                   <p className="text-sm font-semibold text-slate-700">{campana.publico_curso || 'Todos'}</p>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold">Clics</span>
-                  <div className="flex items-center gap-1 text-slate-800">
-                    <span className="material-symbols-outlined text-sm text-[#1e3a8a]">ads_click</span>
-                    <span className="font-bold">{(campana.clics || 0).toLocaleString()}</span>
-                  </div>
+                <div className="flex-1 border-l border-slate-200 pl-4">
+                   <p className="text-[10px] uppercase font-bold text-[#1e3a8a] mb-1">Enviados Reales</p>
+                   <p className="text-xl font-black text-[#1e3a8a]">{campana.alcance || 0}</p>
                 </div>
               </div>
+
             </div>
           </div>
         ))}
       </div>
 
-      {/* Modal */}
       <ModalFormulario
         abierto={modalAbierto}
         alCerrar={cerrarModal}
-        titulo={campanaEditando ? 'Editar Campaña' : 'Nueva Campaña'}
+        titulo={campanaEditando ? 'Editar Pautas y Públicos' : 'Nueva Campaña WhatsApp'}
         campos={camposCampana}
         alEnviar={campanaEditando ? editarCampana : crearCampana}
-        textoBoton={campanaEditando ? 'Guardar Cambios' : 'Crear Campaña'}
+        textoBoton={campanaEditando ? 'Guardar Configuración' : 'Guardar Campaña'}
         datosIniciales={campanaEditando ? {
           nombre: campanaEditando.nombre,
+          nombre_plantilla: campanaEditando.nombre_plantilla,
           mensaje: campanaEditando.mensaje,
+          publico_estado: campanaEditando.publico_estado,
+          publico_curso: campanaEditando.publico_curso,
           canal: campanaEditando.canal,
           estado: campanaEditando.estado,
           imagen_url: campanaEditando.imagen_url,

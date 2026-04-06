@@ -26,7 +26,10 @@ export async function POST(solicitud) {
     mensaje: cuerpo.mensaje || null,
     estado: cuerpo.estado || 'borrador',
     canal: cuerpo.canal || 'whatsapp',
-    imagen_url: cuerpo.imagen_url || null
+    imagen_url: cuerpo.imagen_url || null,
+    publico_estado: cuerpo.publico_estado || 'Todos',
+    publico_curso: cuerpo.publico_curso || 'Todos',
+    nombre_plantilla: cuerpo.nombre_plantilla || null
   }
 
   const { data: campana, error } = await supabase
