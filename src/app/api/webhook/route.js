@@ -16,6 +16,11 @@ export async function GET(solicitud) {
 }
 
 export async function POST(solicitud) {
+  // --- PAUSA TEMPORAL DEL WEBHOOK ---
+  // Descomenta (quita las diagonales) de la siguiente línea para apagar Total English
+  return NextResponse.json({ estado: 'pausado', mensaje: 'Chatbot apagado' }, { status: 200 })
+  // ----------------------------------
+
   try {
     const cuerpo = await solicitud.json()
 
@@ -27,9 +32,9 @@ export async function POST(solicitud) {
       if (valor?.messages && valor.messages.length > 0) {
         const mensajeObj = valor.messages[0]
         const contactoMeta = valor.contacts?.[0]
-        const remitenteId = mensajeObj.from 
+        const remitenteId = mensajeObj.from
         const nombrePerfil = contactoMeta?.profile?.name || 'Prospecto'
-        
+
         // Soportar texto de botones interactivos y texto normal
         let texto = ''
         if (mensajeObj.type === 'text') {
@@ -48,7 +53,7 @@ export async function POST(solicitud) {
 
         // 1 & 2. Conversación y Prospecto: Buscar o Crear
         let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).eq('plataforma', 'whatsapp').maybeSingle()
-        
+
         // --- FILTRO DE PALABRAS MÁGICAS PARA NUEVOS PROSPECTOS ---
         const PALABRAS_CLAVE = ['total', 'english', 'ingles']
         const textoMin = texto.toLowerCase()
@@ -68,16 +73,16 @@ export async function POST(solicitud) {
             prosExist = pData;
           }
         }
-        
+
         // Si no existe la conversación, o si existe pero el prospecto fue eliminado (prospecto_id nulo)
         if (!prosExist) {
           const { data: nuevoP } = await supabase.from('prospectos').insert({ nombre: nombrePerfil, telefono: remitenteId, estado: 'nuevo' }).select('id').single()
           prosExist = nuevoP
           if (convExist) {
-             await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
+            await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
           } else {
-             const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
-             convExist = nuevaC
+            const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
+            convExist = nuevaC
           }
         }
 
@@ -85,20 +90,20 @@ export async function POST(solicitud) {
         const { data: existeMsg } = await supabase.from('mensajes').select('id').eq('id_mensaje_meta', mensajeObj.id).maybeSingle()
         if (existeMsg) return NextResponse.json({ estado: 'ya_procesado' }, { status: 200 })
 
-        const mensajeInsert = { 
-            conversacion_id: convExist.id, 
-            remitente: 'usuario', 
-            contenido: texto, 
-            id_mensaje_meta: mensajeObj.id,
-            tipo: 'texto'
+        const mensajeInsert = {
+          conversacion_id: convExist.id,
+          remitente: 'usuario',
+          contenido: texto,
+          id_mensaje_meta: mensajeObj.id,
+          tipo: 'texto'
         }
         await supabase.from('mensajes').insert(mensajeInsert)
         await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: texto }).eq('id', convExist.id)
-        
+
         // 4. Consultar AlexIA
         const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(30)
         const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
-        
+
         const historialFormat = (historialRaw || []).reverse().map(m => ({
           role: m.remitente === 'usuario' ? 'user' : 'assistant',
           content: m.contenido
@@ -120,19 +125,19 @@ export async function POST(solicitud) {
           { role: 'system', content: contextoCrm },
           ...historialFormat
         ], nombrePerfil, 'WhatsApp')
-        
+
         // Evitar bucles - comparar con los últimos 2 mensajes del bot
         const mensajesBot = (historialRaw || []).filter(m => m.remitente === 'bot');
         const ultimasRespuestasBot = mensajesBot.slice(0, 2).map(m => m.contenido?.trim());
         const respuestaTrimmed = respuesta?.trim();
-        
+
         if (ultimasRespuestasBot.includes(respuestaTrimmed) && intencion !== 'CIERRE_CITA') {
           console.log(`⚠️ Respuesta repetida detectada para ${remitenteId}. Reformulando...`);
           // En vez de ignorar, enviamos un mensaje genérico de avance
           const respuestaAlternativa = "¡Gracias por tu respuesta! 😊 ¿Me puedes dar un poco más de detalle para poder ayudarte mejor?";
-          await supabase.from('mensajes').insert({ 
-            conversacion_id: convExist.id, 
-            remitente: 'bot', 
+          await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id,
+            remitente: 'bot',
             contenido: respuestaAlternativa,
             tipo: 'texto'
           })
@@ -141,46 +146,46 @@ export async function POST(solicitud) {
         }
 
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
-        
+
         // 5. Actualizar CRM (Bifurcación Multi-Alumno)
         if (datos && Object.keys(datos).length > 0) {
-           try {
-             let idTarget = prosExist.id;
+          try {
+            let idTarget = prosExist.id;
 
-             // Bifurcación multi-alumno
-             if (datos.nombre_alumno && freshPros.nombre_alumno && datos.nombre_alumno.toLowerCase() !== freshPros.nombre_alumno.toLowerCase()) {
-                 console.log(`Bifurcando prospecto de ${freshPros.nombre_alumno} a -> ${datos.nombre_alumno}`);
-                 const propObj = { ...freshPros };
-                 delete propObj.id; delete propObj.creado_en; delete propObj.actualizado_en;
-                 propObj.nombre_alumno = datos.nombre_alumno;
-                 propObj.edad = datos.edad ? parseInt(datos.edad) : null;
-                 propObj.nivel = datos.nivel || null;
-                 propObj.horario = datos.horario || null;
-                 propObj.categoria_edad = datos.categoria_edad || null;
-                 propObj.estado = 'nuevo';
-                 propObj.lead_score = null;
+            // Bifurcación multi-alumno
+            if (datos.nombre_alumno && freshPros.nombre_alumno && datos.nombre_alumno.toLowerCase() !== freshPros.nombre_alumno.toLowerCase()) {
+              console.log(`Bifurcando prospecto de ${freshPros.nombre_alumno} a -> ${datos.nombre_alumno}`);
+              const propObj = { ...freshPros };
+              delete propObj.id; delete propObj.creado_en; delete propObj.actualizado_en;
+              propObj.nombre_alumno = datos.nombre_alumno;
+              propObj.edad = datos.edad ? parseInt(datos.edad) : null;
+              propObj.nivel = datos.nivel || null;
+              propObj.horario = datos.horario || null;
+              propObj.categoria_edad = datos.categoria_edad || null;
+              propObj.estado = 'nuevo';
+              propObj.lead_score = null;
 
-                 const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('id').single();
-                 if (nuevoHijo) {
-                     await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
-                     idTarget = nuevoHijo.id;
-                     prosExist.id = nuevoHijo.id;
-                 }
-             } else {
-                 const updateData = { actualizado_en: new Date().toISOString() };
-                 if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
-                 if (datos.edad) updateData.edad = parseInt(datos.edad);
-                 if (datos.nivel) updateData.nivel = datos.nivel;
-                 if (datos.horario) updateData.horario = datos.horario;
-                 if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
-                 if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
+              const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('id').single();
+              if (nuevoHijo) {
+                await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
+                idTarget = nuevoHijo.id;
+                prosExist.id = nuevoHijo.id;
+              }
+            } else {
+              const updateData = { actualizado_en: new Date().toISOString() };
+              if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
+              if (datos.edad) updateData.edad = parseInt(datos.edad);
+              if (datos.nivel) updateData.nivel = datos.nivel;
+              if (datos.horario) updateData.horario = datos.horario;
+              if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+              if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
 
-                 const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
-                 if (crmError) console.error('Error actualizando prospecto:', crmError.message);
-             }
-           } catch (errSync) {
-             console.error('❌ Error fatal en sync CRM:', errSync.message);
-           }
+              const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
+              if (crmError) console.error('Error actualizando prospecto:', crmError.message);
+            }
+          } catch (errSync) {
+            console.error('❌ Error fatal en sync CRM:', errSync.message);
+          }
         }
 
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
@@ -191,7 +196,7 @@ export async function POST(solicitud) {
             .eq('estado', 'pendiente')
             .order('creado_en', { ascending: false })
             .limit(1);
-            
+
           const citaExistente = citasExistentes && citasExistentes.length > 0 ? citasExistentes[0] : null;
 
           let fCitaStr = datos.fecha_cita;
@@ -228,17 +233,17 @@ export async function POST(solicitud) {
         }
 
         // Preparar opciones (sanitizar)
-        const opcionesLimpias = (datos?.opciones && Array.isArray(datos.opciones) && datos.opciones.length > 0) 
-          ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '') 
+        const opcionesLimpias = (datos?.opciones && Array.isArray(datos.opciones) && datos.opciones.length > 0)
+          ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
           : null;
 
         const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, opcionesLimpias)
-        
+
         const respuestaFinal = enviadoCorrectamente ? respuesta : `[⚠️ WHATSAPP BLOQUEÓ EL ENVÍO (Número No Autorizado)]\n${respuesta}`
 
-        await supabase.from('mensajes').insert({ 
-          conversacion_id: convExist.id, 
-          remitente: 'bot', 
+        await supabase.from('mensajes').insert({
+          conversacion_id: convExist.id,
+          remitente: 'bot',
           contenido: respuestaFinal,
           tipo: imagenUrl ? 'imagen' : 'texto',
           url_archivo: imagenUrl || null
@@ -293,7 +298,7 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
     return true
   } catch (error) {
     console.warn(`⚠️ Error en primer intento para ${to}:`, error.response?.data || error.message)
-    
+
     // LÓGICA DE MÉXICO: Si falla con 521, intentar con 52
     if (to.startsWith('521') && to.length === 13) {
       console.log(`🇲🇽 Intentando reenvío sin el '1' para México...`)
