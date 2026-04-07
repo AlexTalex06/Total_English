@@ -223,6 +223,21 @@ export async function POST(solicitud) {
               await supabase.from('prospectos').update({ lead_score: 'CALIENTE' }).eq('id', prosExist.id);
             }
           }
+
+          // --- NOTIFICACIÓN AL ADMINISTRADOR ---
+          const adminPhone = process.env.ADMIN_PHONE_NUMBER;
+          if (adminPhone) {
+            const msgAdmin = `🇬🇧 *¡NUEVA CITA AGENDADA EN TOTAL ENGLISH!* 🇬🇧\n\n` +
+              `👤 *Alumno:* ${datos.nombre_alumno || nombrePerfil}\n` +
+              `📅 *Fecha:* ${fCitaStr}\n` +
+              `⏰ *Hora:* ${datos.hora_cita || '16:00'}\n` +
+              `📚 *Curso:* ${datos.curso_interes || 'Por definir'}\n` +
+              `📊 *Nivel:* ${datos.nivel || 'No especificado'}\n\n` +
+              `🔗 *Ver en Citas:* https://total-english-crm.vercel.app/citas`;
+            
+            console.log('📢 Notificando al admin:', adminPhone);
+            await enviarMensajeWhatsApp(adminPhone, msgAdmin);
+          }
         }
 
         // 7. Enviar a Meta
