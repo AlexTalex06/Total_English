@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { consultarAlex } from '@/lib/alexIA'
 import { escalarAHumano } from '@/lib/prospectoSync'
+import { notificarEscalamientoAdmin } from '@/lib/mailer'
 import axios from 'axios'
 
 export async function GET(solicitud) {
@@ -166,6 +167,25 @@ export async function POST(solicitud) {
             conversacion_id: convExist.id, remitente: 'bot', contenido: msjEscalamiento, tipo: 'texto'
           });
           await supabase.from('conversaciones').update({ ultimo_mensaje: msjEscalamiento }).eq('id', convExist.id);
+
+          // Buscar al primer administrador y mandarle correo con Resend
+          try {
+            const { data: admins } = await supabase.from('usuarios').select('email').eq('rol', 'admin');
+            const adminEmail = admins && admins.length > 0 ? admins[0].email : null;
+            if (adminEmail) {
+              await notificarEscalamientoAdmin({
+                adminEmail: adminEmail,
+                nombreProspecto: freshPros?.nombre_alumno || nombrePerfil || 'Desconocido',
+                telefonoProspecto: remitenteId,
+                motivo: texto || 'escalamiento',
+                conversacionId: convExist.id
+              });
+            } else {
+              console.warn('⚠️ No se encontró email de administrador para enviar alerta de escalamiento.');
+            }
+          } catch (e) {
+            console.error('❌ Error enviando notificación de correo:', e);
+          }
 
           return NextResponse.json({ estado: 'escalado' }, { status: 200 });
         }
