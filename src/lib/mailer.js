@@ -1,8 +1,5 @@
 import { Resend } from 'resend'
 
-// Instancia global. La API key debe estar en .env como RESEND_API_KEY
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 /**
  * Manda un correo de alerta al administrador cuando la IA de Total English
  * requiere intervención humana.
@@ -19,6 +16,8 @@ export async function notificarEscalamientoAdmin({ adminEmail, nombreProspecto, 
     console.warn('⚠️ No se ha configurado RESEND_API_KEY. No se enviará correo de alerta.')
     return { success: false, error: 'API Key missing' }
   }
+
+  const resend = new Resend(process.env.RESEND_API_KEY)
 
   try {
     const { data, error } = await resend.emails.send({
