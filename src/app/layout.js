@@ -2,6 +2,7 @@ import './globals.css'
 import BarraLateral from '@/componentes/BarraLateral'
 import BarraSuperior from '@/componentes/BarraSuperior'
 import { AuthProvider } from '@/componentes/AuthProvider'
+import { NotificationProvider } from '@/componentes/NotificationProvider'
 import AuthGuard from '@/componentes/AuthGuard'
 
 export const metadata = {
@@ -20,13 +21,15 @@ export default function LayoutRaiz({ children }) {
       </head>
       <body className="bg-[#f8f9fa] text-[#191c1d] min-h-screen">
         <AuthProvider>
-          <AuthGuard>
-            <BarraLateral />
-            <main className="md:ml-72 min-h-screen pb-20 md:pb-0">
-              <BarraSuperior />
-              {children}
-            </main>
-          </AuthGuard>
+          <NotificationProvider>
+            <AuthGuard>
+              <BarraLateral />
+              <main className="md:ml-72 min-h-screen pb-20 md:pb-0">
+                <BarraSuperior />
+                {children}
+              </main>
+            </AuthGuard>
+          </NotificationProvider>
         </AuthProvider>
       </body>
     </html>

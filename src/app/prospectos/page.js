@@ -2,24 +2,46 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { cambiarEstadoProspecto } from '@/lib/prospectoSync'
+import { useNotifications } from '@/componentes/NotificationProvider'
 
 export default function PaginaProspectos() {
   const [prospectos, setProspectos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [filtroEstado, setFiltroEstado] = useState('Todos')
   const [prospectoSeleccionado, setProspectoSeleccionado] = useState(null)
+  const { setUltimoToast } = useNotifications()
   
   const cargarProspectos = async () => {
     setCargando(true)
     const { data, error } = await supabase
       .from('prospectos')
-      .select('*, citas(id, fecha, hora, estado), conversaciones(id_plataforma, ultimo_mensaje)')
+      .select('*, citas(id, fecha, hora, estado), conversaciones(id, id_plataforma, ultimo_mensaje)')
       .order('creado_en', { ascending: false })
       
     if (!error && data) {
       setProspectos(data)
     }
     setCargando(false)
+  }
+
+  const handleCambiarEstado = async (id, nuevoEstado) => {
+    try {
+      await cambiarEstadoProspecto(id, nuevoEstado)
+      setUltimoToast({
+        tipo: 'exito',
+        titulo: 'Estado Actualizado',
+        mensaje: `El prospecto ahora está en: ${nuevoEstado}`
+      })
+      cargarProspectos()
+    } catch (error) {
+      console.error('Error:', error)
+      setUltimoToast({
+        tipo: 'error',
+        titulo: 'Error',
+        mensaje: 'No se pudo actualizar el estado'
+      })
+    }
   }
 
   useEffect(() => {
@@ -91,14 +113,15 @@ export default function PaginaProspectos() {
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Contacto Origen</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Curso / Interés</th>
                   <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Estado</th>
+                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Acciones Rápidas</th>
                   <th className="px-6 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-400">Score</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {cargando ? (
-                  <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400"><span className="material-symbols-outlined animate-spin align-middle mr-2">refresh</span>Cargando...</td></tr>
+                  <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400"><span className="material-symbols-outlined animate-spin align-middle mr-2">refresh</span>Cargando...</td></tr>
                 ) : prospectosFiltrados.length === 0 ? (
-                  <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">No hay prospectos.</td></tr>
+                  <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">No hay prospectos.</td></tr>
                 ) : prospectosFiltrados.map(p => (
                   <tr 
                     key={p.id} 
@@ -127,7 +150,7 @@ export default function PaginaProspectos() {
                         {p.curso_interes || 'Por definir'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${
                         p.estado === 'agendado' ? 'bg-green-100 text-green-700' :
                         p.estado === 'en_proceso' ? 'bg-blue-100 text-blue-700' :
@@ -136,6 +159,31 @@ export default function PaginaProspectos() {
                       }`}>
                         {p.estado}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleCambiarEstado(p.id, 'contactado'); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-amber-100 hover:text-amber-700 transition-colors"
+                          title="Marcar como Contactado"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">call</span>
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleCambiarEstado(p.id, 'en_proceso'); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                          title="Mover a En Proceso"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">cached</span>
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleCambiarEstado(p.id, 'agendado'); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-green-100 hover:text-green-700 transition-colors"
+                          title="Marcar como Agendado"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">event_available</span>
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={`px-2 py-1 rounded inline-block text-[10px] font-black uppercase tracking-wider ${

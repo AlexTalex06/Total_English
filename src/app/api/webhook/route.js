@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { consultarAlex } from '@/lib/alexIA'
+import { escalarAHumano } from '@/lib/prospectoSync'
 import axios from 'axios'
 
 export async function GET(solicitud) {
@@ -86,7 +87,6 @@ export async function POST(solicitud) {
           }
         }
 
-        // 3. Guardar Mensaje de Usuario (Evitar duplicados si Meta reintenta)
         const { data: existeMsg } = await supabase.from('mensajes').select('id').eq('id_mensaje_meta', mensajeObj.id).maybeSingle()
         if (existeMsg) return NextResponse.json({ estado: 'ya_procesado' }, { status: 200 })
 
@@ -99,6 +99,13 @@ export async function POST(solicitud) {
         }
         await supabase.from('mensajes').insert(mensajeInsert)
         await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString(), ultimo_mensaje: texto }).eq('id', convExist.id)
+
+        // --- PAUSA DE BOT: SI ESTÁ ASIGNADO A HUMANO, NO CONSULTA A ALEXIA ---
+        if (convExist.asignado_a_humano) {
+          console.log(`⏸️ Chatbot pausado para ${remitenteId}. El mensaje se guardó en el Inbox para el agente.`)
+          return NextResponse.json({ estado: 'pausado_humano' }, { status: 200 })
+        }
+        // ---------------------------------------------------------------------
 
         // 4. Consultar AlexIA
         const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(30)
@@ -146,6 +153,23 @@ export async function POST(solicitud) {
         }
 
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
+
+        // --- MANEJO ESPECIAL: ESCALAMIENTO HUMANO ---
+        if (intencion === 'SPECIFIC_QUESTION_PASS_AGENT' || intencion === 'TRANSFER_HUMANO') {
+          console.log(`🚨 Escalamiento a humano para ${remitenteId}`);
+          await escalarAHumano(convExist.id, prosExist.id, 'Usuario solicitó hablar con un asesor o hizo pregunta compleja', 'pregunta_especifica');
+          
+          const msjEscalamiento = respuesta || "Voy a transferir tu solicitud ahora mismo con uno de nuestros asesores. Revisará tu caso para darte una respuesta personalizada en unos momentos. ¡Gracias por tu paciencia!";
+          
+          await enviarMensajeWhatsApp(remitenteId, msjEscalamiento);
+          await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id, remitente: 'bot', contenido: msjEscalamiento, tipo: 'texto'
+          });
+          await supabase.from('conversaciones').update({ ultimo_mensaje: msjEscalamiento }).eq('id', convExist.id);
+
+          return NextResponse.json({ estado: 'escalado' }, { status: 200 });
+        }
+        // --------------------------------------------
 
         // 5. Actualizar CRM (Bifurcación Multi-Alumno)
         if (datos && Object.keys(datos).length > 0) {
