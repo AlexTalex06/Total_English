@@ -13,6 +13,7 @@ export default function PaginaProspectos() {
   const [prospectoSeleccionado, setProspectoSeleccionado] = useState(null)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [prospectoEditando, setProspectoEditando] = useState(null)
+  const [vista, setVista] = useState('kanban') // Poner kanban por defecto como evolución
   const { setUltimoToast } = useNotifications()
 
   const camposProspecto = [
@@ -125,6 +126,15 @@ export default function PaginaProspectos() {
     URL.revokeObjectURL(url)
   }
 
+  // Lógica de manipulación HTML5 Drag & Drop simple (funcionalidad base opcional)
+  const onDragStart = (e, id) => { e.dataTransfer.setData('prospectoId', id) }
+  const onDragOver = (e) => { e.preventDefault() }
+  const onDrop = (e, nuevoEstado) => {
+    e.preventDefault()
+    const id = e.dataTransfer.getData('prospectoId')
+    if (id) { handleCambiarEstado(id, nuevoEstado) }
+  }
+
   const prospectosFiltrados = filtroEstado === 'Todos' 
     ? prospectos 
     : prospectos.filter(p => p.estado === filtroEstado.toLowerCase())
@@ -142,6 +152,10 @@ export default function PaginaProspectos() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={() => setVista(vista === 'tabla' ? 'kanban' : 'tabla')} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold rounded-xl transition-all">
+              <span className="material-symbols-outlined text-lg">{vista === 'tabla' ? 'view_kanban' : 'table_rows'}</span>
+              {vista === 'tabla' ? 'Vista Kanban' : 'Vista Lista'}
+            </button>
             <button onClick={exportarCSV} className="flex items-center gap-2 px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-[#191c1d] text-sm font-semibold rounded-xl transition-all active:scale-95">
               <span className="material-symbols-outlined text-lg">file_download</span>
               Exportar
@@ -173,7 +187,7 @@ export default function PaginaProspectos() {
           ))}
         </div>
 
-        {/* Tabla/Lista */}
+        {vista === 'tabla' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 overflow-hidden flex flex-col">
           <div className="overflow-y-auto flex-1">
             <table className="w-full text-left border-collapse">
@@ -270,6 +284,68 @@ export default function PaginaProspectos() {
             </table>
           </div>
         </div>
+        ) : (
+        /* VISTA KANBAN */
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 items-start">
+          {['nuevo', 'contactado', 'en_proceso', 'agendado'].map(columna => {
+            const items = prospectosFiltrados.filter(p => p.estado === columna);
+            const tituloColumna = columna === 'nuevo' ? 'Nuevos Leads' :
+                                  columna === 'contactado' ? 'Contactados' :
+                                  columna === 'en_proceso' ? 'En Negociación' : 'Inscritos / Agendados';
+            const colorColumna = columna === 'nuevo' ? 'border-slate-200' :
+                                 columna === 'contactado' ? 'border-amber-200' :
+                                 columna === 'en_proceso' ? 'border-blue-200' : 'border-green-200';
+            const colorBg = columna === 'nuevo' ? 'bg-slate-50' :
+                            columna === 'contactado' ? 'bg-amber-50/30' :
+                            columna === 'en_proceso' ? 'bg-blue-50/30' : 'bg-green-50/30';                                 
+            return (
+              <div 
+                key={columna} 
+                className={`min-w-[280px] max-w-[300px] flex-1 flex flex-col rounded-2xl border ${colorColumna} ${colorBg} p-3 shrink-0 h-full`}
+                onDragOver={onDragOver}
+                onDrop={(e) => onDrop(e, columna)}
+              >
+                <div className="flex justify-between items-center mb-4 px-1">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-1.5 uppercase text-xs tracking-wider">
+                    <span className={`w-2.5 h-2.5 rounded-full ${
+                      columna === 'nuevo' ? 'bg-slate-400' : columna === 'contactado' ? 'bg-amber-400' : columna === 'en_proceso' ? 'bg-blue-500' : 'bg-green-500'
+                    }`}></span>
+                    {tituloColumna}
+                  </h3>
+                  <span className="bg-white text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{items.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-3 px-1 custom-scrollbar">
+                  {items.map(p => (
+                    <div 
+                      key={p.id}
+                      draggable
+                      onDragStart={(e) => onDragStart(e, p.id)}
+                      onClick={() => setProspectoSeleccionado(p)}
+                      className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-300 transition-all cursor-grab active:cursor-grabbing group relative select-none"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold text-[#1e3a8a] text-sm leading-tight pr-4">{p.nombre_alumno || p.nombre}</span>
+                        {p.lead_score && (
+                           <div className={`w-2 h-2 rounded-full ring-2 ring-white absolute top-4 right-4 ${p.lead_score === 'CALIENTE' ? 'bg-red-500' : p.lead_score === 'TIBIO' ? 'bg-amber-400' : 'bg-slate-300'}`}></div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+                         <span className="material-symbols-outlined text-[13px] text-green-600">message</span> {p.telefono}
+                      </div>
+                      <div className="flex items-center justify-between mt-3 flex-wrap gap-1">
+                         <span className="text-[10px] font-semibold bg-slate-100 px-2 py-1 rounded text-slate-600">
+                           {p.curso_interes ? p.curso_interes.substring(0, 15) : 'Por definir'}
+                         </span>
+                         {p.nivel && <span className="text-[10px] text-slate-400 font-medium border border-slate-200 px-1.5 py-0.5 rounded">{p.nivel}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        )}
       </div>
 
       {/* Slide-over Detalles del Prospecto */}
