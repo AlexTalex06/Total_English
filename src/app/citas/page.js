@@ -9,6 +9,7 @@ export default function PaginaCitas() {
   const [prospectos, setProspectos] = useState([])
   const [cargando, setCargando] = useState(true)
   const [modalAbierto, setModalAbierto] = useState(false)
+  const [citaEditando, setCitaEditando] = useState(null)
   const [mesActual, setMesActual] = useState(new Date())
   const [diaSeleccionado, setDiaSeleccionado] = useState(new Date().getDate())
 
@@ -54,6 +55,20 @@ export default function PaginaCitas() {
     })
     if (respuesta.ok) {
       cargarDatos()
+      setModalAbierto(false)
+    }
+  }
+
+  const editarCita = async (datos) => {
+    const respuesta = await fetch('/api/citas', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: citaEditando.id, ...datos }),
+    })
+    if (respuesta.ok) {
+      cargarDatos()
+      setModalAbierto(false)
+      setCitaEditando(null)
     }
   }
 
@@ -127,7 +142,7 @@ export default function PaginaCitas() {
           <p className="text-[#444651] mt-1">Gestiona tus consultas y exámenes de ubicación.</p>
         </div>
         <button
-          onClick={() => setModalAbierto(true)}
+          onClick={() => { setCitaEditando(null); setModalAbierto(true); }}
           className="bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white px-6 py-3 rounded-xl font-semibold shadow-lg shadow-blue-900/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"
         >
           <span className="material-symbols-outlined">add</span>
@@ -247,12 +262,16 @@ export default function PaginaCitas() {
                         onChange={(e) => {
                           if (e.target.value === '_eliminar') {
                             eliminarCita(cita.id)
+                          } else if (e.target.value === '_editar') {
+                            setCitaEditando(cita)
+                            setModalAbierto(true)
                           } else if (e.target.value) {
                             actualizarEstadoCita(cita.id, e.target.value)
                           }
                         }}
                       >
                         <option value="">⋮</option>
+                        <option value="_editar">✏️ Editar Detalles</option>
                         <option value="confirmada">Confirmar</option>
                         <option value="cancelada">Cancelar</option>
                         <option value="completada">Completar</option>
@@ -315,11 +334,18 @@ export default function PaginaCitas() {
       {/* Modal */}
       <ModalFormulario
         abierto={modalAbierto}
-        alCerrar={() => setModalAbierto(false)}
-        titulo="Nueva Cita"
+        alCerrar={() => { setModalAbierto(false); setCitaEditando(null); }}
+        titulo={citaEditando ? 'Editar Cita' : 'Nueva Cita'}
         campos={camposCita}
-        alEnviar={crearCita}
-        textoBoton="Agendar Cita"
+        alEnviar={citaEditando ? editarCita : crearCita}
+        textoBoton={citaEditando ? 'Guardar Cambios' : 'Agendar Cita'}
+        datosIniciales={citaEditando ? {
+          prospecto_id: citaEditando.prospecto_id,
+          fecha: citaEditando.fecha,
+          hora: citaEditando.hora,
+          tipo: citaEditando.tipo,
+          notas: citaEditando.notas
+        } : null}
       />
     </div>
   )
