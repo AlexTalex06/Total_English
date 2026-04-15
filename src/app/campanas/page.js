@@ -51,6 +51,8 @@ export default function PaginaCampanas() {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [enviando, setEnviando] = useState(null)
   const [campanaEditando, setCampanaEditando] = useState(null)
+  const [plantillasMeta, setPlantillasMeta] = useState([])
+  const [cargandoMeta, setCargandoMeta] = useState(false)
 
   const cargarCampanas = async () => {
     setCargando(true)
@@ -65,8 +67,24 @@ export default function PaginaCampanas() {
     }
   }
 
+  const cargarPlantillasMeta = async () => {
+    setCargandoMeta(true)
+    try {
+      const res = await fetch('/api/campanas/plantillas')
+      const data = await res.json()
+      if (data.plantillas) {
+        setPlantillasMeta(data.plantillas)
+      }
+    } catch (e) {
+      console.error('Error cargando plantillas meta:', e)
+    } finally {
+      setCargandoMeta(false)
+    }
+  }
+
   useEffect(() => {
     cargarCampanas()
+    cargarPlantillasMeta()
   }, [])
 
   const crearCampana = async (datos) => {
@@ -197,21 +215,62 @@ export default function PaginaCampanas() {
         </button>
       </div>
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Alcance Real Acumulado</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.alcanceTotal} Enviados</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Configuradas / En pausa</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.activas}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Completadas</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.completadas}</p>
         </div>
       </div>
+
+      {/* Sección Meta Templates */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-blue-600">verified</span>
+            <h3 className="font-bold text-slate-800 tracking-tight">Estado de Plantillas en Meta Cloud</h3>
+          </div>
+          <button 
+            onClick={cargarPlantillasMeta}
+            disabled={cargandoMeta}
+            className="text-[10px] font-bold uppercase tracking-widest text-[#1e3a8a] hover:underline flex items-center gap-1"
+          >
+            <span className={`material-symbols-outlined text-sm ${cargandoMeta ? 'animate-spin' : ''}`}>refresh</span>
+            Sincronizar Meta
+          </button>
+        </div>
+        
+        <div className="p-4 overflow-x-auto">
+          {cargandoMeta ? (
+            <div className="text-center py-6 text-slate-400 text-sm">Validando con Meta Business Manager...</div>
+          ) : plantillasMeta.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-sm">No se encontraron plantillas. Créalas en tu Business Manager de Meta.</div>
+          ) : (
+            <div className="flex gap-4 min-w-max pb-2">
+              {plantillasMeta.map(plt => (
+                <div key={plt.id} className="bg-slate-50 border border-slate-100 p-3 rounded-xl min-w-[200px]">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase truncate max-w-[120px]" title={plt.name}>{plt.name}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                      plt.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                      plt.status === 'PENDING' ? 'bg-orange-100 text-orange-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {plt.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[11px] text-slate-500 font-medium">Idioma: {plt.language}</span>
+                    <span className="material-symbols-outlined text-slate-300 text-sm">ads_click</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {plantillasMeta.some(p => p.status === 'APPROVED') && (
+          <div className="bg-green-50/50 px-6 py-2 border-t border-slate-100 text-[10px] text-green-600 font-medium flex items-center gap-1">
+            <span className="material-symbols-outlined text-xs">info</span>
+            Tienes plantillas aprobadas listas para usar en tus campañas.
+          </div>
+        )}
+      </div>
+
 
       {/* Lista de Campañas */}
       <div className="space-y-4">

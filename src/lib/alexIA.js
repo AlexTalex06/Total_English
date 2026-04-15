@@ -7,6 +7,7 @@ import { openai } from '@ai-sdk/openai'
 const TABLA_LOGICA_CURSOS = `
 CASO 1 - NIÑOS (6-9 años):
   Curso: DIPLOMADO CHILDREN
+  Imagen: CHILDREN.jpg
   Frase Espejo: "¡Qué gran iniciativa buscar lo mejor para el futuro de tu peque! 🌟"
   Beneficios:
   • 🗣️ Mucho *speaking* (que sí se anime a hablar)
@@ -18,6 +19,7 @@ CASO 1 - NIÑOS (6-9 años):
 
 CASO 2 - ADOLESCENTES (10-13 años):
   Curso: DIPLOMADO PRE-TEENS
+  Imagen: PRE-TEENS.jpeg
   Frase Espejo: "Entiendo que buscas herramientas que le faciliten la escuela y el futuro 🚀."
   Beneficios:
   ✅ *Especializado* para esa edad (10-13 años)
@@ -31,6 +33,7 @@ CASO 2 - ADOLESCENTES (10-13 años):
 
 CASO 3 - JÓVENES/ADULTOS (14+ años, Horario Fijo):
   Curso: DIPLOMADO YOUNG & ADULTS
+  Imagen: YOUNG_ADULTS.jpeg
   Frase Espejo: "Se nota que estás comprometido/a con tu crecimiento profesional 💼."
   Beneficios:
   ✅ *Inglés práctico* para Escuela, Trabajo y vida real
@@ -44,6 +47,7 @@ CASO 3 - JÓVENES/ADULTOS (14+ años, Horario Fijo):
 
 CASO 4 - ADULTOS FLEXIBLES (16+, Horario Flexible):
   Curso: DIPLOMADO MY TIME ENGLISH
+  Imagen: MY_TIME.jpg
   Frase Espejo: "Comprendo perfectamente que necesitas que el inglés se adapte a tu ritmo 🕒."
   Beneficios:
   ✨ Sistema 100% flexible y personalizado ✨
@@ -53,6 +57,28 @@ CASO 4 - ADULTOS FLEXIBLES (16+, Horario Flexible):
   🚀 Avanza a tu ritmo
   Precio Ancla: "Es un programa Premium a medida. La inversión se ajusta a tu plan de carrera."
   Regalo: 🎁 Demo de Plataforma + Asesoría Personalizada
+
+CASO 5 - ESPECIALIZACIONES:
+  Curso: DIPLOMADOS TÉCNICOS
+  Imagen: DIPLOMADOS.jpeg
+  Frase Espejo: "¡Genial! Buscas llevar tu inglés al siguiente nivel profesional 📈."
+  Beneficios:
+  ✅ Vocabulario técnico y empresarial
+  ✅ Perfeccionamiento de gramática avanzada
+  ✅ Enfoque 100% en el mundo laboral
+  Precio Ancla: "Consulta con el asesor el diplomado de tu interés."
+  Regalo: 🎁 Auditoría de CV en Inglés
+
+CASO 6 - CERTIFICACIONES (TOEFL/CAMBRIDGE):
+  Curso: PREPARACIÓN PARA CERTIFICACIONES
+  Imagen: PREPARACION_PARA_CERTIFICADOS.jpeg
+  Frase Espejo: "Obtener un certificado internacional abrirá muchísimas puertas en tu carrera 🌍."
+  Beneficios:
+  ✅ Simulacros de examen reales
+  ✅ Estrategias específicas para subir puntaje
+  ✅ Teachers certificados
+  Precio Ancla: "Los costos varían según la certificación (Cambridge, TOEFL, CENNI)."
+  Regalo: 🎁 Examen de Simulación Inicial (Mock Test)
 `
 
 const REGLAS_GENERALES = `
@@ -144,6 +170,7 @@ Estructura exacta:
     "horario": "fijo|flexible" (o null),
     "curso_interes": "nombre del curso" (o null),
     "lead_score": "CALIENTE|TIBIO|FRIO" (Asigna CALIENTE si quieren cita/llamada. TIBIO si hay interes. FRIO si rechazan),
+    "imagen": "NOMBRE_ARCHIVO.ext" (Solo cuando recomiendes un curso, pon el nombre de la Imagen que aparece en la Tabla Lógica para ese curso),
     "fecha_cita": "YYYY-MM-DD" (si se sugirió/confirmó fecha),
     "hora_cita": "HH:MM" (si se sugirió/confirmó hora)
   },
