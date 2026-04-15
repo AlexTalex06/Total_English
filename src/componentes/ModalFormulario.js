@@ -80,6 +80,24 @@ export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alE
                     </option>
                   ))}
                 </select>
+              ) : campo.tipo === 'datalist' ? (
+                <>
+                  <input
+                    className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
+                    list={`list-${campo.nombre}`}
+                    placeholder={campo.placeholder}
+                    required={campo.requerido}
+                    value={datosFormulario[campo.nombre] || ''}
+                    onChange={(e) => manejarCambio(campo.nombre, e.target.value)}
+                  />
+                  <datalist id={`list-${campo.nombre}`}>
+                    {campo.opciones?.map((opcion) => (
+                      <option key={opcion.valor} value={opcion.valor}>
+                        {opcion.etiqueta}
+                      </option>
+                    ))}
+                  </datalist>
+                </>
               ) : (
                 <input
                   className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"

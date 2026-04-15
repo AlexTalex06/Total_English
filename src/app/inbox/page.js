@@ -501,6 +501,7 @@ export default function PaginaInbox() {
               type="button" 
               className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shrink-0"
               title="Adjuntar archivo"
+              onClick={() => alert('La función de adjuntar archivos estará disponible próximamente.')}
             >
               <span className="material-symbols-outlined text-[24px] rotate-45">attach_file</span>
             </button>

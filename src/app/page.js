@@ -126,9 +126,9 @@ export default function PaginaPanel() {
             <p className="text-blue-200 font-medium opacity-90 leading-relaxed mb-6">
               Tu sistema está listo para gestionar prospectos, cursos y citas. Comienza agregando datos para ver las métricas en acción.
             </p>
-            <a href="/campanas" className="inline-block bg-white text-[#00236f] px-6 py-3 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors">
+            <Link href="/campanas" className="inline-block bg-white text-[#00236f] px-6 py-3 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors">
               Crear Campaña
-            </a>
+            </Link>
           </div>
           <div className="mt-8 border-t border-white/10 pt-6">
             <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest opacity-60">

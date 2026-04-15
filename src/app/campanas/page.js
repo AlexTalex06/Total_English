@@ -13,19 +13,23 @@ export default function PaginaCampanas() {
   const [plantillasMeta, setPlantillasMeta] = useState([])
   const [cargandoMeta, setCargandoMeta] = useState(false)
 
-  const plantillasAprobadas = plantillasMeta
-    .filter(p => p.status === 'APPROVED')
-    .map(p => ({ valor: p.name, etiqueta: `${p.name} (${p.language})` }))
+  // 1. Obtener plantillas únicas ya utilizadas en el CRM (del proyecto Total English)
+  const plantillasDelProyecto = [...new Set(campanas.map(c => c.nombre_plantilla).filter(Boolean))]
+
+  // 2. Solo mostrar el estado (APPROVED, PENDING, etc) de las que pertenecen a este proyecto
+  const plantillasMostrar = plantillasMeta.filter(p => plantillasDelProyecto.includes(p.name))
+
+  // 3. Opciones sugeridas para el autocompletado (Datalist)
+  const plantillasSugeridas = plantillasDelProyecto.map(nombre => ({ valor: nombre }))
 
   const camposCampana = [
     { nombre: 'nombre', etiqueta: 'Nombre de la campaña', tipo: 'text', placeholder: 'Ej: Promoción Buen Fin', requerido: true },
     { 
       nombre: 'nombre_plantilla', 
-      etiqueta: 'Plantilla de Meta Aprobada', 
-      tipo: 'select', 
-      opciones: plantillasAprobadas.length > 0 
-        ? plantillasAprobadas 
-        : [{ valor: '', etiqueta: '❌ Sin plantillas aprobadas en Meta' }],
+      etiqueta: 'Plantilla de Meta', 
+      tipo: 'datalist', 
+      placeholder: 'Escribe el nombre exacto o selecciona una existente...',
+      opciones: plantillasSugeridas,
       requerido: true 
     },
     { nombre: 'mensaje', etiqueta: 'Notas Internas', tipo: 'textarea', placeholder: 'Notas sobre esta campaña...', requerido: false },
@@ -256,11 +260,11 @@ export default function PaginaCampanas() {
         <div className="p-4 overflow-x-auto">
           {cargandoMeta ? (
             <div className="text-center py-6 text-slate-400 text-sm">Validando con Meta Business Manager...</div>
-          ) : plantillasMeta.length === 0 ? (
-            <div className="text-center py-6 text-slate-400 text-sm">No se encontraron plantillas. Créalas en tu Business Manager de Meta.</div>
+          ) : plantillasMostrar.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-sm">Aún no hay plantillas vinculadas a Total English. Escribe el nombre de tu plantilla de Meta al crear una campaña para empezar a darle seguimiento.</div>
           ) : (
             <div className="flex gap-4 min-w-max pb-2">
-              {plantillasMeta.map(plt => (
+              {plantillasMostrar.map(plt => (
                 <div key={plt.id} className="bg-slate-50 border border-slate-100 p-3 rounded-xl min-w-[200px]">
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-[10px] font-black text-slate-400 uppercase truncate max-w-[120px]" title={plt.name}>{plt.name}</span>
@@ -281,7 +285,7 @@ export default function PaginaCampanas() {
             </div>
           )}
         </div>
-        {plantillasMeta.some(p => p.status === 'APPROVED') && (
+        {plantillasMostrar.some(p => p.status === 'APPROVED') && (
           <div className="bg-green-50/50 px-6 py-2 border-t border-slate-100 text-[10px] text-green-600 font-medium flex items-center gap-1">
             <span className="material-symbols-outlined text-xs">info</span>
             Tienes plantillas aprobadas listas para usar en tus campañas.

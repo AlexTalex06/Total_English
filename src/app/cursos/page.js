@@ -232,7 +232,7 @@ export default function PaginaCursos() {
                 <span className="text-xl font-black text-blue-900">
                   {curso.precio ? `$${curso.precio}` : 'Consultar'}
                 </span>
-                <button className="text-[#00236f] text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all">
+                <button onClick={() => abrirEditar(curso)} className="text-[#00236f] text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all">
                   Detalles <span className="material-symbols-outlined text-sm">arrow_forward</span>
                 </button>
               </div>
