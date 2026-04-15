@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic'
 export async function POST(solicitud) {
   try {
     const { id } = await solicitud.json()
+    const urlObj = new URL(solicitud.url)
+    const domainOrigin = urlObj.origin
     console.log('🚀 Iniciando ejecución de campaña ID:', id)
 
     if (!id) {
@@ -74,13 +76,35 @@ export async function POST(solicitud) {
 
       let to = prospecto.telefono.replace(/\D/g, '') // Solo números
 
+      const baseUrl = process.env.NEXT_PUBLIC_URL || domainOrigin || 'https://total-english-crm.vercel.app'
+      const uniqueLink = `${baseUrl}/api/track?p=${prospecto.id}&c=${id}`
+
       const payload = {
         messaging_product: 'whatsapp',
         to: to,
         type: 'template',
         template: { 
           name: campana.nombre_plantilla, 
-          language: { code: 'es_MX' } 
+          language: { code: 'es_MX' },
+          components: [
+            {
+              type: "body",
+              parameters: [
+                {
+                  type: "text",
+                  text: prospecto.nombre_alumno || prospecto.nombre || "Estimado/a"
+                },
+                {
+                  type: "text",
+                  text: campana.nombre || "nuestro evento"
+                },
+                {
+                  type: "text",
+                  text: uniqueLink
+                }
+              ]
+            }
+          ]
         }
       }
 
