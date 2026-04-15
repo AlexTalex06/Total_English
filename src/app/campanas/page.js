@@ -214,7 +214,19 @@ export default function PaginaCampanas() {
           <span>Configurar Envío</span>
         </button>
       </div>
-
+      {/* Estadísticas */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Alcance Real Acumulado</p>
+          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.alcanceTotal} Enviados</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Configuradas / En pausa</p>
+          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.activas}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Completadas</p>
+          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.completadas}</p>
         </div>
       </div>
 
