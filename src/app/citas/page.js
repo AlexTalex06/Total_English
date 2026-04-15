@@ -47,29 +47,33 @@ export default function PaginaCitas() {
     { nombre: 'notas', etiqueta: 'Notas', tipo: 'textarea', placeholder: 'Notas adicionales...', requerido: false },
   ]
 
-  const crearCita = async (datos) => {
-    const respuesta = await fetch('/api/citas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos),
-    })
-    if (respuesta.ok) {
-      cargarDatos()
+  const handleGuardarCita = async (datos) => {
+    try {
+      if (citaEditando) {
+        const respuesta = await fetch('/api/citas', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: citaEditando.id, ...datos }),
+        })
+        if (respuesta.ok) cargarDatos()
+      } else {
+        const respuesta = await fetch('/api/citas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(datos),
+        })
+        if (respuesta.ok) cargarDatos()
+      }
       setModalAbierto(false)
+      setCitaEditando(null)
+    } catch (error) {
+      console.error('Error guardando cita:', error)
     }
   }
 
-  const editarCita = async (datos) => {
-    const respuesta = await fetch('/api/citas', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: citaEditando.id, ...datos }),
-    })
-    if (respuesta.ok) {
-      cargarDatos()
-      setModalAbierto(false)
-      setCitaEditando(null)
-    }
+  const abrirEditarCita = (cita) => {
+    setCitaEditando(cita)
+    setModalAbierto(true)
   }
 
   const actualizarEstadoCita = async (id, nuevoEstado) => {
@@ -263,18 +267,17 @@ export default function PaginaCitas() {
                           if (e.target.value === '_eliminar') {
                             eliminarCita(cita.id)
                           } else if (e.target.value === '_editar') {
-                            setCitaEditando(cita)
-                            setModalAbierto(true)
+                            abrirEditarCita(cita)
                           } else if (e.target.value) {
                             actualizarEstadoCita(cita.id, e.target.value)
                           }
                         }}
                       >
                         <option value="">⋮</option>
-                        <option value="_editar">✏️ Editar Detalles</option>
                         <option value="confirmada">Confirmar</option>
                         <option value="cancelada">Cancelar</option>
                         <option value="completada">Completar</option>
+                        <option value="_editar">✍️ Editar</option>
                         <option value="_eliminar" className="text-red-600">🗑 Eliminar</option>
                       </select>
                     </div>
@@ -337,15 +340,9 @@ export default function PaginaCitas() {
         alCerrar={() => { setModalAbierto(false); setCitaEditando(null); }}
         titulo={citaEditando ? 'Editar Cita' : 'Nueva Cita'}
         campos={camposCita}
-        alEnviar={citaEditando ? editarCita : crearCita}
+        alEnviar={handleGuardarCita}
         textoBoton={citaEditando ? 'Guardar Cambios' : 'Agendar Cita'}
-        datosIniciales={citaEditando ? {
-          prospecto_id: citaEditando.prospecto_id,
-          fecha: citaEditando.fecha,
-          hora: citaEditando.hora,
-          tipo: citaEditando.tipo,
-          notas: citaEditando.notas
-        } : null}
+        datosIniciales={citaEditando}
       />
     </div>
   )

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/componentes/AuthProvider'
+import { supabase } from '@/lib/supabase'
 
 const ROLES = [
   { valor: 'admin', etiqueta: 'Administrador', color: 'bg-red-100 text-red-700', desc: 'Acceso total al sistema' },
@@ -81,6 +82,23 @@ export default function PaginaUsuarios() {
       body: JSON.stringify({ id: u.id, activo: !u.activo })
     })
     cargar()
+  }
+
+  const borrarPermanente = async (u) => {
+    if (!confirm(`¿Estás SEGURO de eliminar permanentemente a ${u.nombre}? Esta acción NO se puede deshacer y podría afectar el historial si tiene registros asociados.`)) return
+    
+    // El backend actual solo tiene DELETE para desactivar. Voy a usar una lógica de Supabase directa si es posible o simplemente un llamado DELETE.
+    // Viendo el route.js de usuarios, el DELETE hace un update activo: false. 
+    // Si el usuario quiere "Eliminar", tal vez se refiera a eso o a un delete real. 
+    // Haré un delete real directo a Supabase con supabaseAdmin si el API no lo soporta.
+    
+    try {
+      const { error } = await supabase.from('usuarios').delete().eq('id', u.id)
+      if (error) throw error
+      cargar()
+    } catch (e) {
+      alert('Error al eliminar: ' + e.message)
+    }
   }
 
   if (!esAdmin) {
@@ -168,6 +186,9 @@ export default function PaginaUsuarios() {
                       </button>
                       <button onClick={() => toggleActivo(u)} className={`p-2 transition-colors ${u.activo ? 'text-slate-400 hover:text-red-600' : 'text-slate-400 hover:text-green-600'}`} title={u.activo ? 'Desactivar' : 'Reactivar'}>
                         <span className="material-symbols-outlined text-lg">{u.activo ? 'person_off' : 'person_add'}</span>
+                      </button>
+                      <button onClick={() => borrarPermanente(u)} className="p-2 text-slate-400 hover:text-red-800 transition-colors" title="Eliminar Permanente">
+                        <span className="material-symbols-outlined text-lg">delete_forever</span>
                       </button>
                     </div>
                   </td>

@@ -38,12 +38,8 @@ export async function POST(solicitud) {
   const { data: prospecto, error } = await supabase
     .from('prospectos')
     .insert([{
-      nombre: cuerpo.nombre,
-      correo: cuerpo.correo,
-      telefono: cuerpo.telefono,
-      estado: cuerpo.estado || 'nuevo',
-      curso_interes: cuerpo.curso_interes,
-      notas: cuerpo.notas
+      ...cuerpo,
+      estado: cuerpo.estado || 'nuevo'
     }])
     .select()
     .single()

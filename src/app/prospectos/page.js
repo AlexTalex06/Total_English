@@ -6,23 +6,6 @@ import { cambiarEstadoProspecto } from '@/lib/prospectoSync'
 import { useNotifications } from '@/componentes/NotificationProvider'
 import ModalFormulario from '@/componentes/ModalFormulario'
 
-const camposProspecto = [
-  { nombre: 'nombre', etiqueta: 'Nombre del Contacto (Tutor/WhatsApp)', tipo: 'text', placeholder: 'Ej: María López', requerido: true },
-  { nombre: 'telefono', etiqueta: 'Teléfono (WhatsApp)', tipo: 'text', placeholder: 'Ej: 52341000000', requerido: true },
-  { nombre: 'nombre_alumno', etiqueta: 'Nombre del Alumno (Real)', tipo: 'text', placeholder: 'Ej: Carlitos López', requerido: false },
-  { nombre: 'edad', etiqueta: 'Edad', tipo: 'number', placeholder: 'Ej: 8', requerido: false },
-  { nombre: 'nivel', etiqueta: 'Nivel Estimado', tipo: 'text', placeholder: 'A1, A2, Abierto...', requerido: false },
-  { nombre: 'curso_interes', etiqueta: 'Curso de Interés', tipo: 'select', requerido: false,
-    opciones: [
-      { valor: 'CHILDREN', etiqueta: 'Children' },
-      { valor: 'PRE-TEENS', etiqueta: 'Pre-Teens' },
-      { valor: 'YOUNG', etiqueta: 'Young & Adults' },
-      { valor: 'MY TIME', etiqueta: 'My Time English' },
-    ]
-  },
-  { nombre: 'notas', etiqueta: 'Notas Base', tipo: 'textarea', placeholder: 'Detalles adicionales...', requerido: false }
-]
-
 export default function PaginaProspectos() {
   const [prospectos, setProspectos] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -31,6 +14,33 @@ export default function PaginaProspectos() {
   const [modalAbierto, setModalAbierto] = useState(false)
   const [prospectoEditando, setProspectoEditando] = useState(null)
   const { setUltimoToast } = useNotifications()
+
+  const camposProspecto = [
+    { nombre: 'nombre_alumno', etiqueta: 'Nombre del Alumno', tipo: 'text', placeholder: 'Ej: Carlos Ruiz', requerido: true },
+    { nombre: 'nombre', etiqueta: 'Nombre del Tutor/Contacto', tipo: 'text', placeholder: 'Ej: María Ruiz' },
+    { nombre: 'telefono', etiqueta: 'Teléfono (WhatsApp)', tipo: 'text', placeholder: '521...', requerido: true },
+    { nombre: 'curso_interes', etiqueta: 'Curso de Interés', tipo: 'text', placeholder: 'Ej: Children' },
+    { nombre: 'edad', etiqueta: 'Edad', tipo: 'number', placeholder: 'Ej: 8' },
+    { nombre: 'nivel', etiqueta: 'Nivel', tipo: 'text', placeholder: 'Ej: Básico' },
+    { 
+      nombre: 'estado', etiqueta: 'Estado', tipo: 'select', 
+      opciones: [
+        { valor: 'nuevo', etiqueta: 'Nuevo' },
+        { valor: 'en_proceso', etiqueta: 'En Proceso' },
+        { valor: 'contactado', etiqueta: 'Contactado' },
+        { valor: 'agendado', etiqueta: 'Agendado' },
+      ]
+    },
+    {
+      nombre: 'lead_score', etiqueta: 'Score', tipo: 'select',
+      opciones: [
+        { valor: '', etiqueta: 'Sin Score' },
+        { valor: 'CALIENTE', etiqueta: 'Caliente' },
+        { valor: 'TIBIO', etiqueta: 'Tibio' },
+        { valor: 'FRIO', etiqueta: 'Frío' },
+      ]
+    }
+  ]
   
   const cargarProspectos = async () => {
     setCargando(true)
@@ -64,47 +74,37 @@ export default function PaginaProspectos() {
     }
   }
 
-  const crearProspecto = async (datos) => {
+  const handleDeleteProspecto = async (id) => {
+    if (!confirm('¿Estás seguro de eliminar este prospecto permanentemente? Esta acción no se puede deshacer.')) return
     try {
-      const resp = await fetch('/api/prospectos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) })
-      if (resp.ok) {
-        cargarProspectos()
-        setModalAbierto(false)
-        setUltimoToast({ tipo: 'exito', titulo: 'Éxito', mensaje: 'Prospecto añadido manualmente' })
-      } else {
-        const d = await resp.json()
-        setUltimoToast({ tipo: 'error', titulo: 'Error', mensaje: d.error })
-      }
-    } catch(e) { console.error(e) }
+      const { error } = await supabase.from('prospectos').delete().eq('id', id)
+      if (error) throw error
+      setUltimoToast({ tipo: 'exito', titulo: 'Eliminado', mensaje: 'Prospecto eliminado correctamente' })
+      setProspectoSeleccionado(null)
+      cargarProspectos()
+    } catch (error) {
+      console.error('Error eliminando:', error)
+      setUltimoToast({ tipo: 'error', titulo: 'Error', mensaje: 'No se pudo eliminar el prospecto' })
+    }
   }
 
-  const editarProspecto = async (datos) => {
+  const handleGuardarProspecto = async (datos) => {
     try {
-      const resp = await fetch('/api/prospectos', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: prospectoEditando.id, ...datos }) })
-      if (resp.ok) {
-        cargarProspectos()
-        setModalAbierto(false)
-        setProspectoSeleccionado(null)
+      if (prospectoEditando) {
+        const { error } = await supabase.from('prospectos').update(datos).eq('id', prospectoEditando.id)
+        if (error) throw error
         setUltimoToast({ tipo: 'exito', titulo: 'Actualizado', mensaje: 'Prospecto actualizado correctamente' })
       } else {
-        const d = await resp.json()
-        setUltimoToast({ tipo: 'error', titulo: 'Error', mensaje: d.error })
+        const { error } = await supabase.from('prospectos').insert([datos])
+        if (error) throw error
+        setUltimoToast({ tipo: 'exito', titulo: 'Creado', mensaje: 'Prospecto creado correctamente' })
       }
-    } catch(e) { console.error(e) }
-  }
-
-  const eliminarProspecto = async (id) => {
-    if (!confirm('¿Estás sumamente seguro de eliminar este prospecto? Perderás todo el historial.')) return;
-    try {
-      const resp = await fetch(`/api/prospectos?id=${id}`, { method: 'DELETE' })
-      if (resp.ok) {
-        cargarProspectos()
-        setProspectoSeleccionado(null)
-        setUltimoToast({ tipo: 'exito', titulo: 'Eliminado', mensaje: 'Prospecto purgado del sistema' })
-      } else {
-         alert('Error al intentar eliminar')
-      }
-    } catch(e) {}
+      setModalAbierto(false)
+      cargarProspectos()
+    } catch (error) {
+      console.error('Error guardando:', error)
+      setUltimoToast({ tipo: 'error', titulo: 'Error', mensaje: 'No se pudo guardar la información' })
+    }
   }
 
   useEffect(() => {
@@ -146,12 +146,12 @@ export default function PaginaProspectos() {
               <span className="material-symbols-outlined text-lg">file_download</span>
               Exportar
             </button>
-            <button
+            <button 
               onClick={() => { setProspectoEditando(null); setModalAbierto(true); }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-900/20 active:scale-95 transition-transform"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-semibold rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-900/20"
             >
               <span className="material-symbols-outlined text-lg">person_add</span>
-              Manual
+              Nuevo Prospecto
             </button>
           </div>
         </div>
@@ -281,16 +281,24 @@ export default function PaginaProspectos() {
               <span className="material-symbols-outlined">badge</span>
               Expediente
             </h3>
-            <div className="flex gap-1 items-center">
-              <button onClick={() => { setProspectoEditando(prospectoSeleccionado); setModalAbierto(true); }} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-blue-100 text-blue-600 transition-colors" title="Editar Prospecto">
-                <span className="material-symbols-outlined text-[20px]">edit</span>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => { setProspectoEditando(prospectoSeleccionado); setModalAbierto(true); }}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-blue-100 text-blue-600"
+                title="Editar Prospecto"
+              >
+                <span className="material-symbols-outlined text-lg">edit</span>
               </button>
-              <button onClick={() => eliminarProspecto(prospectoSeleccionado.id)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-100 text-red-600 transition-colors" title="Eliminar Prospecto">
-                <span className="material-symbols-outlined text-[20px]">delete</span>
+              <button 
+                onClick={() => handleDeleteProspecto(prospectoSeleccionado.id)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-100 text-red-600"
+                title="Eliminar Prospecto"
+              >
+                <span className="material-symbols-outlined text-lg">delete</span>
               </button>
-              <div className="w-px h-6 bg-slate-200 mx-1"></div>
-              <button onClick={() => setProspectoSeleccionado(null)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 text-slate-400 transition-colors">
-                <span className="material-symbols-outlined text-[20px]">close</span>
+              <div className="w-[1px] h-4 bg-slate-200 mx-1"></div>
+              <button onClick={() => setProspectoSeleccionado(null)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-200 text-slate-400">
+                <span className="material-symbols-outlined text-lg">close</span>
               </button>
             </div>
           </div>
@@ -377,23 +385,16 @@ export default function PaginaProspectos() {
           </div>
         </div>
       )}
-      {/* Modal */}
+
+      {/* Modal CRUD */}
       <ModalFormulario
         abierto={modalAbierto}
-        alCerrar={() => { setModalAbierto(false); setProspectoEditando(null); }}
-        titulo={prospectoEditando ? 'Editar Pautas y Datos' : 'Nuevo Prospecto Manual'}
+        alCerrar={() => setModalAbierto(false)}
+        titulo={prospectoEditando ? 'Editar Prospecto' : 'Nuevo Prospecto'}
         campos={camposProspecto}
-        alEnviar={prospectoEditando ? editarProspecto : crearProspecto}
-        textoBoton={prospectoEditando ? 'Actualizar Expediente' : 'Añadir Prospecto'}
-        datosIniciales={prospectoEditando ? {
-          nombre: prospectoEditando.nombre,
-          nombre_alumno: prospectoEditando.nombre_alumno,
-          telefono: prospectoEditando.telefono,
-          curso_interes: prospectoEditando.curso_interes,
-          nivel: prospectoEditando.nivel,
-          edad: prospectoEditando.edad,
-          notas: prospectoEditando.notas
-        } : null}
+        alEnviar={handleGuardarProspecto}
+        textoBoton={prospectoEditando ? 'Guardar Cambios' : 'Crear Prospecto'}
+        datosIniciales={prospectoEditando}
       />
     </div>
   )
