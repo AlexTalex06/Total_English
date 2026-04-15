@@ -3,47 +3,6 @@
 import { useState, useEffect } from 'react'
 import ModalFormulario from '@/componentes/ModalFormulario'
 
-const camposCampana = [
-  { nombre: 'nombre', etiqueta: 'Nombre de la campaña', tipo: 'text', placeholder: 'Ej: Promoción Buen Fin', requerido: true },
-  { nombre: 'nombre_plantilla', etiqueta: 'Nombre Plantilla META (Template)', tipo: 'text', placeholder: 'Ej: promo_buen_fin_v1', requerido: true },
-  { nombre: 'mensaje', etiqueta: 'Referencia visual del mensaje', tipo: 'textarea', placeholder: 'Texto para recordar de qué trata la plantilla...', requerido: false },
-  {
-    nombre: 'publico_estado', etiqueta: 'Público (Estado)', tipo: 'select', requerido: false,
-    opciones: [
-      { valor: 'Todos', etiqueta: 'Todos los Estados' },
-      { valor: 'nuevo', etiqueta: 'Nuevos' },
-      { valor: 'contactado', etiqueta: 'Contactados' },
-      { valor: 'en_proceso', etiqueta: 'En Proceso' },
-      { valor: 'agendado', etiqueta: 'Agendados' },
-    ]
-  },
-  {
-    nombre: 'publico_curso', etiqueta: 'Público (Curso de Interés)', tipo: 'select', requerido: false,
-    opciones: [
-      { valor: 'Todos', etiqueta: 'Todos los Cursos' },
-      { valor: 'CHILDREN', etiqueta: 'Children' },
-      { valor: 'PRE-TEENS', etiqueta: 'Pre-Teens' },
-      { valor: 'YOUNG', etiqueta: 'Young & Adults' },
-      { valor: 'MY TIME', etiqueta: 'My Time English' },
-    ]
-  },
-  {
-    nombre: 'canal', etiqueta: 'Canal', tipo: 'select', requerido: false,
-    opciones: [
-      { valor: 'whatsapp', etiqueta: 'WhatsApp (API Meta)' }
-    ]
-  },
-  {
-    nombre: 'estado', etiqueta: 'Estado Visual', tipo: 'select', requerido: false,
-    opciones: [
-      { valor: 'borrador', etiqueta: 'Borrador' },
-      { valor: 'programada', etiqueta: 'Programada' },
-      { valor: 'activa', etiqueta: 'Activa' },
-      { valor: 'completada', etiqueta: 'Completada' },
-    ]
-  },
-  { nombre: 'imagen_url', etiqueta: 'URL de imagen (Opcional)', tipo: 'url', placeholder: 'https://...', requerido: false },
-]
 
 export default function PaginaCampanas() {
   const [campanas, setCampanas] = useState([])
@@ -54,6 +13,53 @@ export default function PaginaCampanas() {
   const [plantillasMeta, setPlantillasMeta] = useState([])
   const [cargandoMeta, setCargandoMeta] = useState(false)
 
+  const plantillasAprobadas = plantillasMeta
+    .filter(p => p.status === 'APPROVED')
+    .map(p => ({ valor: p.name, etiqueta: `${p.name} (${p.language})` }))
+
+  const camposCampana = [
+    { nombre: 'nombre', etiqueta: 'Nombre de la campaña', tipo: 'text', placeholder: 'Ej: Promoción Buen Fin', requerido: true },
+    { 
+      nombre: 'nombre_plantilla', 
+      etiqueta: 'Plantilla de Meta Aprobada', 
+      tipo: 'select', 
+      opciones: plantillasAprobadas.length > 0 
+        ? plantillasAprobadas 
+        : [{ valor: '', etiqueta: '❌ Sin plantillas aprobadas en Meta' }],
+      requerido: true 
+    },
+    { nombre: 'mensaje', etiqueta: 'Notas Internas', tipo: 'textarea', placeholder: 'Notas sobre esta campaña...', requerido: false },
+    {
+      nombre: 'publico_estado', etiqueta: 'Público (Estado)', tipo: 'select', requerido: false,
+      opciones: [
+        { valor: 'Todos', etiqueta: 'Todos los Estados' },
+        { valor: 'nuevo', etiqueta: 'Nuevos' },
+        { valor: 'contactado', etiqueta: 'Contactados' },
+        { valor: 'en_proceso', etiqueta: 'En Proceso' },
+        { valor: 'agendado', etiqueta: 'Agendados' },
+      ]
+    },
+    {
+      nombre: 'publico_curso', etiqueta: 'Público (Curso de Interés)', tipo: 'select', requerido: false,
+      opciones: [
+        { valor: 'Todos', etiqueta: 'Todos los Cursos' },
+        { valor: 'CHILDREN', etiqueta: 'Children' },
+        { valor: 'PRE-TEENS', etiqueta: 'Pre-Teens' },
+        { valor: 'YOUNG', etiqueta: 'Young & Adults' },
+        { valor: 'MY TIME', etiqueta: 'My Time English' },
+      ]
+    },
+    {
+      nombre: 'estado', etiqueta: 'Estado Visual', tipo: 'select', requerido: false,
+      opciones: [
+        { valor: 'borrador', etiqueta: 'Borrador' },
+        { valor: 'programada', etiqueta: 'Programada' },
+        { valor: 'activa', etiqueta: 'Activa' },
+        { valor: 'completada', etiqueta: 'Completada' },
+      ]
+    },
+    { nombre: 'imagen_url', etiqueta: 'URL de imagen / Media ID (Opcional)', tipo: 'url', placeholder: 'https://...', requerido: false },
+  ]
   const cargarCampanas = async () => {
     setCargando(true)
     try {
