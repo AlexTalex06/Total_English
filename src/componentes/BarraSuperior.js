@@ -18,6 +18,11 @@ export default function BarraSuperior() {
   const [notificaciones, setNotificaciones] = useState([])
   const [notifCount, setNotifCount] = useState(0)
 
+  // Perfil state
+  const [modalPerfilAbierto, setModalPerfilAbierto] = useState(false)
+  const [perfilNombre, setPerfilNombre] = useState('')
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false)
+
   const menuRef = useRef(null)
   const notifRef = useRef(null)
   const searchRef = useRef(null)
@@ -183,7 +188,35 @@ export default function BarraSuperior() {
     setMenuPerfilAbierto(false)
   }
 
+  const abrirPerfil = () => {
+    setPerfilNombre(usuario?.nombre || '')
+    setModalPerfilAbierto(true)
+    setMenuPerfilAbierto(false)
+  }
+
+  const guardarPerfil = async (e) => {
+    e.preventDefault()
+    setGuardandoPerfil(true)
+    try {
+      const { error } = await supabase.from('usuarios').update({ nombre: perfilNombre }).eq('id', usuario.id)
+      if (error) throw error
+      // Actualizamos local (seria mejor actualizar context pero como es manual y simple servirá para demostrar)
+      let currentLoc = JSON.parse(localStorage.getItem('te_usuario'))
+      currentLoc.nombre = perfilNombre
+      localStorage.setItem('te_usuario', JSON.stringify(currentLoc))
+      alert('Perfil actualizado con éxito.')
+      setModalPerfilAbierto(false)
+      // Recargar pagina para forzar actualización del context
+      window.location.reload()
+    } catch (err) {
+      alert('Error al guardar perfil')
+    } finally {
+      setGuardandoPerfil(false)
+    }
+  }
+
   return (
+    <>
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20">
       
       <h1 className="text-xl font-bold text-[#191c1d]">{tituloActual}</h1>
@@ -294,8 +327,11 @@ export default function BarraSuperior() {
                 <p className="text-sm font-bold text-[#191c1d]">{usuario?.nombre}</p>
                 <p className="text-xs text-slate-500">{usuario?.email}</p>
               </div>
+              <button onClick={abrirPerfil} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px] text-slate-400">person</span> Mi Perfil
+              </button>
               <button onClick={() => { router.push('/configuracion'); setMenuPerfilAbierto(false) }} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px] text-slate-400">settings</span> Configuración
+                <span className="material-symbols-outlined text-[18px] text-slate-400">smart_toy</span> Admin AlexIA
               </button>
               <div className="h-px bg-slate-100 my-1"></div>
               <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-3 group">
@@ -307,6 +343,56 @@ export default function BarraSuperior() {
 
       </div>
     </header>
+
+    {/* MODAL MI PERFIL */}
+    {modalPerfilAbierto && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalPerfilAbierto(false)}></div>
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+          
+          <div className="p-6 bg-gradient-to-br from-[#00236f] to-[#1e3a8a] text-center text-white relative">
+            <button onClick={() => setModalPerfilAbierto(false)} className="absolute top-4 right-4 text-white/70 hover:text-white">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <div className="w-20 h-20 mx-auto rounded-full bg-white/20 flex items-center justify-center text-3xl font-bold mb-3 ring-4 ring-white/10">
+              {usuario?.nombre?.[0]?.toUpperCase() || 'U'}
+            </div>
+            <h2 className="text-xl font-bold">{usuario?.nombre}</h2>
+            <p className="text-blue-200 text-sm capitalize">{usuario?.rol}</p>
+          </div>
+
+          <form onSubmit={guardarPerfil} className="p-6 space-y-4">
+            
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Correo (Solo lectura)</label>
+              <input type="text" readOnly disabled value={usuario?.email || ''} className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 text-sm outline-none" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre a mostrar</label>
+              <input type="text" required value={perfilNombre} onChange={e => setPerfilNombre(e.target.value)} className="w-full p-2.5 bg-white border border-slate-300 focus:border-[#1e3a8a] focus:ring-1 focus:ring-[#1e3a8a] rounded-lg text-slate-800 text-sm outline-none transition-all" />
+            </div>
+
+            <div className="space-y-1 pt-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estado de Sesión</label>
+              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2.5 rounded-lg border border-green-100 font-medium">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                Sesión Activa Segura
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setModalPerfilAbierto(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-semibold transition-colors">Cancelar</button>
+              <button type="submit" disabled={guardandoPerfil} className="px-5 py-2 bg-[#1e3a8a] text-white hover:bg-blue-900 rounded-lg text-sm font-bold shadow-sm transition-colors disabled:opacity-50">
+                {guardandoPerfil ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
