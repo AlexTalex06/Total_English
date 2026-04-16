@@ -21,6 +21,9 @@ export async function POST(solicitud) {
     if (tipo === 'template' && nombrePlantilla) {
       payload.type = 'template'
       payload.template = { name: nombrePlantilla, language: { code: 'es_MX' } }
+    } else if (tipo === 'image' && solicitud.url_archivo) {
+      payload.type = 'image'
+      payload.image = { link: solicitud.url_archivo, caption: text }
     } else {
       payload.type = 'text'
       payload.text = { body: text }

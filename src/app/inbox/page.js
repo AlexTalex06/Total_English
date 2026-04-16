@@ -114,26 +114,46 @@ export default function PaginaInbox() {
     }
   }, [mensajes, escribiendo])
 
-  const enviarMensaje = async (e) => {
-    e.preventDefault()
-    if (!nuevoMensaje.trim() || !chatActivo) return
+  const enviarMensaje = async (e, imageUrl = null) => {
+    if (e) e.preventDefault()
+    if ((!nuevoMensaje.trim() && !imageUrl) || !chatActivo) return
     const texto = nuevoMensaje
     setNuevoMensaje('')
     setMostrarEmojis(false)
     try {
+      const payload = { to: chatActivo.id_plataforma, text: texto, plataforma: 'whatsapp' }
+      if (imageUrl) {
+        payload.tipo = 'image'
+        payload.url_archivo = imageUrl
+      }
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: chatActivo.id_plataforma, text: texto, plataforma: 'whatsapp' })
+        body: JSON.stringify(payload)
       })
       if (res.ok) {
-        await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: texto })
-        await supabase.from('conversaciones').update({ ultimo_mensaje: texto, actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
+        await supabase.from('mensajes').insert({ 
+          conversacion_id: chatActivo.id, 
+          remitente: 'humano', 
+          contenido: texto,
+          tipo: imageUrl ? 'imagen' : 'texto',
+          url_archivo: imageUrl || null
+        })
+        await supabase.from('conversaciones').update({ ultimo_mensaje: imageUrl ? '🖼️ [Imagen]' : texto, actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
       } else {
         const err = await res.json()
         console.error('Error enviando:', err)
       }
     } catch (err) { console.error(err) }
+  }
+
+  const enviarImagenPorURL = () => {
+    const url = prompt('Ingresa la URL pública de la imagen (JPG/PNG):')
+    if (url && (url.startsWith('http') || url.startsWith('https'))) {
+      enviarMensaje(null, url)
+    } else if (url) {
+      alert('Por favor ingresa una URL válida que empiece con http o https')
+    }
   }
 
   const cambiarChat = async (c) => {
@@ -545,8 +565,8 @@ export default function PaginaInbox() {
             <button 
               type="button" 
               className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shrink-0"
-              title="Adjuntar archivo"
-              onClick={() => alert('La función de adjuntar archivos estará disponible próximamente.')}
+              title="Adjuntar archivo por URL"
+              onClick={enviarImagenPorURL}
             >
               <span className="material-symbols-outlined text-[24px] rotate-45">attach_file</span>
             </button>
@@ -606,21 +626,26 @@ export default function PaginaInbox() {
 
           {/* Quick Actions */}
           <div className="p-4 border-b border-slate-100">
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => { if(chatActivo.prospectos?.estado !== 'agendado') { supabase.from('prospectos').update({estado:'contactado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); } }}
-                className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-blue-50 transition-colors">
-                <span className="material-symbols-outlined text-[18px] text-[#1e3a8a]">call</span>
-                <span className="text-[9px] text-slate-500 font-semibold">Contactado</span>
+            <div className="grid grid-cols-4 gap-2">
+              <button onClick={() => { if(chatActivo.prospectos?.estado !== 'contactado') { supabase.from('prospectos').update({estado:'contactado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); } }}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-blue-50 transition-colors bg-white border border-slate-100">
+                <span className="material-symbols-outlined text-[16px] text-[#1e3a8a]">call</span>
+                <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Contactado</span>
               </button>
               <button onClick={() => { supabase.from('prospectos').update({estado:'agendado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); }}
-                className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-green-50 transition-colors">
-                <span className="material-symbols-outlined text-[18px] text-green-600">event_available</span>
-                <span className="text-[9px] text-slate-500 font-semibold">Agendar</span>
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors bg-white border border-slate-100">
+                <span className="material-symbols-outlined text-[16px] text-orange-600">event_available</span>
+                <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Agendar</span>
+              </button>
+              <button onClick={() => { supabase.from('prospectos').update({estado:'cerrado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); }}
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-green-50 transition-colors bg-white border border-slate-100">
+                <span className="material-symbols-outlined text-[16px] text-green-600">verified</span>
+                <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Cerrar</span>
               </button>
               <button onClick={toggleBotHumano}
-                className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-amber-50 transition-colors">
-                <span className="material-symbols-outlined text-[18px] text-amber-600">{chatActivo.asignado_a_humano ? 'smart_toy' : 'person'}</span>
-                <span className="text-[9px] text-slate-500 font-semibold">{chatActivo.asignado_a_humano ? 'Bot' : 'Tomar'}</span>
+                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-amber-50 transition-colors bg-white border border-slate-100">
+                <span className="material-symbols-outlined text-[16px] text-amber-600">{chatActivo.asignado_a_humano ? 'smart_toy' : 'person'}</span>
+                <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">{chatActivo.asignado_a_humano ? 'Bot' : 'Tomar'}</span>
               </button>
             </div>
           </div>
