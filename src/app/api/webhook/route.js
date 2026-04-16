@@ -155,10 +155,11 @@ export async function POST(solicitud) {
 
         console.log(`🤖 AlexIA (${remitenteId}):`, { intencion, datos })
 
-        // --- MANEJO ESPECIAL: ESCALAMIENTO HUMANO ---
         if (intencion === 'SPECIFIC_QUESTION_PASS_AGENT' || intencion === 'TRANSFER_HUMANO') {
           console.log(`🚨 Escalamiento a humano para ${remitenteId}`);
-          await escalarAHumano(convExist.id, prosExist.id, 'Usuario solicitó hablar con un asesor o hizo pregunta compleja', 'pregunta_especifica');
+          const motivo = datos?.escalation_reason || 'Usuario solicitó hablar con un asesor o hizo pregunta compleja';
+          const categoria = datos?.escalation_category || 'pregunta_especifica';
+          await escalarAHumano(convExist.id, prosExist.id, motivo, categoria);
           
           const msjEscalamiento = respuesta || "Voy a transferir tu solicitud ahora mismo con uno de nuestros asesores. Revisará tu caso para darte una respuesta personalizada en unos momentos. ¡Gracias por tu paciencia!";
           

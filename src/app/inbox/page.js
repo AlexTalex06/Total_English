@@ -160,9 +160,30 @@ export default function PaginaInbox() {
     if (!chatActivo || toggling) return
     setToggling(true)
     const nuevoValor = !chatActivo.asignado_a_humano
-    await supabase.from('conversaciones').update({ asignado_a_humano: nuevoValor }).eq('id', chatActivo.id)
-    setChatActivo(prev => ({ ...prev, asignado_a_humano: nuevoValor }))
+    let updates = { asignado_a_humano: nuevoValor }
+    
+    // Si lo estamos devolviendo al bot (o tomando siendo humano), limpiamos la alerta
+    if (!nuevoValor || chatActivo.escalation_reason) {
+        updates.escalation_reason = null
+        updates.escalation_category = null
+    }
+
+    await supabase.from('conversaciones').update(updates).eq('id', chatActivo.id)
+    setChatActivo(prev => ({ ...prev, ...updates }))
     setToggling(false)
+  }
+
+  const resolverEscalamiento = async () => {
+    if (!chatActivo || toggling) return;
+    setToggling(true);
+    let updates = { 
+        asignado_a_humano: true,
+        escalation_reason: null, 
+        escalation_category: null 
+    };
+    await supabase.from('conversaciones').update(updates).eq('id', chatActivo.id);
+    setChatActivo(prev => ({ ...prev, ...updates }));
+    setToggling(false);
   }
 
   const insertarEmoji = (emoji) => {
@@ -354,6 +375,30 @@ export default function PaginaInbox() {
               </button>
             </div>
           </div>
+
+          {/* ESCALATION BANNER (MANDADOS STYLE) */}
+          {chatActivo.escalation_reason && (
+            <div className="bg-red-50 border-b border-red-100 p-3 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between z-10 shadow-sm relative">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-red-500 shrink-0 mt-0.5">warning</span>
+                <div>
+                  <h4 className="text-[13px] font-bold text-red-800">ATENCIÓN REQUERIDA</h4>
+                  <p className="text-[12px] text-red-600 leading-tight">
+                    Alex pausó esta conversación por el siguiente motivo: <br/>
+                    <strong className="text-red-900">"{chatActivo.escalation_reason}"</strong> 
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={resolverEscalamiento}
+                disabled={toggling}
+                className="bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold px-4 py-1.5 rounded-lg text-xs shadow-sm whitespace-nowrap transition-colors"
+              >
+                <span className="material-symbols-outlined text-[14px] align-middle mr-1">check_circle</span>
+                Tomar y Resolver
+              </button>
+            </div>
+          )}
 
           {/* Messages */}
           <div 

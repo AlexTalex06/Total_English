@@ -145,7 +145,9 @@ Estructura exacta:
     "curso_interes": "nombre del curso" (o null),
     "lead_score": "CALIENTE|TIBIO|FRIO" (Asigna CALIENTE si quieren cita/llamada. TIBIO si hay interes. FRIO si rechazan),
     "fecha_cita": "YYYY-MM-DD" (si se sugirió/confirmó fecha),
-    "hora_cita": "HH:MM" (si se sugirió/confirmó hora)
+    "hora_cita": "HH:MM" (si se sugirió/confirmó hora),
+    "escalation_reason": "breve descripcion del motivo del escalamiento (solo si intencion es SPECIFIC_QUESTION_PASS_AGENT) o null",
+    "escalation_category": "pago|queja|pregunta_especifica|solicitud_humano|otro (solo si es escalamiento) o null"
   },
   "intencion": "BIENVENIDA|RECOLECCION|REQUEST_PRICE_NO_AGE|COURSE_RECOMMENDED|CIERRE_CITA|SPECIFIC_QUESTION_PASS_AGENT|PREGUNTA_FAQ"
 }
