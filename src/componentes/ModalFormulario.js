@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alEnviar, textoBoton = 'Guardar', datosIniciales = null }) {
   const [datosFormulario, setDatosFormulario] = useState({})
   const [cargando, setCargando] = useState(false)
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false)
 
   // Sincronizar datos iniciales cuando se abre en modo edición
   useEffect(() => {
@@ -19,6 +21,26 @@ export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alE
 
   const manejarCambio = (nombreCampo, valor) => {
     setDatosFormulario(anterior => ({ ...anterior, [nombreCampo]: valor }))
+  }
+
+  const handleFileUpload = async (nombreCampo, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setSubiendoArchivo(true);
+    try {
+      const ext = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+      const { data, error } = await supabase.storage.from('recursos').upload(fileName, file, { cacheControl: '3600', upsert: false })
+      if (error) throw error;
+      
+      const { data: publicData } = supabase.storage.from('recursos').getPublicUrl(fileName)
+      manejarCambio(nombreCampo, publicData.publicUrl)
+    } catch (err) {
+      alert('Error subiendo imagen al servidor. ¿Ya creaste el bucket público llamado "recursos" en Storage de Supabase? Detalle técnico: ' + err.message)
+    } finally {
+      setSubiendoArchivo(false);
+    }
   }
 
   const manejarEnvio = async (e) => {
@@ -98,6 +120,23 @@ export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alE
                     ))}
                   </datalist>
                 </>
+              ) : campo.tipo === 'image_upload' ? (
+                <div className="space-y-2">
+                  <input
+                    className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
+                    type="url"
+                    placeholder="Pega una URL o sube desde tu equipo 👇"
+                    value={datosFormulario[campo.nombre] || ''}
+                    onChange={(e) => manejarCambio(campo.nombre, e.target.value)}
+                  />
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(campo.nombre, e)}
+                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-[#00236f] hover:file:bg-blue-100 cursor-pointer transition-colors"
+                  />
+                  {subiendoArchivo && <p className="text-[11px] text-blue-600 font-bold animate-pulse">Subiendo imagen al servidor de Supabase...</p>}
+                </div>
               ) : (
                 <input
                   className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
@@ -122,7 +161,7 @@ export default function ModalFormulario({ abierto, alCerrar, titulo, campos, alE
             </button>
             <button
               type="submit"
-              disabled={cargando}
+              disabled={cargando || subiendoArchivo}
               className="px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-900/20 hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
             >
               {cargando ? 'Guardando...' : textoBoton}
