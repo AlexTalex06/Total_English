@@ -1,67 +1,13 @@
 import { generateText } from 'ai'
 import { openai } from '@ai-sdk/openai'
 
-// ============================================
-// BASE DE CONOCIMIENTO Y LÓGICA DE DIPLOMADOS
-// ============================================
-const TABLA_LOGICA_CURSOS = `
-CASO 1 - NIÑOS (6-9 años):
-  Curso: DIPLOMADO CHILDREN
-  Frase Espejo: "¡Qué gran iniciativa buscar lo mejor para el futuro de tu peque! 🌟"
-  Beneficios:
-  • 🗣️ Mucho *speaking* (que sí se anime a hablar)
-  • 👥 Grupos reducidos + atención personalizada
-  • 🎲 Aprenden *de forma divertida* (no basado en tareas eternas)
-  • 👨‍👩‍👧 Feedback a papás: progreso claro y medible
-  Precio Ancla: "Planes de beca desde $350 MXN semanales."
-  Regalo: 🎁 Pase para una Clase Muestra
-
-CASO 2 - ADOLESCENTES (10-13 años):
-  Curso: DIPLOMADO PRE-TEENS
-  Frase Espejo: "Entiendo que buscas herramientas que le faciliten la escuela y el futuro 🚀."
-  Beneficios:
-  ✅ *Especializado* para esa edad (10-13 años)
-  💬 Enfoque en *conversación* + Inglés funcional 🗣️
-  📖 Nivel similar a *Colegios bilingües*
-  🚫 Sin tareas aburridas
-  👥 *Atención personalizada*
-  🏆 Pueden *exentar Inglés* en Secundaria y/o Prepa
-  Precio Ancla: "Planes de beca desde $350 MXN semanales."
-  Regalo: 🎁 Pase para una Clase Muestra
-
-CASO 3 - JÓVENES/ADULTOS (14+ años, Horario Fijo):
-  Curso: DIPLOMADO YOUNG & ADULTS
-  Frase Espejo: "Se nota que estás comprometido/a con tu crecimiento profesional 💼."
-  Beneficios:
-  ✅ *Inglés práctico* para Escuela, Trabajo y vida real
-  🗣️ Desarrolla *fluidez* y confianza
-  💻 Actividades *Online* de reforzamiento
-  💬 *Club de speaking*
-  👥 Clases *a tu nivel*
-  🇬🇧 *Certificación* Cambridge (opcional)
-  Precio Ancla: "La inversión regular ronda los $450 - $550 MXN semanales."
-  Regalo: 🎁 Diagnóstico de Nivel + Clase de Prueba
-
-CASO 4 - ADULTOS FLEXIBLES (16+, Horario Flexible):
-  Curso: DIPLOMADO MY TIME ENGLISH
-  Frase Espejo: "Comprendo perfectamente que necesitas que el inglés se adapte a tu ritmo 🕒."
-  Beneficios:
-  ✨ Sistema 100% flexible y personalizado ✨
-  ✅ Horarios Flexibles
-  👨🏻‍🏫 Teachers (en vivo) + 📲 Plataforma E-learning 24/7
-  🗣️ Club de Conversación
-  🚀 Avanza a tu ritmo
-  Precio Ancla: "Es un programa Premium a medida. La inversión se ajusta a tu plan de carrera."
-  Regalo: 🎁 Demo de Plataforma + Asesoría Personalizada
-`
-
 const REGLAS_GENERALES = `
 **Información General de la Escuela:**
 - **Ubicación:** 📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima.
 - **Contacto / WhatsApp:** 📞 312 181 1610.
 - **Diagnóstico:** GRATIS para todos.
-- **Certificaciones:** Preparamos para TOEFL, Cambridge y CENNI (solo para Edad 16+).
-- **Validez SEP:** Nuestros diplomas tienen validez curricular, pero si te preguntan detalles técnicos de la SEP o Visas, indícales que lo verá el asesor académico.
+- **Certificaciones:** Preparamos para TOEFL, Cambridge y CENNI.
+- **Validez SEP:** Nuestros diplomas tienen validez curricular, pero si te preguntan detalles técnicos escálalo a un humano.
 `
 
 // ============================================
@@ -141,8 +87,8 @@ Estructura exacta:
     "nombre_alumno": "Juan Perez" (si se detectó),
     "edad": 15 (número o null),
     "nivel": "básico" (texto o null),
-    "horario": "fijo|flexible" (o null),
     "curso_interes": "nombre del curso" (o null),
+    "imagen": "URL o string exacto proporcionado en 'Imagen Referencia' del curso para que se le muestre el banner al usuario (null si no hay)",
     "lead_score": "CALIENTE|TIBIO|FRIO" (Asigna CALIENTE si quieren cita/llamada. TIBIO si hay interes. FRIO si rechazan),
     "fecha_cita": "YYYY-MM-DD" (si se sugirió/confirmó fecha),
     "hora_cita": "HH:MM" (si se sugirió/confirmó hora),
@@ -153,18 +99,18 @@ Estructura exacta:
 }
 `
 
-export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plataforma = 'WhatsApp') {
+export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plataforma = 'WhatsApp', tablaDinamicaCursos = 'NO HAY CURSOS') {
   try {
     // 1. Extraemos el mensaje de sistema inyectado desde route.js para aislar el contexto CRM
     const mensajeSistemaCrm = mensajesOriginales.find(m => m.role === 'system')?.content || '';
     const historialDeUsuario = mensajesOriginales.filter(m => m.role !== 'system');
 
-    // 2. Preparamos el Prompt Dinámico con el CRM inyectado de forma más limpia
+    // 2. Preparamos el Prompt Dinámico con el CRM y la Tabla de Cursos inyectados
     const promptPersonalizado = MEGA_SYSTEM_PROMPT
       .replace('{nombre del usuario}', nombreUsuario || 'amigo/a')
-      .replace('\${CONTEXTO_CRM}', mensajeSistemaCrm)
-      .replace('\${TABLA_LOGICA_CURSOS}', TABLA_LOGICA_CURSOS)
-      .replace('\${REGLAS_GENERALES}', REGLAS_GENERALES);
+      .replace('${CONTEXTO_CRM}', mensajeSistemaCrm)
+      .replace('${TABLA_LOGICA_CURSOS}', tablaDinamicaCursos)
+      .replace('${REGLAS_GENERALES}', REGLAS_GENERALES);
 
     const { text } = await generateText({
       model: openai('gpt-4o-mini'),

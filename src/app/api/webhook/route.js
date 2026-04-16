@@ -129,10 +129,24 @@ export async function POST(solicitud) {
         Curso de Interés: ${freshPros.curso_interes || 'Desconocido'}
         IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo avanza al siguiente paso del flujo.`;
 
+        // OBTENER CURSOS REALES DE LA BASE DE DATOS
+        const { data: cursosDb } = await supabase.from('cursos').select('*')
+        let tablaDinamicaCursos = 'NO HAY CURSOS'
+        if (cursosDb && cursosDb.length > 0) {
+          tablaDinamicaCursos = cursosDb.map(c => `
+🎓 CURSO: ${c.nombre}
+   Descripción: ${c.descripcion || 'Sin descripción'}
+   Beneficios (Para usar en tu frase espejo): ${c.beneficios || 'Generales'}
+   Para Edad/Nivel: ${c.nivel || 'Todas'}
+   Imagen Referencia: ${c.imagen_url || 'null'}
+   Inversión Ancla: ${c.precio ? '$' + c.precio : 'A Consultar con Asesor'}
+          `).join('\n\n')
+        }
+
         const { respuesta, datos, intencion } = await consultarAlex([
           { role: 'system', content: contextoCrm },
           ...historialFormat
-        ], nombrePerfil, 'WhatsApp')
+        ], nombrePerfil, 'WhatsApp', tablaDinamicaCursos)
 
         // Evitar bucles - comparar con los últimos 2 mensajes del bot
         const mensajesBot = (historialRaw || []).filter(m => m.remitente === 'bot');
@@ -288,8 +302,12 @@ export async function POST(solicitud) {
         // 7. Enviar a Meta
         let imagenUrl = null
         if (datos && datos.imagen && datos.imagen !== 'null') {
-          const origin = new URL(solicitud.url).origin
-          imagenUrl = `${origin}/cursos/${datos.imagen}`
+          if (datos.imagen.startsWith('http')) {
+            imagenUrl = datos.imagen
+          } else {
+            const origin = new URL(solicitud.url).origin
+            imagenUrl = `${origin}/cursos/${datos.imagen}`
+          }
         }
 
         // Preparar opciones (sanitizar)
