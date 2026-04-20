@@ -37,9 +37,12 @@ export default function PaginaCitas() {
 
   const camposCita = [
     {
-      nombre: 'prospecto_id', etiqueta: 'Prospecto', tipo: 'select', requerido: true,
+      nombre: 'prospecto_id', etiqueta: 'Prospecto (Alumno)', tipo: 'select', requerido: true,
       placeholder: 'Seleccionar prospecto...',
-      opciones: prospectos.map(p => ({ valor: p.id, etiqueta: p.nombre }))
+      opciones: prospectos.map(p => ({ 
+        valor: p.id, 
+        etiqueta: `${p.nombre_alumno || p.nombre} ${p.nombre_alumno ? `(De: ${p.nombre})` : ''}`.trim() 
+      }))
     },
     { nombre: 'fecha', etiqueta: 'Fecha', tipo: 'date', requerido: true },
     { nombre: 'hora', etiqueta: 'Hora', tipo: 'time', requerido: true },
@@ -47,8 +50,36 @@ export default function PaginaCitas() {
     { nombre: 'notas', etiqueta: 'Notas', tipo: 'textarea', placeholder: 'Notas adicionales...', requerido: false },
   ]
 
+  const MINUTOS_BRECHA = 30;
+
   const handleGuardarCita = async (datos) => {
     try {
+      // 1. Prevención de Empalmes / Superposición de horarios
+      const citasMismoDia = citas.filter(c => c.fecha === datos.fecha && c.id !== citaEditando?.id);
+      const milisegundosNueva = new Date(`1970-01-01T\${datos.hora}`).getTime();
+      
+      let empalmada = null;
+      for (let c of citasMismoDia) {
+        const miliExistente = new Date(`1970-01-01T\${c.hora}`).getTime();
+        const diffMinutos = Math.abs((milisegundosNueva - miliExistente) / 1000 / 60);
+        
+        if (diffMinutos < MINUTOS_BRECHA) {
+          empalmada = c;
+          break;
+        }
+      }
+
+      if (empalmada) {
+        const confirmarFuerza = window.confirm(
+          `⚠️ ADVERTENCIA DE EMPALME ⚠️\n\n` +
+          `Ya tienes una cita que colisiona a las \${empalmada.hora} (margen menor a \${MINUTOS_BRECHA} min).\n` +
+          `Agendar ambas puede causar tiempos de espera en recepción.\n\n` +
+          `¿Estás absolutamente seguro de forzar y ENCIMAR esta cita?`
+        );
+        if (!confirmarFuerza) return; // Cancela el guardado inteligentemente
+      }
+
+      // 2. Ejecutar Guardado
       if (citaEditando) {
         const respuesta = await fetch('/api/citas', {
           method: 'PATCH',
