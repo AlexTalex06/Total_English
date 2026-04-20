@@ -28,7 +28,13 @@ export async function POST(solicitud) {
       if (valor?.messages && valor.messages.length > 0) {
         const mensajeObj = valor.messages[0]
         const contactoMeta = valor.contacts?.[0]
-        const remitenteId = mensajeObj.from
+        let remitenteId = mensajeObj.from
+        
+        // Normalización para México (521 -> 52) para consistencia en búsquedas
+        if (remitenteId.startsWith('521') && remitenteId.length === 13) {
+          remitenteId = '52' + remitenteId.substring(3)
+        }
+
         const nombrePerfil = contactoMeta?.profile?.name || 'Prospecto'
 
         // Soportar texto de botones interactivos y texto normal
@@ -48,7 +54,13 @@ export async function POST(solicitud) {
         }
 
         // 1 & 2. Conversación y Prospecto: Buscar o Crear
-        let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).eq('plataforma', 'whatsapp').maybeSingle()
+        // Buscar con ambas variantes (52 y 521)
+        const variantesId = remitenteId.startsWith('52') ? [remitenteId, remitenteId.replace('52', '521')] : [remitenteId]
+        let { data: convExist } = await supabase.from('conversaciones')
+          .select('*')
+          .in('id_plataforma', variantesId)
+          .eq('plataforma', 'whatsapp')
+          .maybeSingle()
 
         // --- FILTRO DE DISPARADORES PARA NUEVOS PROSPECTOS ---
         const PALABRAS_CLAVE = [
@@ -91,12 +103,29 @@ export async function POST(solicitud) {
 
         // 3. Crear conversación si no existe (SIN prospecto por ahora si no encontramos uno)
         if (!convExist) {
-          const { data: nuevaC } = await supabase.from('conversaciones').insert({ 
-            prospecto_id: prosExist ? prosExist.id : null, 
-            plataforma: 'whatsapp', 
-            id_plataforma: remitenteId 
-          }).select('*').single()
-          convExist = nuevaC
+          // Normalizar ID para búsqueda
+          const searchId = remitenteId.startsWith('52') ? [remitenteId, remitenteId.replace('52', '521')] : [remitenteId]
+          
+          const { data: cExist } = await supabase.from('conversaciones')
+            .select('*, prospectos(*)')
+            .in('id_plataforma', searchId)
+            .eq('plataforma', 'whatsapp')
+            .maybeSingle()
+          
+          if (cExist) {
+            convExist = cExist
+            prosExist = cExist.prospectos
+          } else {
+            const { data: nuevaC } = await supabase.from('conversaciones').insert({ 
+              prospecto_id: prosExist ? prosExist.id : null, 
+              plataforma: 'whatsapp', 
+              id_plataforma: remitenteId 
+            }).select('*').single()
+            convExist = nuevaC
+            
+            // Pausa de 2 segundos para el primer mensaje (Bienvenida)
+            await sleep(2000)
+          }
         }
 
 
