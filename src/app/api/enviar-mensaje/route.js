@@ -3,7 +3,8 @@ import axios from 'axios'
 
 export async function POST(solicitud) {
   try {
-    const { to, text, plataforma, tipo = 'text', nombrePlantilla = '' } = await solicitud.json()
+    const cuerpo = await solicitud.json()
+    const { to, text, plataforma, tipo = 'text', nombrePlantilla = '', url_archivo } = cuerpo
     
     if (plataforma !== 'whatsapp') {
       return NextResponse.json({ error: 'Plataforma no soportada' }, { status: 400 })
@@ -21,9 +22,12 @@ export async function POST(solicitud) {
     if (tipo === 'template' && nombrePlantilla) {
       payload.type = 'template'
       payload.template = { name: nombrePlantilla, language: { code: 'es_MX' } }
-    } else if (tipo === 'image' && solicitud.url_archivo) {
+    } else if (tipo === 'image' && url_archivo) {
       payload.type = 'image'
-      payload.image = { link: solicitud.url_archivo, caption: text }
+      payload.image = { link: url_archivo, caption: text }
+    } else if (tipo === 'document' && url_archivo) {
+      payload.type = 'document'
+      payload.document = { link: url_archivo, caption: text, filename: 'documento_total_english' }
     } else {
       payload.type = 'text'
       payload.text = { body: text }
