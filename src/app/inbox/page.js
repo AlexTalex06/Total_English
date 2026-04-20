@@ -218,52 +218,54 @@ export default function PaginaInbox() {
     // Normalizar teléfono (solo números)
     const telLimpio = telefonoNuevo.replace(/\D/g, '')
 
-    const { data: existing } = await supabase.from('conversaciones').select('*').eq('id_plataforma', telLimpio).eq('plataforma', 'whatsapp').maybeSingle()
-    
-    if (existing) {
-      const conv = conversaciones.find(c => c.id === existing.id)
-      if (conv) cambiarChat(conv)
-      setModalNuevoChat(false)
-      setTelefonoNuevo('')
-      setNombreNuevo('')
-      return
-    }
+    try {
+      const { data: existing } = await supabase
+        .from('conversaciones')
+        .select('*, prospectos(*)')
+        .eq('id_plataforma', telLimpio)
+        .eq('plataforma', 'whatsapp')
+        .maybeSingle()
+      
+      if (existing) {
+        cambiarChat(existing)
+        setModalNuevoChat(false)
+        setTelefonoNuevo('')
+        setNombreNuevo('')
+        return
+      }
 
-    const { data: nuevoP, error: pError } = await supabase.from('prospectos').insert({ 
-      nombre: nombreNuevo || telLimpio, 
-      telefono: telLimpio, 
-      estado: 'nuevo',
-      notas_internas: 'Contacto iniciado manualmente'
-    }).select('id').single()
+      // 1. Crear prospecto
+      const { data: nuevoP, error: pError } = await supabase.from('prospectos').insert({ 
+        nombre: nombreNuevo || telLimpio, 
+        telefono: telLimpio, 
+        estado: 'nuevo',
+        notas_internas: 'Contacto iniciado manualmente'
+      }).select('id').single()
 
-    if (pError) {
-      console.error("Error pError:", pError)
-      alert("Error al crear el prospecto")
-      return
-    }
+      if (pError) throw pError
 
-    if (nuevoP) {
+      // 2. Crear conversación vinculada
       const { data: nuevaC, error: cError } = await supabase.from('conversaciones').insert({ 
         prospecto_id: nuevoP.id, 
         plataforma: 'whatsapp', 
         id_plataforma: telLimpio,
-        asignado_a_humano: true // Lo marcamos como humano de inicio para que el bot no interfiera si es manual
-      }).select('*').single()
+        asignado_a_humano: true 
+      }).select('*, prospectos(*)').single()
       
-      if (cError) {
-        console.error("Error cError:", cError)
-        return
-      }
+      if (cError) throw cError
 
       await cargarConversaciones()
       if (nuevaC) {
-        setChatActivo(nuevaC)
-        setMensajes([])
+        cambiarChat(nuevaC)
       }
+      
+      setModalNuevoChat(false)
+      setTelefonoNuevo('')
+      setNombreNuevo('')
+    } catch (err) {
+      console.error("Error creando chat:", err)
+      alert("Error al iniciar el chat: " + err.message)
     }
-    setModalNuevoChat(false)
-    setTelefonoNuevo('')
-    setNombreNuevo('')
   }
 
   const conversacionesFiltradas = conversaciones.filter(c =>
