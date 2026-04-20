@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/componentes/AuthProvider'
 
 // Emojis frecuentes para el picker rápido
-const EMOJIS_RAPIDOS = ['😊', '👍', '❤️', '🎉', '🙌', '😄', '🤔', '👋', '✅', '🔥', '💪', '📚', '⭐', '🎓', '💯', '😃', '🙏', '👏', '📝', '🏫']
+const EMOJIS_RAPIDOS = ['😊', '👍', '❤️', '🎉', '🙌', '😄', '🤔', '👋', '✅', '🔥', '💪', '📚', '⭐', '🎓', '💯', '😃', '🙏', '👏', '📝', '🏫', '📍', '📞', '✨', '🚀', '👌', '😎', '💬', '📢', '🇬🇧', '🇺🇸', '🗓️']
 
 export default function PaginaInbox() {
   const { token } = useAuth()
@@ -23,6 +23,9 @@ export default function PaginaInbox() {
   const [escribiendo, setEscribiendo] = useState(false)
   const [toggling, setToggling] = useState(false)
   const [mostrarClipMenu, setMostrarClipMenu] = useState(false)
+  const [mensajeInicial, setMensajeInicial] = useState('¡Hola! Soy de Total English. ¿En qué podemos ayudarte?')
+  const fileInputRef = useRef(null)
+  const docInputRef = useRef(null)
 
   const chatActivoRef = useRef(null)
   const cargarMensajesRef = useRef(null)
@@ -115,17 +118,42 @@ export default function PaginaInbox() {
     }
   }, [mensajes, escribiendo])
 
-  const enviarMensaje = async (e, imageUrl = null) => {
+  const subirArchivo = async (e, tipo = 'imagen') => {
+    const file = e.target.files?.[0]
+    if (!file || !chatActivo) return
+
+    try {
+      setCargando(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random()}.${fileExt}`
+      const filePath = `inbox/${fileName}`
+
+      const { data, error } = await supabase.storage.from('recursos').upload(filePath, file)
+      if (error) throw error
+
+      const { data: { publicUrl } } = supabase.storage.from('recursos').getPublicUrl(filePath)
+      
+      await enviarMensaje(null, publicUrl, tipo === 'documento' ? 'archivo' : 'imagen')
+      setMostrarClipMenu(false)
+    } catch (err) {
+      console.error('Error subiendo:', err)
+      alert('Error al subir archivo. Asegúrate de tener el bucket "recursos" en Supabase.')
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const enviarMensaje = async (e, fileUrl = null, tipoMsg = 'texto') => {
     if (e) e.preventDefault()
-    if ((!nuevoMensaje.trim() && !imageUrl) || !chatActivo) return
+    if ((!nuevoMensaje.trim() && !fileUrl) || !chatActivo) return
     const texto = nuevoMensaje
     setNuevoMensaje('')
     setMostrarEmojis(false)
     try {
       const payload = { to: chatActivo.id_plataforma, text: texto, plataforma: 'whatsapp' }
-      if (imageUrl) {
-        payload.tipo = 'image'
-        payload.url_archivo = imageUrl
+      if (fileUrl) {
+        payload.tipo = tipoMsg === 'archivo' ? 'document' : 'image'
+        payload.url_archivo = fileUrl
       }
       const res = await fetch('/api/enviar-mensaje', {
         method: 'POST',
@@ -136,25 +164,19 @@ export default function PaginaInbox() {
         await supabase.from('mensajes').insert({
           conversacion_id: chatActivo.id,
           remitente: 'humano',
-          contenido: texto,
-          tipo: imageUrl ? 'imagen' : 'texto',
-          url_archivo: imageUrl || null
+          contenido: texto || (tipoMsg === 'archivo' ? '📄 Documento' : '🖼️ Imagen'),
+          tipo: tipoMsg === 'archivo' ? 'archivo' : (fileUrl ? 'imagen' : 'texto'),
+          url_archivo: fileUrl || null
         })
-        await supabase.from('conversaciones').update({ ultimo_mensaje: imageUrl ? '🖼️ [Imagen]' : texto, actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
+        await supabase.from('conversaciones').update({ 
+          ultimo_mensaje: fileUrl ? (tipoMsg === 'archivo' ? '📄 Documento' : '🖼️ [Imagen]') : texto, 
+          actualizado_en: new Date().toISOString() 
+        }).eq('id', chatActivo.id)
       } else {
         const err = await res.json()
         console.error('Error enviando:', err)
       }
     } catch (err) { console.error(err) }
-  }
-
-  const enviarImagenPorURL = () => {
-    const url = prompt('Ingresa la URL pública de la imagen (JPG/PNG):')
-    if (url && (url.startsWith('http') || url.startsWith('https'))) {
-      enviarMensaje(null, url)
-    } else if (url) {
-      alert('Por favor ingresa una URL válida que empiece con http o https')
-    }
   }
 
   const cambiarChat = async (c) => {
@@ -247,10 +269,26 @@ export default function PaginaInbox() {
         prospecto_id: prosExist ? prosExist.id : null, 
         plataforma: 'whatsapp', 
         id_plataforma: telLimpio,
-        asignado_a_humano: true // Tomamos control manual
+        asignado_a_humano: true,
+        ultimo_mensaje: mensajeInicial
       }).select('*, prospectos(*)').single()
       
       if (cError) throw cError
+
+      // 4. Enviar el mensaje inicial real por WhatsApp
+      await fetch('/api/enviar-mensaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: telLimpio, text: mensajeInicial, plataforma: 'whatsapp' })
+      })
+
+      // 5. Guardar el mensaje en la base de datos
+      await supabase.from('mensajes').insert({
+        conversacion_id: nuevaC.id,
+        remitente: 'humano',
+        contenido: mensajeInicial,
+        tipo: 'texto'
+      })
 
       await cargarConversaciones()
       if (nuevaC) {
@@ -404,13 +442,7 @@ export default function PaginaInbox() {
                       <span className={`text-[11px] shrink-0 ml-2 ${unreadCount > 0 ? 'text-[#25D366] font-bold' : 'text-slate-400'}`}>
                         {obtenerTiempoRelativo(conv.actualizado_en)}
                       </span>
-                      <button 
-                        onClick={(e) => eliminarConversacion(e, conv.id)}
-                        className="material-symbols-outlined text-[18px] text-slate-300 hover:text-red-500 transition-colors p-1"
-                        title="Eliminar conversación"
-                      >
-                        delete
-                      </button>
+                      {/* Botón de eliminar removido de aquí por petición del usuario */}
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -459,15 +491,7 @@ export default function PaginaInbox() {
                 {chatActivo.asignado_a_humano ? 'HUMANO' : 'ALEX IA'}
               </button>
 
-              <div className="w-px h-6 bg-slate-200 mx-1"></div>
-
-              <button
-                onClick={(e) => eliminarConversacion(e, chatActivo.id)}
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                title="Eliminar esta conversación"
-              >
-                <span className="material-symbols-outlined">delete</span>
-              </button>
+              {/* Botón de eliminar removido de la cabecera por petición del usuario */}
             </div>
           </div>
 
@@ -632,25 +656,21 @@ export default function PaginaInbox() {
             {/* Clip Menu Popover */}
             {mostrarClipMenu && (
               <div className="absolute bottom-[60px] left-4 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 flex flex-col gap-1 z-50 animate-in fade-in slide-in-from-bottom-2">
-                <button type="button" onClick={() => { enviarImagenPorURL(); setMostrarClipMenu(false); }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
                   <span className="material-symbols-outlined text-[#00a884] text-[20px]">image</span>
                   <span className="text-[13px] font-medium">Fotos y Videos</span>
                 </button>
-                <button type="button" onClick={() => {
-                  const url = prompt('Ingresa la URL pública del documento (PDF, DOC, etc.):')
-                  if (url && url.startsWith('http')) {
-                    enviarMensaje(null, url)
-                  } else if (url) {
-                    alert('Por favor ingresa una URL válida que empiece con http')
-                  }
-                  setMostrarClipMenu(false)
-                }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                <input type="file" ref={fileInputRef} onChange={(e) => subirArchivo(e, 'imagen')} accept="image/*" className="hidden" />
+
+                <button type="button" onClick={() => docInputRef.current?.click()} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
                   <span className="material-symbols-outlined text-[#7f66ff] text-[20px]">description</span>
                   <span className="text-[13px] font-medium">Documento</span>
                 </button>
+                <input type="file" ref={docInputRef} onChange={(e) => subirArchivo(e, 'documento')} className="hidden" />
+
                 <button type="button" onClick={async () => {
                   if (!chatActivo) return
-                  const ubicacion = '🏫 Total English School\n📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima\n🗺️ https://share.google/e08MtvtfxfbGAKmz1\n🕒 Lun-Vie 2-9pm | Sáb 8am-2pm'
+                  const ubicacion = '🏫 Total English School\n📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima\n🗺️ https://maps.app.goo.gl/e08MtvtfxfbGAKmz1\n🕒 Lun-Vie 2-9pm | Sáb 8am-2pm'
                   try {
                     const res = await fetch('/api/enviar-mensaje', {
                       method: 'POST',
@@ -861,6 +881,15 @@ export default function PaginaInbox() {
                   className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
                   value={nombreNuevo}
                   onChange={(e) => setNombreNuevo(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">Mensaje Inicial</label>
+                <textarea
+                  placeholder="Escribe el primer mensaje..."
+                  className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3 h-24"
+                  value={mensajeInicial}
+                  onChange={(e) => setMensajeInicial(e.target.value)}
                 />
               </div>
               <div className="flex items-center justify-end gap-3 pt-3">
