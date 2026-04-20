@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(solicitud) {
   try {
-    const { id } = await solicitud.json()
+    const cuerpoSolicitud = await solicitud.json()
+    const { id } = cuerpoSolicitud
     const urlObj = new URL(solicitud.url)
     const domainOrigin = urlObj.origin
     console.log('🚀 Iniciando ejecución de campaña ID:', id)
@@ -30,25 +31,37 @@ export async function POST(solicitud) {
        return NextResponse.json({ error: 'Falta configurar el "Nombre de Plantilla" de Meta en la campaña' }, { status: 400 })
     }
 
-    // 2. Construir query de prospectos basado en el público objetivo
-    let query = supabase.from('prospectos').select('id, telefono, nombre, nombre_alumno, estado, curso_interes')
+    // 2. Obtener lista de prospectos
+    let prospectos = []
     
-    // Filtrar por Estado
-    if (campana.publico_estado && campana.publico_estado !== 'Todos') {
-      const dbEstado = campana.publico_estado.toLowerCase().replace(' ', '_')
-      query = query.eq('estado', dbEstado)
-    }
+    if (cuerpoSolicitud.prospectos_ids && Array.isArray(cuerpoSolicitud.prospectos_ids) && cuerpoSolicitud.prospectos_ids.length > 0) {
+      // Audiencia Dinámica generada en el Frontend
+      console.log('📌 Usando prospectos_ids personalizados desde la Audiencia UI');
+      const { data: pDatos, error: errP } = await supabase
+        .from('prospectos')
+        .select('id, telefono, nombre, nombre_alumno, estado, curso_interes')
+        .in('id', cuerpoSolicitud.prospectos_ids);
+        
+      if (errP) return NextResponse.json({ error: 'Error obteniendo audiencia personalizada: ' + errP.message }, { status: 500 });
+      prospectos = pDatos || [];
+    } else {
+      // Audiencia Estática Tradicional (por selects básicos)
+      let query = supabase.from('prospectos').select('id, telefono, nombre, nombre_alumno, estado, curso_interes')
+      
+      // Filtrar por Estado
+      if (campana.publico_estado && campana.publico_estado !== 'Todos') {
+        const dbEstado = campana.publico_estado.toLowerCase().replace(' ', '_')
+        query = query.eq('estado', dbEstado)
+      }
 
-    // Filtrar por Curso de interés
-    if (campana.publico_curso && campana.publico_curso !== 'Todos') {
-       // Support 'Todos', specific course names. Since user inputs are weird sometimes, we'll use ilike
-       query = query.ilike('curso_interes', `%${campana.publico_curso}%`)
-    }
+      // Filtrar por Curso de interés
+      if (campana.publico_curso && campana.publico_curso !== 'Todos') {
+        query = query.ilike('curso_interes', `%${campana.publico_curso}%`)
+      }
 
-    const { data: prospectos, error: errPros } = await query
-
-    if (errPros) {
-      return NextResponse.json({ error: 'Error obteniendo audiencia: ' + errPros.message }, { status: 500 })
+      const { data: pros, error: errPros } = await query
+      if (errPros) return NextResponse.json({ error: 'Error obteniendo audiencia estática: ' + errPros.message }, { status: 500 })
+      prospectos = pros || [];
     }
 
     if (!prospectos || prospectos.length === 0) {
@@ -106,6 +119,25 @@ export async function POST(solicitud) {
             }
           ]
         }
+      }
+
+      // Si la campaña incluye una imagen configurada, añadimos el componente Header tipo imagen a la estructura de Meta API
+      if (campana.imagen_url && campana.imagen_url.trim() !== '') {
+        // Asegurarnos de que sea una URL absoluta para los servidores de Meta
+        const isUrlExterna = campana.imagen_url.startsWith('http');
+        const finalImageUrl = isUrlExterna ? campana.imagen_url : `${baseUrl}${campana.imagen_url.startsWith('/') ? '' : '/'}${campana.imagen_url}`;
+        
+        payload.template.components.unshift({
+          type: "header",
+          parameters: [
+            {
+              type: "image",
+              image: {
+                link: finalImageUrl
+              }
+            }
+          ]
+        });
       }
 
       try {

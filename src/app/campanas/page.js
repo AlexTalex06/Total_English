@@ -16,6 +16,7 @@ export default function PaginaCampanas() {
 
   // Estados para Audiencias
   const [prospectosAud, setProspectosAud] = useState([])
+  const [cursosDisponibles, setCursosDisponibles] = useState([])
   const [filtrosAud, setFiltrosAud] = useState({
     estado: 'Todos',
     curso: 'Todos',
@@ -59,11 +60,7 @@ export default function PaginaCampanas() {
       nombre: 'publico_curso', etiqueta: 'Público (Diplomado Seleccionado)', tipo: 'select', requerido: false,
       opciones: [
         { valor: 'Todos', etiqueta: 'Todos los Diplomados' },
-        { valor: 'DIPLOMADO CHILDREN', etiqueta: 'Diplomado Children' },
-        { valor: 'DIPLOMADO PRE-TEENS', etiqueta: 'Diplomado Pre-Teens' },
-        { valor: 'DIPLOMADO YOUNG & ADULTS', etiqueta: 'Diplomado Young & Adults' },
-        { valor: 'DIPLOMADO MY TIME ENGLISH', etiqueta: 'Diplomado My Time English' },
-        { valor: 'PREPARACION PARA CERTIFICADOS', etiqueta: 'Preparación para Certificados' },
+        ...cursosDisponibles.map(c => ({ valor: c.nombre, etiqueta: c.nombre }))
       ]
     },
     {
@@ -121,6 +118,18 @@ export default function PaginaCampanas() {
       }
     }
     cargarProspectos()
+
+    // Cargar cursos dinámicamente desde la BD
+    const cargarCursos = async () => {
+      try {
+        const resp = await fetch('/api/cursos?t=' + Date.now())
+        const datos = await resp.json()
+        setCursosDisponibles(Array.isArray(datos) ? datos : [])
+      } catch (e) {
+        console.error('Error cargando cursos', e)
+      }
+    }
+    cargarCursos()
   }, [])
 
   // Calculo dinamico de audiencia en tiempo real
@@ -192,8 +201,8 @@ export default function PaginaCampanas() {
   }
 
   const dispararCampana = async (id) => {
-    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros.\n\n¿Estás absolutamente seguro de continuar?')) return
-
+    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros base de esta campaña.\n\n¿Estás absolutamente seguro de continuar?')) return
+    
     setEnviando(id)
     try {
       const respuesta = await fetch('/api/campanas/ejecutar', {
@@ -201,9 +210,9 @@ export default function PaginaCampanas() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
       })
-
+      
       const resData = await respuesta.json()
-
+      
       if (respuesta.ok) {
         alert(`✅ ¡Campaña Disparada!\nAudiencia encontrada: ${resData.alcance_esperado}\nMensajes enviados: ${resData.envios_exitosos}`)
         cargarCampanas()
@@ -212,6 +221,47 @@ export default function PaginaCampanas() {
       }
     } catch (e) {
       alert('❌ Error de conexión al disparar campaña: ' + e.message)
+    } finally {
+      setEnviando(null)
+    }
+  }
+
+  const dispararCampanaDinamica = async () => {
+    const ids = prospectosFiltrados.map(p => p.id);
+    if (!ids || ids.length === 0) return alert('No hay prospectos en esta audiencia. Ajusta los filtros.');
+
+    const promptText = campanas.map(c => `- ${c.nombre}`).join('\n');
+    const idCampaña = prompt(`Ingresa el NOMBRE EXACTO de la Campaña (plantilla) que deseas disparar a esta audiencia filtrada:\n\nCampañas disponibles:\n${promptText}`);
+    
+    if (!idCampaña) return;
+    
+    const campanaRef = campanas.find(c => c.nombre.toLowerCase().trim() === idCampaña.toLowerCase().trim());
+    if (!campanaRef) return alert('❌ No se encontró ninguna campaña con ese nombre exacto.');
+
+    if (campanaRef.estado === 'completada') {
+       if (!confirm(`⚠️ La campaña "${campanaRef.nombre}" ya está marcada como 'completada'. ¿Deseas dispararla de nuevo de todos modos?`)) return;
+    }
+
+    if (!confirm(`⚠️ Estás a punto de disparar la campaña "${campanaRef.nombre}" a ${ids.length} personas basándonos estrictamente en los filtros de audiencia de tu pantalla.\n\n¿Deseas continuar?`)) return;
+
+    setEnviando(campanaRef.id)
+    try {
+      const respuesta = await fetch('/api/campanas/ejecutar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: campanaRef.id, prospectos_ids: ids })
+      })
+      
+      const resData = await respuesta.json()
+      
+      if (respuesta.ok) {
+        alert(`✅ ¡Campaña de Audiencia Dinámica Disparada!\nPersonas Procesadas: ${resData.alcance_esperado}\nMensajes Oficiales Enviados: ${resData.envios_exitosos}`)
+        cargarCampanas()
+      } else {
+        alert('❌ Error al disparar: ' + (resData.error || 'Error desconocido'))
+      }
+    } catch (e) {
+      alert('❌ Error de conexión al disparar campaña dinámica: ' + e.message)
     } finally {
       setEnviando(null)
     }
@@ -300,19 +350,19 @@ export default function PaginaCampanas() {
                  <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col justify-center items-center">
                    <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">mark_email_read</span></div>
                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Alcance Real</p>
-                   <p className="text-4xl font-black text-blue-700 mt-2">${estadisticas.alcanceTotal}</p>
+                   <p className="text-4xl font-black text-blue-700 mt-2">{estadisticas.alcanceTotal}</p>
                    <p className="text-xs text-slate-400 mt-1">Personas contactadas</p>
                  </div>
                  <div className="bg-gradient-to-br from-emerald-50 to-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center">
                    <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Completadas</p>
-                   <p className="text-4xl font-black text-emerald-700 mt-2">${estadisticas.completadas}</p>
+                   <p className="text-4xl font-black text-emerald-700 mt-2">{estadisticas.completadas}</p>
                    <p className="text-xs text-slate-400 mt-1">Satisfechas exitosamente</p>
                  </div>
                  <div className="bg-gradient-to-br from-amber-50 to-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col justify-center items-center">
                    <div className="p-3 bg-amber-100 text-amber-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">pending_actions</span></div>
                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Configuradas</p>
-                   <p className="text-4xl font-black text-amber-700 mt-2">${estadisticas.activas}</p>
+                   <p className="text-4xl font-black text-amber-700 mt-2">{estadisticas.activas}</p>
                    <p className="text-xs text-slate-400 mt-1">Listas o en espera</p>
                  </div>
                </div>
@@ -440,9 +490,9 @@ export default function PaginaCampanas() {
                           <div>
                             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">AUDIENCIA (FILTROS)</span>
                             <span className="text-slate-700 bg-blue-50/50 px-2 py-1 rounded inline-block border border-blue-100/50">
-                              ${campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
-                              ${campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''} 
-                              ${campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
+                              {campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
+                              {campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''}
+                              {campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
                             </span>
                           </div>
                         </div>
@@ -481,10 +531,12 @@ export default function PaginaCampanas() {
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-xl font-bold text-slate-800">Constructor de Audiencias</h2>
                 <button
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-5 rounded-xl shadow-sm transition-all"
-                  onClick={() => alert("Próximamente: Podrás guardar y nombrar estos segmentos de audiencia y seleccionarlos cuando crees una campaña.")}
+                  disabled={prospectosFiltrados.length === 0}
+                  className={`font-bold py-2 px-5 rounded-xl flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.1)] transition-all ${prospectosFiltrados.length === 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                  onClick={dispararCampanaDinamica}
                 >
-                  Guardar Audiencia (Próximamente)
+                  <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
+                  Disparar a esta Audiencia
                 </button>
               </div>
 
@@ -503,10 +555,11 @@ export default function PaginaCampanas() {
                          value={filtrosAud.estado} onChange={e => setFiltrosAud({...filtrosAud, estado: e.target.value})}
                        >
                          <option>Todos</option>
-                         <option value="Borrador">Borrador</option>
-                         <option value="Contactado">Contactado</option>
-                         <option value="Interesado">Interesado</option>
-                         <option value="Agendado">Agendado</option>
+                         <option value="nuevo">Nuevo</option>
+                         <option value="contactado">Contactado</option>
+                         <option value="en_proceso">En Proceso</option>
+                         <option value="agendado">Agendado</option>
+                         <option value="inscrito">Inscrito</option>
                        </select>
                      </div>
                      <div className="flex flex-col gap-1.5">
@@ -516,9 +569,9 @@ export default function PaginaCampanas() {
                          value={filtrosAud.curso} onChange={e => setFiltrosAud({...filtrosAud, curso: e.target.value})}
                        >
                          <option>Todos</option>
-                         <option value="DIPLOMADO CHILDREN">DIPLOMADO CHILDREN</option>
-                         <option value="DIPLOMADO PRE-TEENS">DIPLOMADO PRE-TEENS</option>
-                         <option value="DIPLOMADO YOUNG & ADULTS">DIPLOMADO YOUNG & ADULTS</option>
+                         {cursosDisponibles.map(c => (
+                           <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                         ))}
                        </select>
                      </div>
                      <div className="flex flex-col gap-1.5">
