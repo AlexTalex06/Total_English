@@ -16,13 +16,7 @@ export async function GET(solicitud) {
   }
   return NextResponse.json({ error: 'Verificación fallida' }, { status: 403 })
 }
-
 export async function POST(solicitud) {
-  // --- PAUSA TEMPORAL DEL WEBHOOK ---
-  // Descomenta (quita las diagonales) de la siguiente línea para apagar Total English
-  return NextResponse.json({ estado: 'pausado', mensaje: 'Chatbot apagado' }, { status: 200 })
-  // ----------------------------------
-
   try {
     const cuerpo = await solicitud.json()
 
