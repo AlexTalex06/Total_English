@@ -54,7 +54,7 @@ export async function POST(solicitud) {
         const PALABRAS_CLAVE = [
           'info', 'información', 'clases', 'hola', 'horarios', 'detalles', 
           'cursos', 'diplomado', 'ingles', 'inglés', 'costo', 'precio', 
-          'inscripción', 'mensualidad', 'total'
+          'inscripción', 'mensualidad', 'total', 'english'
         ]
         const textoMin = texto.toLowerCase()
         const dijoPalabraClave = PALABRAS_CLAVE.some(palabra => textoMin.includes(palabra))
