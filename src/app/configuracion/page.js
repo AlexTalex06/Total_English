@@ -7,6 +7,10 @@ export default function PaginaConfiguracion() {
   const [config, setConfig] = useState({
     nombre_agente: 'Alex',
     temperatura: 0.7,
+    agenda_dias: 'Lunes a Sábado',
+    agenda_inicio: '09:00',
+    agenda_fin: '18:00',
+    agenda_brecha: 30
   })
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -17,7 +21,11 @@ export default function PaginaConfiguracion() {
       if (data) {
         setConfig({
           nombre_agente: data.nombre_agente || 'Alex',
-          temperatura: data.temperatura || 0.7
+          temperatura: data.temperatura || 0.7,
+          agenda_dias: data.agenda_dias || 'Lunes a Sábado',
+          agenda_inicio: data.agenda_inicio || '09:00',
+          agenda_fin: data.agenda_fin || '18:00',
+          agenda_brecha: data.agenda_brecha || 30
         })
       }
       setCargando(false)
@@ -31,6 +39,10 @@ export default function PaginaConfiguracion() {
     const { error } = await supabase.from('configuracion_bot').update({
       nombre_agente: config.nombre_agente,
       temperatura: parseFloat(config.temperatura),
+      agenda_dias: config.agenda_dias,
+      agenda_inicio: config.agenda_inicio,
+      agenda_fin: config.agenda_fin,
+      agenda_brecha: parseInt(config.agenda_brecha),
       actualizado_en: new Date().toISOString()
     }).eq('id', 1)
 
@@ -86,6 +98,61 @@ export default function PaginaConfiguracion() {
               className="w-full accent-[#1e3a8a]"
             />
             <span className="font-bold text-[#1e3a8a] w-8 text-center">{config.temperatura}</span>
+          </div>
+        </div>
+
+        {/* --- MÓDULO DE AGENDA --- */}
+        <div className="border-t border-slate-100 pt-6 mt-2">
+          <h2 className="text-xl font-bold text-[#191c1d] mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-blue-600">calendar_month</span>
+            Reglas de Agendamiento
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div className="flex flex-col gap-2">
+              <label className="font-bold text-[#191c1d] text-sm">Días Operativos</label>
+              <input 
+                type="text" 
+                value={config.agenda_dias}
+                onChange={(e) => setConfig({...config, agenda_dias: e.target.value})}
+                placeholder="Ej: Lunes a Sábado"
+                className="border border-slate-200 rounded-lg p-2.5 outline-none focus:border-[#1e3a8a] text-sm"
+              />
+            </div>
+
+            <div className="flex gap-4">
+               <div className="flex flex-col gap-2 flex-1">
+                 <label className="font-bold text-[#191c1d] text-sm">Hora de Apertura</label>
+                 <input 
+                   type="time" 
+                   value={config.agenda_inicio}
+                   onChange={(e) => setConfig({...config, agenda_inicio: e.target.value})}
+                   className="border border-slate-200 rounded-lg p-2.5 outline-none focus:border-[#1e3a8a] text-sm"
+                 />
+               </div>
+               <div className="flex flex-col gap-2 flex-1">
+                 <label className="font-bold text-[#191c1d] text-sm">Cierre</label>
+                 <input 
+                   type="time" 
+                   value={config.agenda_fin}
+                   onChange={(e) => setConfig({...config, agenda_fin: e.target.value})}
+                   className="border border-slate-200 rounded-lg p-2.5 outline-none focus:border-[#1e3a8a] text-sm"
+                 />
+               </div>
+            </div>
+
+            <div className="flex flex-col gap-2 md:col-span-2">
+              <label className="font-bold text-[#191c1d] text-sm">Tiempo/Brecha obligatoria (Minutos)</label>
+              <p className="text-xs text-slate-500 mb-1">El tiempo que reserva el CRM para la cita e impide empalmes (Ej: 30, 45, 60).</p>
+              <input 
+                type="number" 
+                min="5"
+                step="5"
+                value={config.agenda_brecha}
+                onChange={(e) => setConfig({...config, agenda_brecha: e.target.value})}
+                className="border border-slate-200 rounded-lg p-2.5 outline-none focus:border-[#1e3a8a] max-w-[150px] text-sm"
+              />
+            </div>
           </div>
         </div>
 

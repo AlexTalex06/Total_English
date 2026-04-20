@@ -8,6 +8,8 @@ const REGLAS_GENERALES = `
 - **Diagnóstico:** GRATIS para todos.
 - **Certificaciones:** Preparamos para TOEFL, Cambridge y CENNI.
 - **Validez SEP:** Nuestros diplomas tienen validez curricular, pero si te preguntan detalles técnicos escálalo a un humano.
+
+\${REGLAS_AGENDAMIENTO_DINAMICAS}
 `
 
 // ============================================
@@ -115,18 +117,27 @@ Estructura exacta:
 }
 `
 
-export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plataforma = 'WhatsApp', tablaDinamicaCursos = 'NO HAY CURSOS') {
+export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plataforma = 'WhatsApp', tablaDinamicaCursos = 'NO HAY CURSOS', configBot = null) {
   try {
     // 1. Extraemos el mensaje de sistema inyectado desde route.js para aislar el contexto CRM
     const mensajeSistemaCrm = mensajesOriginales.find(m => m.role === 'system')?.content || '';
     const historialDeUsuario = mensajesOriginales.filter(m => m.role !== 'system');
+    
+    // Reglas Dinámicas de Calendario
+    const reglasAgenda = configBot ? `
+**Reglas Estrictas de Disponibilidad (Citas):**
+- Días Operativos: \${configBot.agenda_dias || 'Lunes a Sábado'}
+- Horario de Apertura: \${configBot.agenda_inicio || '09:00'}
+- Horario de Cierre: \${configBot.agenda_fin || '18:00'}
+- Intervalo/Duración por cita: \${configBot.agenda_brecha || 30} minutos.
+INSTRUCCIÓN CRÍTICA: Si el usuario quiere proponer una hora o día para venir, asegúrate rigurosamente de que encaje dentro de los Días Operativos y entre Apertura y Cierre. Si pide algo fuera de horario, proponle amablemente un horario válido.` : '';
 
     // 2. Preparamos el Prompt Dinámico con el CRM y la Tabla de Cursos inyectados
     const promptPersonalizado = MEGA_SYSTEM_PROMPT
       .replace('{nombre del usuario}', nombreUsuario || 'amigo/a')
       .replace('${CONTEXTO_CRM}', mensajeSistemaCrm)
       .replace('${TABLA_LOGICA_CURSOS}', tablaDinamicaCursos)
-      .replace('${REGLAS_GENERALES}', REGLAS_GENERALES);
+      .replace('${REGLAS_GENERALES}', REGLAS_GENERALES.replace('${REGLAS_AGENDAMIENTO_DINAMICAS}', reglasAgenda));
 
     const { text } = await generateText({
       model: openai('gpt-4o-mini'),

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Etiqueta from '@/componentes/Etiqueta'
 import ModalFormulario from '@/componentes/ModalFormulario'
+import { supabase } from '@/lib/supabase'
 
 export default function PaginaCitas() {
   const [citas, setCitas] = useState([])
@@ -12,6 +13,9 @@ export default function PaginaCitas() {
   const [citaEditando, setCitaEditando] = useState(null)
   const [mesActual, setMesActual] = useState(new Date())
   const [diaSeleccionado, setDiaSeleccionado] = useState(new Date().getDate())
+  const [configAgenda, setConfigAgenda] = useState({ 
+    agenda_brecha: 30, agenda_dias: 'Lunes a Sábado', agenda_inicio: '09:00', agenda_fin: '18:00' 
+  })
 
   const cargarDatos = async () => {
     setCargando(true)
@@ -24,6 +28,17 @@ export default function PaginaCitas() {
       const datosProspectos = await respProspectos.json()
       setCitas(Array.isArray(datosCitas) ? datosCitas : [])
       setProspectos(Array.isArray(datosProspectos) ? datosProspectos : [])
+
+      // Cargar configuracion (gap y horarios)
+      const { data: cnf } = await supabase.from('configuracion_bot').select('agenda_brecha, agenda_dias, agenda_inicio, agenda_fin').eq('id', 1).single()
+      if (cnf) {
+        setConfigAgenda({
+          agenda_brecha: cnf.agenda_brecha || 30,
+          agenda_dias: cnf.agenda_dias || 'Lunes a Sábado',
+          agenda_inicio: cnf.agenda_inicio || '09:00',
+          agenda_fin: cnf.agenda_fin || '18:00'
+        })
+      }
     } catch (error) {
       console.error('Error al cargar datos:', error)
     } finally {
@@ -50,9 +65,8 @@ export default function PaginaCitas() {
     { nombre: 'notas', etiqueta: 'Notas', tipo: 'textarea', placeholder: 'Notas adicionales...', requerido: false },
   ]
 
-  const MINUTOS_BRECHA = 30;
-
   const handleGuardarCita = async (datos) => {
+    const MINUTOS_BRECHA = configAgenda.agenda_brecha;
     try {
       // 1. Prevención de Empalmes / Superposición de horarios
       const citasMismoDia = citas.filter(c => c.fecha === datos.fecha && c.id !== citaEditando?.id);

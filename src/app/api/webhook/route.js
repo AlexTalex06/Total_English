@@ -143,10 +143,15 @@ export async function POST(solicitud) {
           `).join('\n\n')
         }
 
+        // Obtener configuración del bot (horarios, brechas)
+        let configBot = null;
+        const { data: cnf } = await supabase.from('configuracion_bot').select('*').eq('id', 1).single();
+        if (cnf) configBot = cnf;
+
         const { respuesta, datos, intencion } = await consultarAlex([
           { role: 'system', content: contextoCrm },
           ...historialFormat
-        ], nombrePerfil, 'WhatsApp', tablaDinamicaCursos)
+        ], nombrePerfil, 'WhatsApp', tablaDinamicaCursos, configBot)
 
         // Evitar bucles - comparar con los últimos 2 mensajes del bot
         const mensajesBot = (historialRaw || []).filter(m => m.remitente === 'bot');

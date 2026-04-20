@@ -242,6 +242,15 @@ export default function PaginaCampanas() {
             Campañas ({campanas.length})
             {tabActivo === 'campanas' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
           </button>
+
+          <button 
+            className={`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative ${tabActivo === 'audiencias' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
+            onClick={() => setTabActivo('audiencias')}
+          >
+            <span className="material-symbols-outlined text-[20px]">group_add</span>
+            Audiencias Dinámicas
+            {tabActivo === 'audiencias' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
+          </button>
         </div>
 
         {/* CONTENIDO DE LAS PESTAÑAS */}
@@ -427,6 +436,81 @@ export default function PaginaCampanas() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: AUDIENCIAS */}
+          {tabActivo === 'audiencias' && (
+            <div className="animate-fade-in space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h2 className="text-xl font-bold text-slate-800">Constructor de Audiencias</h2>
+                <button
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-5 rounded-xl shadow-sm transition-all"
+                  onClick={() => alert("Próximamente: Podrás guardar y nombrar estos segmentos de audiencia y seleccionarlos cuando crees una campaña.")}
+                >
+                  Guardar Audiencia (Próximamente)
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 {/* Panel de Filtros */}
+                 <div className="md:col-span-2 bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                     <span className="material-symbols-outlined text-blue-600">tune</span>
+                     Filtros de Segmentación
+                   </h3>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     <div className="flex flex-col gap-1.5">
+                       <label className="text-xs font-bold text-slate-500">Estado del Lead</label>
+                       <select className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700">
+                         <option>Todos</option>
+                         <option>Borrador</option>
+                         <option>Contactado</option>
+                         <option>Interesado</option>
+                         <option>Agendado</option>
+                       </select>
+                     </div>
+                     <div className="flex flex-col gap-1.5">
+                       <label className="text-xs font-bold text-slate-500">Curso de Interés</label>
+                       <select className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700">
+                         <option>Todos</option>
+                         <option>Children</option>
+                         <option>Pre-Teens</option>
+                         <option>Young & Adults</option>
+                       </select>
+                     </div>
+                     <div className="flex flex-col gap-1.5">
+                       <label className="text-xs font-bold text-slate-500">Edad Minima (Ej: 5)</label>
+                       <input type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" />
+                     </div>
+                     <div className="flex flex-col gap-1.5">
+                       <label className="text-xs font-bold text-slate-500">Edad Máxima (Ej: 60)</label>
+                       <input type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" />
+                     </div>
+                     <div className="flex flex-col gap-1.5 sm:col-span-2">
+                       <label className="text-xs font-bold text-slate-500">Flexibilidad de Horario</label>
+                       <select className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700">
+                         <option>Indistinto</option>
+                         <option>Horario Fijo</option>
+                         <option>Horario Flexible</option>
+                       </select>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* Panel de Simulación (Estimador de Alcance) */}
+                 <div className="bg-gradient-to-br from-blue-600 to-[#00236f] p-6 rounded-2xl shadow-md text-white flex flex-col justify-center text-center relative overflow-hidden">
+                   <span className="material-symbols-outlined text-[120px] absolute -right-6 -bottom-6 opacity-10">radar</span>
+                   <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-2 z-10">Alcance Estimado</p>
+                   <p className="text-5xl font-black mb-4 z-10">~14</p>
+                   <p className="text-sm text-blue-100 z-10">Prospectos coinciden con estos filtros en tu base de datos y podrían recibir la campaña.</p>
+                   <button 
+                     className="mt-6 bg-white text-blue-900 font-bold text-sm py-2 px-4 rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.1)] hover:bg-blue-50 transition z-10"
+                   >
+                     Recalcular Audiencia
+                   </button>
+                 </div>
+              </div>
             </div>
           )}
 
