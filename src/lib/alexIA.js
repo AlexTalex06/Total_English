@@ -70,10 +70,10 @@ Si pide "hablar con alguien", "SEP", "visas" o está frustrado:
 (Intención: SPECIFIC_QUESTION_PASS_AGENT)
 
 ## DATOS CRM ACTUALES:
-${CONTEXTO_CRM}
+\${CONTEXTO_CRM}
 
 ## CONOCIMIENTO DE PRECIOS/BASE:
-${TABLA_LOGICA_CURSOS}
+\${TABLA_LOGICA_CURSOS}
 
 ## OBLIGATORIO - FORMATO DE SALIDA (JSON)
 Devuelve ÚNICAMENTE un objeto JSON válido (sin backticks):
