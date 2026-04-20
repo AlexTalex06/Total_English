@@ -75,16 +75,30 @@ export async function POST(solicitud) {
           }
         }
 
-        // Si no existe la conversación, o si existe pero el prospecto fue eliminado (prospecto_id nulo)
+        // Buscar prospecto existente por teléfono (evitar duplicados)
         if (!prosExist) {
-          const { data: nuevoP } = await supabase.from('prospectos').insert({ nombre: nombrePerfil, telefono: remitenteId, estado: 'nuevo' }).select('id').single()
-          prosExist = nuevoP
-          if (convExist) {
-            await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
-          } else {
-            const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
-            convExist = nuevaC
+          const { data: prosPorTel } = await supabase.from('prospectos').select('id').eq('telefono', remitenteId).order('creado_en', { ascending: false }).limit(1).maybeSingle()
+          if (prosPorTel) {
+            prosExist = prosPorTel
           }
+        }
+
+        // Solo crear prospecto si no existe ninguno con ese teléfono
+        if (!prosExist) {
+          const { data: nuevoP } = await supabase.from('prospectos').insert({ 
+            nombre: nombrePerfil || 'Sin nombre', 
+            telefono: remitenteId, 
+            estado: 'nuevo'
+          }).select('id').single()
+          prosExist = nuevoP
+        }
+
+        // Crear o vincular conversación
+        if (convExist && !convExist.prospecto_id) {
+          await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
+        } else if (!convExist) {
+          const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
+          convExist = nuevaC
         }
 
         const { data: existeMsg } = await supabase.from('mensajes').select('id').eq('id_mensaje_meta', mensajeObj.id).maybeSingle()

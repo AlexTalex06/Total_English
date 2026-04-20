@@ -17,6 +17,12 @@ export default function BarraSuperior() {
   const [mostrandoResultados, setMostrandoResultados] = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
   const [notifCount, setNotifCount] = useState(0)
+  const [notifsLeidas, setNotifsLeidas] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try { return new Set(JSON.parse(localStorage.getItem('te_notifs_leidas') || '[]')) } catch { return new Set() }
+    }
+    return new Set()
+  })
 
   // Perfil state
   const [modalPerfilAbierto, setModalPerfilAbierto] = useState(false)
@@ -104,7 +110,8 @@ export default function BarraSuperior() {
       }
 
       setNotificaciones(notifs)
-      setNotifCount(notifs.length)
+      const noLeidas = notifs.filter(n => !notifsLeidas.has(n.id)).length
+      setNotifCount(noLeidas)
     }
 
     cargarNotificaciones()
@@ -285,22 +292,57 @@ export default function BarraSuperior() {
             <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h3 className="font-bold text-[#191c1d]">Notificaciones</h3>
-                <span className="text-[#1e3a8a] text-xs font-bold">{notifCount} nuevas</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#1e3a8a] text-xs font-bold">{notifCount} nuevas</span>
+                  {notifCount > 0 && (
+                    <button 
+                      onClick={() => {
+                        const allIds = notificaciones.map(n => n.id)
+                        const updated = new Set([...notifsLeidas, ...allIds])
+                        setNotifsLeidas(updated)
+                        localStorage.setItem('te_notifs_leidas', JSON.stringify([...updated]))
+                        setNotifCount(0)
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-[#1e3a8a] font-medium transition-colors"
+                    >
+                      Marcar todo leído
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {notificaciones.length === 0 ? (
                   <div className="p-6 text-center text-slate-400 text-sm">Sin notificaciones nuevas</div>
-                ) : notificaciones.map(n => (
-                  <div key={n.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 flex gap-3 cursor-pointer">
-                    <div className={`w-8 h-8 rounded-full ${n.color} flex items-center justify-center shrink-0`}>
-                      <span className="material-symbols-outlined text-sm">{n.icono}</span>
+                ) : notificaciones.map(n => {
+                  const yaLeida = notifsLeidas.has(n.id)
+                  return (
+                    <div 
+                      key={n.id} 
+                      onClick={() => {
+                        if (!yaLeida) {
+                          const updated = new Set([...notifsLeidas, n.id])
+                          setNotifsLeidas(updated)
+                          localStorage.setItem('te_notifs_leidas', JSON.stringify([...updated]))
+                          setNotifCount(prev => Math.max(0, prev - 1))
+                        }
+                        if (n.tipo === 'mensaje') router.push('/inbox')
+                        else if (n.tipo === 'prospecto') router.push('/prospectos')
+                        else if (n.tipo === 'cita') router.push('/citas')
+                        setNotificacionesAbiertas(false)
+                      }}
+                      className={`p-4 border-b border-slate-50 hover:bg-slate-50 flex gap-3 cursor-pointer transition-colors ${yaLeida ? 'opacity-50' : ''}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full ${n.color} flex items-center justify-center shrink-0`}>
+                        <span className="material-symbols-outlined text-sm">{n.icono}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-sm truncate ${yaLeida ? 'text-slate-400' : 'text-slate-800 font-medium'}`}>{n.texto}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{n.tiempo}</p>
+                      </div>
+                      {!yaLeida && <div className="w-2 h-2 rounded-full bg-[#1e3a8a] shrink-0 mt-2"></div>}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-slate-800 truncate">{n.texto}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{n.tiempo}</p>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

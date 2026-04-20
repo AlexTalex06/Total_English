@@ -389,26 +389,53 @@ export default function PaginaProspectos() {
               <h2 className="text-xl font-bold text-[#191c1d] mt-4">
                 {prospectoSeleccionado.nombre_alumno || prospectoSeleccionado.nombre}
               </h2>
+              {prospectoSeleccionado.nombre_alumno && prospectoSeleccionado.nombre && prospectoSeleccionado.nombre !== prospectoSeleccionado.nombre_alumno && (
+                <p className="text-xs text-slate-400 mt-0.5">Tutor: {prospectoSeleccionado.nombre}</p>
+              )}
               <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
                 <span className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                  prospectoSeleccionado.estado === 'agendado' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                  prospectoSeleccionado.estado === 'agendado' ? 'bg-green-100 text-green-700' : 
+                  prospectoSeleccionado.estado === 'contactado' ? 'bg-blue-100 text-blue-700' :
+                  prospectoSeleccionado.estado === 'en_proceso' ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-600'
                 }`}>
                   {prospectoSeleccionado.estado}
                 </span>
                 {prospectoSeleccionado.lead_score && (
                   <span className={`px-2.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
-                    prospectoSeleccionado.lead_score === 'CALIENTE' ? 'text-red-700 bg-red-100/50' : 'text-amber-700 bg-amber-100/50'
+                    prospectoSeleccionado.lead_score === 'CALIENTE' ? 'text-red-700 bg-red-100/50' : 
+                    prospectoSeleccionado.lead_score === 'FRIO' ? 'text-blue-700 bg-blue-100/50' :
+                    'text-amber-700 bg-amber-100/50'
                   }`}>
-                    {prospectoSeleccionado.lead_score}
+                    {prospectoSeleccionado.lead_score === 'CALIENTE' ? '🔥' : prospectoSeleccionado.lead_score === 'FRIO' ? '❄️' : '🌡️'} {prospectoSeleccionado.lead_score}
                   </span>
                 )}
               </div>
+              {/* Acciones rápidas */}
+              <div className="flex items-center justify-center gap-2 mt-4">
+                {prospectoSeleccionado.conversaciones?.[0] && (
+                  <button 
+                    onClick={() => window.location.href = '/inbox'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 hover:bg-green-100 text-xs font-bold rounded-lg transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">chat</span>
+                    Ir al Inbox
+                  </button>
+                )}
+                <button 
+                  onClick={() => { setProspectoEditando(prospectoSeleccionado); setModalAbierto(true); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold rounded-lg transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[14px]">edit</span>
+                  Editar
+                </button>
+              </div>
             </div>
 
-            {/* Ficha Académica */}
+            {/* Perfil Académico */}
             <div className="p-6 border-b border-slate-100">
               <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-4">Perfil Académico</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-[10px] text-slate-500 block mb-1">Edad</span>
                   <span className="font-bold text-slate-800">{prospectoSeleccionado.edad ? `${prospectoSeleccionado.edad} años` : '—'}</span>
@@ -417,6 +444,14 @@ export default function PaginaProspectos() {
                   <span className="text-[10px] text-slate-500 block mb-1">Nivel</span>
                   <span className="font-bold text-slate-800">{prospectoSeleccionado.nivel || '—'}</span>
                 </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-500 block mb-1">Horario</span>
+                  <span className="font-bold text-slate-800 capitalize">{prospectoSeleccionado.horario || '—'}</span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-500 block mb-1">Parentesco</span>
+                  <span className="font-bold text-slate-800">{prospectoSeleccionado.parentesco || '—'}</span>
+                </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 col-span-2">
                   <span className="text-[10px] text-slate-500 block mb-1">Curso de Interés</span>
                   <span className="font-bold text-slate-800">{prospectoSeleccionado.curso_interes || '—'}</span>
@@ -424,43 +459,77 @@ export default function PaginaProspectos() {
               </div>
             </div>
 
-            {/* Contacto y Citas */}
-            <div className="p-6">
-              <div className="mb-6">
-                <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Contacto Origen (Tutor / Mismo)</h4>
-                <div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
-                  <span className="material-symbols-outlined text-green-600 text-3xl">chat</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-[#191c1d] text-sm">{prospectoSeleccionado.nombre}</p>
-                    <p className="text-xs text-slate-500 font-medium">{prospectoSeleccionado.telefono}</p>
-                  </div>
-                  {prospectoSeleccionado.parentesco && (
-                    <div className="px-2 py-1 bg-white rounded border border-blue-100 text-[10px] text-blue-700 font-bold whitespace-nowrap">
-                      {prospectoSeleccionado.parentesco}
-                    </div>
-                  )}
+            {/* Contacto */}
+            <div className="p-6 border-b border-slate-100">
+              <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Contacto</h4>
+              <div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                <span className="material-symbols-outlined text-green-600 text-3xl">chat</span>
+                <div className="flex-1">
+                  <p className="font-bold text-[#191c1d] text-sm">{prospectoSeleccionado.nombre || 'Sin nombre'}</p>
+                  <p className="text-xs text-slate-500 font-medium">{prospectoSeleccionado.telefono}</p>
                 </div>
               </div>
+              {/* Último mensaje si existe */}
+              {prospectoSeleccionado.conversaciones?.[0]?.ultimo_mensaje && (
+                <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-[10px] text-slate-400 block mb-1">Último mensaje</span>
+                  <p className="text-xs text-slate-600 truncate">{prospectoSeleccionado.conversaciones[0].ultimo_mensaje}</p>
+                </div>
+              )}
+            </div>
 
-              {prospectoSeleccionado.citas && prospectoSeleccionado.citas.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Historial de Citas</h4>
-                  <div className="space-y-2">
-                    {prospectoSeleccionado.citas.map(cita => (
-                      <div key={cita.id} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-slate-400 text-lg">event</span>
-                          <div>
-                            <p className="text-sm font-bold text-slate-700">{cita.fecha}</p>
-                            <p className="text-[11px] text-slate-500">{cita.hora}</p>
-                          </div>
+            {/* Notas Internas */}
+            <div className="p-6 border-b border-slate-100">
+              <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Notas Internas</h4>
+              <textarea
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 resize-none focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent outline-none"
+                rows={3}
+                placeholder="Escribe notas sobre este prospecto..."
+                defaultValue={prospectoSeleccionado.notas_internas || ''}
+                onBlur={async (e) => {
+                  const val = e.target.value
+                  if (val !== (prospectoSeleccionado.notas_internas || '')) {
+                    await supabase.from('prospectos').update({ notas_internas: val }).eq('id', prospectoSeleccionado.id)
+                    setUltimoToast({ tipo: 'exito', titulo: 'Nota guardada', mensaje: 'La nota se actualizó correctamente' })
+                  }
+                }}
+              />
+            </div>
+
+            {/* Citas */}
+            {prospectoSeleccionado.citas && prospectoSeleccionado.citas.length > 0 && (
+              <div className="p-6 border-b border-slate-100">
+                <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Historial de Citas</h4>
+                <div className="space-y-2">
+                  {prospectoSeleccionado.citas.map(cita => (
+                    <div key={cita.id} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-slate-400 text-lg">event</span>
+                        <div>
+                          <p className="text-sm font-bold text-slate-700">{cita.fecha}</p>
+                          <p className="text-[11px] text-slate-500">{cita.hora}</p>
                         </div>
-                        <span className={`text-[9px] px-2 py-1 rounded font-bold uppercase ${
-                          cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                        }`}>{cita.estado}</span>
                       </div>
-                    ))}
-                  </div>
+                      <span className={`text-[9px] px-2 py-1 rounded font-bold uppercase ${
+                        cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                      }`}>{cita.estado}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Metadata */}
+            <div className="p-6">
+              <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Registro</h4>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span className="material-symbols-outlined text-[14px]">schedule</span>
+                Creado: {new Date(prospectoSeleccionado.creado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
+              {prospectoSeleccionado.actualizado_en && (
+                <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                  <span className="material-symbols-outlined text-[14px]">update</span>
+                  Actualizado: {new Date(prospectoSeleccionado.actualizado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
               )}
             </div>
