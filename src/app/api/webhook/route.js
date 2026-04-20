@@ -66,40 +66,39 @@ export async function POST(solicitud) {
         }
         // --------------------------------------------------------
 
+        // --- LÓGICA DE PROSPECTO POSPUESTA ---
         let prosExist = null;
 
+        // 1. Buscar si la conversación ya tiene un prospecto vinculado
         if (convExist && convExist.prospecto_id) {
-          const { data: pData } = await supabase.from('prospectos').select('id').eq('id', convExist.prospecto_id).single()
+          const { data: pData } = await supabase.from('prospectos').select('*').eq('id', convExist.prospecto_id).maybeSingle()
           if (pData) {
             prosExist = pData;
           }
         }
 
-        // Buscar prospecto existente por teléfono (evitar duplicados)
+        // 2. Si no tiene en la conversación, buscar por teléfono por si acaso existe uno huérfano
         if (!prosExist) {
-          const { data: prosPorTel } = await supabase.from('prospectos').select('id').eq('telefono', remitenteId).order('creado_en', { ascending: false }).limit(1).maybeSingle()
+          const { data: prosPorTel } = await supabase.from('prospectos').select('*').eq('telefono', remitenteId).order('creado_en', { ascending: false }).limit(1).maybeSingle()
           if (prosPorTel) {
             prosExist = prosPorTel
+            // Si lo encontramos por teléfono, vincularlo a la conversación de una vez
+            if (convExist) {
+              await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
+            }
           }
         }
 
-        // Solo crear prospecto si no existe ninguno con ese teléfono
-        if (!prosExist) {
-          const { data: nuevoP } = await supabase.from('prospectos').insert({ 
-            nombre: nombrePerfil || 'Sin nombre', 
-            telefono: remitenteId, 
-            estado: 'nuevo'
-          }).select('id').single()
-          prosExist = nuevoP
-        }
-
-        // Crear o vincular conversación
-        if (convExist && !convExist.prospecto_id) {
-          await supabase.from('conversaciones').update({ prospecto_id: prosExist.id }).eq('id', convExist.id)
-        } else if (!convExist) {
-          const { data: nuevaC } = await supabase.from('conversaciones').insert({ prospecto_id: prosExist.id, plataforma: 'whatsapp', id_plataforma: remitenteId }).select('*').single()
+        // 3. Crear conversación si no existe (SIN prospecto por ahora si no encontramos uno)
+        if (!convExist) {
+          const { data: nuevaC } = await supabase.from('conversaciones').insert({ 
+            prospecto_id: prosExist ? prosExist.id : null, 
+            plataforma: 'whatsapp', 
+            id_plataforma: remitenteId 
+          }).select('*').single()
           convExist = nuevaC
         }
+
 
         const { data: existeMsg } = await supabase.from('mensajes').select('id').eq('id_mensaje_meta', mensajeObj.id).maybeSingle()
         if (existeMsg) return NextResponse.json({ estado: 'ya_procesado' }, { status: 200 })
@@ -208,7 +207,7 @@ export async function POST(solicitud) {
             if (adminEmail) {
               await notificarEscalamientoAdmin({
                 adminEmail: adminEmail,
-                nombreProspecto: freshPros?.nombre_alumno || nombrePerfil || 'Desconocido',
+                nombreProspecto: prosExist?.nombre_alumno || prosExist?.nombre || nombrePerfil || 'Desconocido',
                 telefonoProspecto: remitenteId,
                 motivo: texto || 'escalamiento',
                 conversacionId: convExist.id
@@ -224,54 +223,79 @@ export async function POST(solicitud) {
         }
         // --------------------------------------------
 
-        // 5. Actualizar CRM (Bifurcación Multi-Alumno)
+        // 5. Actualizar CRM o Crear Prospecto si ya hay datos suficientes
         if (datos && Object.keys(datos).length > 0) {
           try {
-            let idTarget = prosExist.id;
-
-            // Bifurcación multi-alumno
-            if (datos.nombre_alumno && freshPros.nombre_alumno && datos.nombre_alumno.toLowerCase() !== freshPros.nombre_alumno.toLowerCase()) {
-              console.log(`Bifurcando prospecto de ${freshPros.nombre_alumno} a -> ${datos.nombre_alumno}`);
-              const propObj = { ...freshPros };
-              delete propObj.id; delete propObj.creado_en; delete propObj.actualizado_en;
-              propObj.nombre_alumno = datos.nombre_alumno;
-              propObj.edad = datos.edad ? parseInt(datos.edad) : null;
-              propObj.nivel = datos.nivel || null;
-              propObj.horario = datos.horario || null;
-              propObj.categoria_edad = datos.categoria_edad || null;
-              propObj.estado = 'nuevo';
-              propObj.lead_score = null;
-
-              const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('id').single();
-              if (nuevoHijo) {
-                await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
-                idTarget = nuevoHijo.id;
-                prosExist.id = nuevoHijo.id;
+            // Si NO hay prospecto pero AlexIA ya obtuvo datos, lo creamos ahora
+            if (!prosExist) {
+              // Requisito mínimo para crear prospecto: Nombre y al menos otro dato (edad o nivel)
+              if (datos.nombre_alumno || datos.nombre) {
+                const { data: nuevoP } = await supabase.from('prospectos').insert({
+                  nombre: datos.nombre || nombrePerfil || 'Interesado',
+                  nombre_alumno: datos.nombre_alumno || null,
+                  telefono: remitenteId,
+                  edad: datos.edad ? parseInt(datos.edad) : null,
+                  nivel: datos.nivel || null,
+                  horario: datos.horario || null,
+                  curso_interes: datos.curso_interes || null,
+                  estado: 'nuevo'
+                }).select('*').single()
+                
+                if (nuevoP) {
+                  prosExist = nuevoP
+                  await supabase.from('conversaciones').update({ prospecto_id: nuevoP.id }).eq('id', convExist.id)
+                  console.log(`✅ Prospecto creado dinámicamente para ${remitenteId} al obtener datos.`)
+                }
               }
             } else {
-              const updateData = { actualizado_en: new Date().toISOString() };
-              if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
-              if (datos.edad) updateData.edad = parseInt(datos.edad);
-              if (datos.nivel) updateData.nivel = datos.nivel;
-              if (datos.horario) updateData.horario = datos.horario;
-              if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
-              if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
-              if (datos.parentesco) updateData.parentesco = datos.parentesco;
-              if (datos.lead_score) updateData.lead_score = datos.lead_score;
+              // Si ya existe, actualizamos
+              let idTarget = prosExist.id;
 
-              const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
-              if (crmError) console.error('Error actualizando prospecto:', crmError.message);
+              // Bifurcación multi-alumno
+              if (datos.nombre_alumno && prosExist.nombre_alumno && datos.nombre_alumno.toLowerCase() !== prosExist.nombre_alumno.toLowerCase()) {
+                console.log(`Bifurcando prospecto de ${prosExist.nombre_alumno} a -> ${datos.nombre_alumno}`);
+                const propObj = { ...prosExist };
+                delete propObj.id; delete propObj.creado_en; delete propObj.actualizado_en;
+                propObj.nombre_alumno = datos.nombre_alumno;
+                propObj.edad = datos.edad ? parseInt(datos.edad) : null;
+                propObj.nivel = datos.nivel || null;
+                propObj.horario = datos.horario || null;
+                propObj.categoria_edad = datos.categoria_edad || null;
+                propObj.estado = 'nuevo';
+                propObj.lead_score = null;
+
+                const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('*').single();
+                if (nuevoHijo) {
+                  await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
+                  idTarget = nuevoHijo.id;
+                  prosExist = nuevoHijo;
+                }
+              } else {
+                const updateData = { actualizado_en: new Date().toISOString() };
+                if (datos.nombre_alumno) updateData.nombre_alumno = datos.nombre_alumno;
+                if (datos.edad) updateData.edad = parseInt(datos.edad);
+                if (datos.nivel) updateData.nivel = datos.nivel;
+                if (datos.horario) updateData.horario = datos.horario;
+                if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
+                if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
+                if (datos.parentesco) updateData.parentesco = datos.parentesco;
+                if (datos.lead_score) updateData.lead_score = datos.lead_score;
+
+                const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
+                if (crmError) console.error('Error actualizando prospecto:', crmError.message);
+              }
             }
           } catch (errSync) {
             console.error('❌ Error fatal en sync CRM:', errSync.message);
           }
         }
 
+
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
-        if (intencion === 'CIERRE_CITA') {
-          const { data: citasExistentes } = await supabase.from('citas')
-            .select('id, fecha, hora')
-            .eq('prospecto_id', prosExist.id)
+          if (prosExist) {
+            const { data: citasExistentes } = await supabase.from('citas')
+              .select('id, fecha, hora')
+              .eq('prospecto_id', prosExist.id)
             .eq('estado', 'pendiente')
             .order('creado_en', { ascending: false })
             .limit(1);

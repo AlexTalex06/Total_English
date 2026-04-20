@@ -219,6 +219,7 @@ export default function PaginaInbox() {
     const telLimpio = telefonoNuevo.replace(/\D/g, '')
 
     try {
+      // 1. Ver si ya existe la conversación
       const { data: existing } = await supabase
         .from('conversaciones')
         .select('*, prospectos(*)')
@@ -227,36 +228,33 @@ export default function PaginaInbox() {
         .maybeSingle()
       
       if (existing) {
-        cambiarChat(existing)
+        await cambiarChat(existing)
         setModalNuevoChat(false)
         setTelefonoNuevo('')
         setNombreNuevo('')
         return
       }
 
-      // 1. Crear prospecto
-      const { data: nuevoP, error: pError } = await supabase.from('prospectos').insert({ 
-        nombre: nombreNuevo || telLimpio, 
-        telefono: telLimpio, 
-        estado: 'nuevo',
-        notas_internas: 'Contacto iniciado manualmente'
-      }).select('id').single()
+      // 2. Si no existe, ver si hay un prospecto huérfano con ese número
+      const { data: prosExist } = await supabase
+        .from('prospectos')
+        .select('*')
+        .eq('telefono', telLimpio)
+        .maybeSingle()
 
-      if (pError) throw pError
-
-      // 2. Crear conversación vinculada
+      // 3. Crear la conversación (con o sin prospecto)
       const { data: nuevaC, error: cError } = await supabase.from('conversaciones').insert({ 
-        prospecto_id: nuevoP.id, 
+        prospecto_id: prosExist ? prosExist.id : null, 
         plataforma: 'whatsapp', 
         id_plataforma: telLimpio,
-        asignado_a_humano: true 
+        asignado_a_humano: true // Tomamos control manual
       }).select('*, prospectos(*)').single()
       
       if (cError) throw cError
 
       await cargarConversaciones()
       if (nuevaC) {
-        cambiarChat(nuevaC)
+        await cambiarChat(nuevaC)
       }
       
       setModalNuevoChat(false)
