@@ -12,11 +12,12 @@ export default function PaginaCampanas() {
   const [campanaEditando, setCampanaEditando] = useState(null)
   const [plantillasMeta, setPlantillasMeta] = useState([])
   const [cargandoMeta, setCargandoMeta] = useState(false)
+  const [tabActivo, setTabActivo] = useState('campanas') // 'general', 'plantillas', 'campanas'
 
-  // 1. Obtener plantillas únicas ya utilizadas en el CRM (del proyecto Total English)
+  // 1. Obtener plantillas únicas ya utilizadas en el CRM
   const plantillasDelProyecto = [...new Set(campanas.map(c => c.nombre_plantilla).filter(Boolean))]
 
-  // 2. Solo mostrar el estado (APPROVED, PENDING, etc) de las que pertenecen a este proyecto
+  // 2. Solo mostrar el estado de las que pertenecen a este proyecto
   const plantillasMostrar = plantillasMeta.filter(p => plantillasDelProyecto.includes(p.name))
 
   // 3. Opciones sugeridas para el autocompletado (Datalist)
@@ -34,23 +35,25 @@ export default function PaginaCampanas() {
     },
     { nombre: 'mensaje', etiqueta: 'Notas Internas', tipo: 'textarea', placeholder: 'Notas sobre esta campaña...', requerido: false },
     {
-      nombre: 'publico_estado', etiqueta: 'Público (Estado)', tipo: 'select', requerido: false,
+      nombre: 'publico_estado', etiqueta: 'Público (Estado de Lead)', tipo: 'select', requerido: false,
       opciones: [
-        { valor: 'Todos', etiqueta: 'Todos los Estados' },
+        { valor: 'Todos', etiqueta: 'Todos los Prospectos' },
         { valor: 'nuevo', etiqueta: 'Nuevos' },
         { valor: 'contactado', etiqueta: 'Contactados' },
         { valor: 'en_proceso', etiqueta: 'En Proceso' },
-        { valor: 'agendado', etiqueta: 'Agendados' },
+        { valor: 'agendado', etiqueta: 'Agendados (Cita Pendiente)' },
+        { valor: 'inscrito', etiqueta: 'Inscritos (Cierre Ganado)' },
       ]
     },
     {
-      nombre: 'publico_curso', etiqueta: 'Público (Curso de Interés)', tipo: 'select', requerido: false,
+      nombre: 'publico_curso', etiqueta: 'Público (Diplomado Seleccionado)', tipo: 'select', requerido: false,
       opciones: [
-        { valor: 'Todos', etiqueta: 'Todos los Cursos' },
-        { valor: 'CHILDREN', etiqueta: 'Children' },
-        { valor: 'PRE-TEENS', etiqueta: 'Pre-Teens' },
-        { valor: 'YOUNG', etiqueta: 'Young & Adults' },
-        { valor: 'MY TIME', etiqueta: 'My Time English' },
+        { valor: 'Todos', etiqueta: 'Todos los Diplomados' },
+        { valor: 'DIPLOMADO CHILDREN', etiqueta: 'Diplomado Children' },
+        { valor: 'DIPLOMADO PRE-TEENS', etiqueta: 'Diplomado Pre-Teens' },
+        { valor: 'DIPLOMADO YOUNG & ADULTS', etiqueta: 'Diplomado Young & Adults' },
+        { valor: 'DIPLOMADO MY TIME ENGLISH', etiqueta: 'Diplomado My Time English' },
+        { valor: 'PREPARACION PARA CERTIFICADOS', etiqueta: 'Preparación para Certificados' },
       ]
     },
     {
@@ -62,12 +65,13 @@ export default function PaginaCampanas() {
         { valor: 'completada', etiqueta: 'Completada' },
       ]
     },
-    { nombre: 'imagen_url', etiqueta: 'URL de imagen / Media ID (Opcional)', tipo: 'url', placeholder: 'https://...', requerido: false },
+    { nombre: 'imagen_url', etiqueta: 'URL de imagen (Opcional si la plantilla Meta lo requiere)', tipo: 'url', placeholder: 'https://...', requerido: false },
   ]
+  
   const cargarCampanas = async () => {
     setCargando(true)
     try {
-      const respuesta = await fetch(`/api/campanas?t=${Date.now()}`, { cache: 'no-store' })
+      const respuesta = await fetch(`/api/campanas?t=\${Date.now()}`, { cache: 'no-store' })
       const datos = await respuesta.json()
       setCampanas(Array.isArray(datos) ? datos : [])
     } catch (error) {
@@ -139,7 +143,7 @@ export default function PaginaCampanas() {
   const eliminarCampana = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta campaña?')) return
     try {
-      const respuesta = await fetch(`/api/campanas?id=${id}`, { method: 'DELETE' })
+      const respuesta = await fetch(`/api/campanas?id=\${id}`, { method: 'DELETE' })
       if (respuesta.ok) {
         await cargarCampanas()
       } else {
@@ -152,7 +156,7 @@ export default function PaginaCampanas() {
   }
 
   const dispararCampana = async (id) => {
-    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros. ¿Estás absolutamente seguro de continuar?')) return
+    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros.\\n\\n¿Estás absolutamente seguro de continuar?')) return
     
     setEnviando(id)
     try {
@@ -165,7 +169,7 @@ export default function PaginaCampanas() {
       const resData = await respuesta.json()
       
       if (respuesta.ok) {
-        alert(`✅ ¡Campaña Disparada!\nAudiencia encontrada: ${resData.alcance_esperado}\nMensajes enviados: ${resData.envios_exitosos}`)
+        alert(\`✅ ¡Campaña Disparada!\\nAudiencia encontrada: \${resData.alcance_esperado}\\nMensajes enviados: \${resData.envios_exitosos}\`)
         cargarCampanas()
       } else {
         alert('❌ Error al disparar: ' + (resData.error || 'Error desconocido'))
@@ -195,182 +199,247 @@ export default function PaginaCampanas() {
     completadas: datosMostrar.filter(c => c.estado === 'completada').length,
   }
 
-  const etiquetaEstado = (estado) => {
-    const estilos = {
-      activa: 'bg-green-100 text-green-700',
-      programada: 'bg-blue-100 text-blue-700',
-      completada: 'bg-slate-100 text-slate-600',
-      borrador: 'bg-yellow-100 text-yellow-700',
-    }
-    return (
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${estilos[estado] || estilos.borrador}`}>
-        {estado}
-      </span>
-    )
-  }
-
   return (
-    <div className="max-w-5xl mx-auto w-full p-4 md:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[#191c1d]">Motor de WhatsApp</h1>
-          <p className="text-slate-500 text-sm">Ejecuta plantillas de envío masivo para tus prospectos</p>
-        </div>
-        <button
-          onClick={() => { setCampanaEditando(null); setModalAbierto(true); }}
-          className="flex items-center justify-center gap-2 rounded-xl h-12 px-6 bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/20 hover:bg-[#1e3a8a]/90 transition-all font-bold"
-        >
-          <span className="material-symbols-outlined">add</span>
-          <span>Configurar Envío</span>
-        </button>
-      </div>
-      {/* Estadísticas */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Alcance Real Acumulado</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.alcanceTotal} Enviados</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Configuradas / En pausa</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.activas}</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-          <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Completadas</p>
-          <p className="text-2xl font-bold text-[#1e3a8a] mt-1">{estadisticas.completadas}</p>
-        </div>
+    <div className="max-w-6xl mx-auto w-full p-4 md:p-6 pb-20">
+      
+      {/* TÍTULO PRINCIPAL (estilo header blanco) */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-[#191c1d] flex items-center gap-2">
+          <span className="material-symbols-outlined text-3xl text-blue-600">mail</span>
+          Marketing Automation & Campañas
+        </h1>
+        <p className="text-slate-500 text-sm mt-1">Gestión de envíos masivos y nutrición de leads</p>
       </div>
 
-      {/* Sección Meta Templates */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-blue-600">verified</span>
-            <h3 className="font-bold text-slate-800 tracking-tight">Estado de Plantillas en Meta Cloud</h3>
-          </div>
+      {/* CONTENEDOR PRINCIPAL BLANCO */}
+      <div className="bg-white rounded-2xl shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)] border border-slate-100 overflow-hidden min-h-[600px]">
+        
+        {/* NAVEGACIÓN POR PESTAÑAS (TABS) */}
+        <div className="flex border-b border-slate-200 px-6">
           <button 
-            onClick={cargarPlantillasMeta}
-            disabled={cargandoMeta}
-            className="text-[10px] font-bold uppercase tracking-widest text-[#1e3a8a] hover:underline flex items-center gap-1"
+            className={\`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative \${tabActivo === 'general' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}\`}
+            onClick={() => setTabActivo('general')}
           >
-            <span className={`material-symbols-outlined text-sm ${cargandoMeta ? 'animate-spin' : ''}`}>refresh</span>
-            Sincronizar Meta
+            <span className="material-symbols-outlined text-[20px]">monitoring</span>
+            Vista General
+            {tabActivo === 'general' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
+          </button>
+          
+          <button 
+            className={\`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative \${tabActivo === 'plantillas' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}\`}
+            onClick={() => setTabActivo('plantillas')}
+          >
+            <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
+            Plantillas ({plantillasMostrar.length})
+            {tabActivo === 'plantillas' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
+          </button>
+          
+          <button 
+            className={\`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative \${tabActivo === 'campanas' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}\`}
+            onClick={() => setTabActivo('campanas')}
+          >
+            <span className="material-symbols-outlined text-[20px]">send</span>
+            Campañas ({campanas.length})
+            {tabActivo === 'campanas' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
           </button>
         </div>
-        
-        <div className="p-4 overflow-x-auto">
-          {cargandoMeta ? (
-            <div className="text-center py-6 text-slate-400 text-sm">Validando con Meta Business Manager...</div>
-          ) : plantillasMostrar.length === 0 ? (
-            <div className="text-center py-6 text-slate-400 text-sm">Aún no hay plantillas vinculadas a Total English. Escribe el nombre de tu plantilla de Meta al crear una campaña para empezar a darle seguimiento.</div>
-          ) : (
-            <div className="flex gap-4 min-w-max pb-2">
-              {plantillasMostrar.map(plt => (
-                <div key={plt.id} className="bg-slate-50 border border-slate-100 p-3 rounded-xl min-w-[200px]">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase truncate max-w-[120px]" title={plt.name}>{plt.name}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                      plt.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
-                      plt.status === 'PENDING' ? 'bg-orange-100 text-orange-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {plt.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[11px] text-slate-500 font-medium">Idioma: {plt.language}</span>
-                    <span className="material-symbols-outlined text-slate-300 text-sm">ads_click</span>
-                  </div>
-                </div>
-              ))}
+
+        {/* CONTENIDO DE LAS PESTAÑAS */}
+        <div className="p-6 md:p-8">
+          
+          {/* TAB: VISTA GENERAL */}
+          {tabActivo === 'general' && (
+            <div className="animate-fade-in">
+               <h2 className="text-xl font-bold text-slate-800 mb-6">Métricas Globales</h2>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col justify-center items-center">
+                   <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">mark_email_read</span></div>
+                   <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Alcance Real</p>
+                   <p className="text-4xl font-black text-blue-700 mt-2">\${estadisticas.alcanceTotal}</p>
+                   <p className="text-xs text-slate-400 mt-1">Personas contactadas</p>
+                 </div>
+                 <div className="bg-gradient-to-br from-emerald-50 to-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center">
+                   <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
+                   <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Completadas</p>
+                   <p className="text-4xl font-black text-emerald-700 mt-2">\${estadisticas.completadas}</p>
+                   <p className="text-xs text-slate-400 mt-1">Satisfechas exitosamente</p>
+                 </div>
+                 <div className="bg-gradient-to-br from-amber-50 to-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col justify-center items-center">
+                   <div className="p-3 bg-amber-100 text-amber-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">pending_actions</span></div>
+                   <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Configuradas</p>
+                   <p className="text-4xl font-black text-amber-700 mt-2">\${estadisticas.activas}</p>
+                   <p className="text-xs text-slate-400 mt-1">Listas o en espera</p>
+                 </div>
+               </div>
             </div>
           )}
-        </div>
-        {plantillasMostrar.some(p => p.status === 'APPROVED') && (
-          <div className="bg-green-50/50 px-6 py-2 border-t border-slate-100 text-[10px] text-green-600 font-medium flex items-center gap-1">
-            <span className="material-symbols-outlined text-xs">info</span>
-            Tienes plantillas aprobadas listas para usar en tus campañas.
-          </div>
-        )}
-      </div>
 
-
-      {/* Lista de Campañas */}
-      <div className="space-y-4">
-        {cargando ? (
-          <div className="text-center py-12 text-slate-400">Cargando motor...</div>
-        ) : datosMostrar.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">No tienes envíos configurados. ¡Empieza creando uno!</div>
-        ) : datosMostrar.map((campana) => (
-          <div key={campana.id} className={`bg-white rounded-xl overflow-hidden shadow-sm border ${campana.estado === 'completada' ? 'border-slate-200 opacity-80' : 'border-[#00236f]/30'} flex flex-col md:flex-row relative`}>
-            
-            {campana.estado === 'completada' && (
-              <div className="absolute inset-0 bg-slate-50/40 z-0 pointer-events-none"></div>
-            )}
-
-            <div className="flex flex-1 flex-col p-5 gap-3 relative z-10">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  {etiquetaEstado(campana.estado)}
-                  <h3 className="text-[#191c1d] text-xl font-bold mt-1">{campana.nombre}</h3>
-                  <div className="flex gap-2 items-center mt-1 text-xs font-medium text-slate-500">
-                    <span className="bg-blue-50 text-blue-700 px-2 pointer-events-none py-0.5 rounded border border-blue-100">
-                      Plantilla META: {campana.nombre_plantilla || 'NO CONFIGURADA'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex gap-1 items-center bg-white/80 backdrop-blur rounded-lg shadow-sm border border-slate-100 p-1">
-                  <button
-                    onClick={() => abrirEditar(campana)}
-                    className="p-2 text-slate-400 hover:text-blue-600 transition-colors rounded-md hover:bg-slate-50"
-                  >
-                    <span className="material-symbols-outlined text-xl">edit</span>
-                  </button>
-                  <button
-                    onClick={() => dispararCampana(campana.id)}
-                    disabled={enviando === campana.id}
-                    className={`p-2 transition-colors rounded-md hover:bg-red-50 flex items-center gap-1 ${enviando === campana.id ? 'text-amber-500 animate-pulse' : 'text-red-500 hover:text-red-700'} font-bold px-3`}
-                  >
-                    <span className="material-symbols-outlined text-xl">
-                      {enviando === campana.id ? 'hourglass_top' : 'rocket_launch'}
-                    </span>
-                    <span className="text-sm">FUEGO</span>
-                  </button>
-                  <button
-                    onClick={() => eliminarCampana(campana.id)}
-                    className="p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-md hover:bg-slate-50"
-                  >
-                    <span className="material-symbols-outlined text-xl">delete</span>
-                  </button>
-                </div>
+          {/* TAB: PLANTILLAS */}
+          {tabActivo === 'plantillas' && (
+            <div className="animate-fade-in">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-800">Estado de Plantillas (Meta Cloud)</h2>
+                <button 
+                  onClick={cargarPlantillasMeta}
+                  disabled={cargandoMeta}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <span className={\`material-symbols-outlined text-sm \${cargandoMeta ? 'animate-spin' : ''}\`}>refresh</span>
+                  Actualizar Status
+                </button>
               </div>
               
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex gap-4 mt-2">
-                <div className="flex-1">
-                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Audiencia: Estado</p>
-                   <p className="text-sm font-semibold text-slate-700">{campana.publico_estado || 'Todos'}</p>
+              {cargandoMeta ? (
+                <div className="text-center py-10 text-slate-400 text-sm">Consultando Meta Business Manager...</div>
+              ) : plantillasMostrar.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">speaker_notes_off</span>
+                  <p>Aún no hay plantillas vinculadas a Total English.</p>
+                  <p className="text-xs mt-1">Escribe el nombre de tu plantilla de Meta al crear una campaña para rastrearla.</p>
                 </div>
-                <div className="flex-1 border-l border-slate-200 pl-4">
-                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Audiencia: Cursos</p>
-                   <p className="text-sm font-semibold text-slate-700">{campana.publico_curso || 'Todos'}</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {plantillasMostrar.map(plt => (
+                    <div key={plt.id} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-4">
+                        <span className="font-bold text-slate-800 uppercase tracking-tight break-all" title={plt.name}>{plt.name}</span>
+                        <span className={\`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider \${
+                          plt.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                          plt.status === 'PENDING' ? 'bg-orange-100 text-orange-700' :
+                          'bg-red-100 text-red-700'
+                        }\`}>
+                          {plt.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-slate-400 gap-1 text-sm font-medium">
+                        <span className="material-symbols-outlined text-[16px]">language</span>
+                        {plt.language === 'es_MX' ? 'Español (México)' : plt.language}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex-1 border-l border-slate-200 pl-4">
-                   <p className="text-[10px] uppercase font-bold text-[#1e3a8a] mb-1">Enviados Reales</p>
-                   <p className="text-xl font-black text-[#1e3a8a]">{campana.alcance || 0}</p>
-                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: CAMPAÑAS */}
+          {tabActivo === 'campanas' && (
+            <div className="animate-fade-in space-y-6">
+              
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h2 className="text-xl font-bold text-slate-800">Campañas Automatizadas</h2>
+                <button
+                  onClick={() => { setCampanaEditando(null); setModalAbierto(true); }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-lg shadow-sm shadow-blue-500/30 flex items-center gap-2 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[20px]">add</span>
+                  Nueva Campaña
+                </button>
               </div>
 
+              {cargando ? (
+                <div className="text-center py-10">Cargando...</div>
+              ) : datosMostrar.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">inbox</span>
+                  <p>No tienes envíos configurados.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6">
+                  {datosMostrar.map((campana) => (
+                    <div key={campana.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all">
+                      <div className="p-5">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{campana.nombre}</h3>
+                            <div className="flex gap-2 mt-2">
+                              <span className={\`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider \${
+                                campana.estado === 'activa' ? 'bg-green-50 text-green-600 border-green-200' : 
+                                campana.estado === 'borrador' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                campana.estado === 'completada' ? 'bg-slate-100 text-slate-500 border-slate-200' :
+                                'bg-blue-50 text-blue-600 border-blue-200'
+                              }\`}>
+                                {campana.estado}
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider">
+                                Automática
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* BOTONES DE ACCIÓN DE CADA CAMPAÑA */}
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => abrirEditar(campana)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                            <button 
+                              onClick={() => dispararCampana(campana.id)}
+                              disabled={enviando === campana.id}
+                              className={\`w-8 h-8 rounded-full flex items-center justify-center transition-colors \${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}\`}
+                              title="Disparar Campaña"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">{enviando === campana.id ? 'hourglass_top' : 'send'}</span>
+                            </button>
+                            <button onClick={() => eliminarCampana(campana.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* DETALLE DE AUDIENCIA Y PLANTILLA EN LA TARJETA */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-medium mb-5">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">PLANTILLA</span>
+                            <span className="text-slate-700 bg-slate-50 px-2 py-1 rounded inline-block border border-slate-100">{campana.nombre_plantilla || 'Sin plantilla'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">AUDIENCIA (FILTROS)</span>
+                            <span className="text-slate-700 bg-blue-50/50 px-2 py-1 rounded inline-block border border-blue-100/50">
+                              \${campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
+                              \${campana.publico_estado !== 'Todos' ? \`Estado: \${campana.publico_estado} \` : ''} 
+                              \${campana.publico_curso !== 'Todos' ? \`| Diplomado: \${campana.publico_curso}\` : ''}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* MÉTRICAS INFERIORES DE LA TARJETA */}
+                        <div className="grid grid-cols-4 divide-x divide-slate-100 bg-slate-50/50 -mx-5 px-5 -mb-5 py-4 border-t border-slate-100">
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-xl font-black text-blue-600">{campana.alcance || 0}</span>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Enviados</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-xl font-black text-emerald-500">{campana.alcance || 0}</span>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Entregados</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-xl font-black text-amber-500">0</span>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Respuestas</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-xl font-black text-slate-500">0.0%</span>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Tasa Respuesta</span>
+                          </div>
+                        </div>
+                        
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )}
+
+        </div>
       </div>
 
       <ModalFormulario
         abierto={modalAbierto}
         alCerrar={cerrarModal}
-        titulo={campanaEditando ? 'Editar Pautas y Públicos' : 'Nueva Campaña WhatsApp'}
+        titulo={campanaEditando ? 'Editar Campaña y Públicos' : 'Nueva Campaña de Automatización'}
         campos={camposCampana}
         alEnviar={campanaEditando ? editarCampana : crearCampana}
-        textoBoton={campanaEditando ? 'Guardar Configuración' : 'Guardar Campaña'}
+        textoBoton={campanaEditando ? 'Guardar Cambios' : 'Crear Campaña'}
         datosIniciales={campanaEditando ? {
           nombre: campanaEditando.nombre,
           nombre_plantilla: campanaEditando.nombre_plantilla,
