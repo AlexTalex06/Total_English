@@ -13,6 +13,7 @@ export default function PaginaCampanas() {
   const [plantillasMeta, setPlantillasMeta] = useState([])
   const [cargandoMeta, setCargandoMeta] = useState(false)
   const [tabActivo, setTabActivo] = useState('campanas') // 'general', 'plantillas', 'campanas', 'audiencias'
+  const [modoConstructor, setModoConstructor] = useState(false) // Para la vista de creación de audiencia
 
   // Estados para Audiencias
   const [prospectosAud, setProspectosAud] = useState([])
@@ -313,6 +314,7 @@ export default function PaginaCampanas() {
 
       if (resp.ok) {
         alert('✅ Audiencia guardada con éxito.');
+        setModoConstructor(false);
         // Recargar audiencias
         const r2 = await fetch('/api/audiencias');
         const d2 = await r2.json();
@@ -323,6 +325,21 @@ export default function PaginaCampanas() {
       }
     } catch (e) {
       alert('❌ Error de conexión: ' + e.message);
+    }
+  }
+
+  const eliminarAudiencia = async (id) => {
+    if (!confirm('¿Seguro que deseas eliminar este segmento de audiencia?')) return;
+    try {
+      const resp = await fetch(`/api/audiencias?id=${id}`, { method: 'DELETE' });
+      if (resp.ok) {
+        setAudienciasGuardadas(audienciasGuardadas.filter(a => a.id !== id));
+      } else {
+        const err = await resp.json();
+        alert('Error: ' + err.error);
+      }
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -591,24 +608,27 @@ export default function PaginaCampanas() {
                             </div>
                           </div>
                           
-                          {/* MÉTRICAS INFERIORES DE LA TARJETA */}
-                          <div className="grid grid-cols-4 divide-x divide-slate-100 bg-slate-50/50 -mx-5 px-5 -mb-5 py-4 border-t border-slate-100">
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="text-xl font-black text-blue-600">{campana.alcance || 0}</span>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Enviados</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="text-xl font-black text-emerald-500">{campana.alcance || 0}</span>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Entregados</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="text-xl font-black text-amber-500">0</span>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Respuestas</span>
-                            </div>
-                            <div className="flex flex-col items-center justify-center">
-                              <span className="text-xl font-black text-slate-500">0.0%</span>
-                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Tasa Respuesta</span>
-                            </div>
+                          <div className="flex justify-between items-center bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                             <div className="flex gap-8">
+                                <div className="text-center">
+                                   <p className="text-2xl font-black text-blue-600">{campana.alcance || 0}</p>
+                                   <p className="text-[10px] uppercase font-bold text-slate-400">Enviados</p>
+                                </div>
+                                <div className="text-center">
+                                   <p className="text-2xl font-black text-emerald-500">{campana.alcance || 0}</p>
+                                   <p className="text-[10px] uppercase font-bold text-slate-400">Entregados</p>
+                                </div>
+                                <div className="text-center border-l border-slate-100 pl-4 ml-4">
+                                   <p className="text-2xl font-black text-amber-500">{campana.interacciones || 0}</p>
+                                   <p className="text-[10px] uppercase font-bold text-slate-400">Clicks</p>
+                                </div>
+                             </div>
+                             <div className="text-right">
+                                <p className="text-xl font-black text-slate-700">
+                                   {campana.alcance > 0 ? ((campana.interacciones || 0) / campana.alcance * 100).toFixed(1) : '0.0'}%
+                                </p>
+                                <p className="text-[10px] uppercase font-bold text-slate-400">CTR</p>
+                             </div>
                           </div>
                           
                         </div>
@@ -623,120 +643,163 @@ export default function PaginaCampanas() {
           {/* TAB: AUDIENCIAS */}
           {tabActivo === 'audiencias' && (
             <div className="animate-fade-in space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h2 className="text-xl font-bold text-slate-800">Constructor de Audiencias</h2>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    className={`font-bold py-2 px-5 rounded-xl flex items-center gap-2 shadow-sm transition-all bg-emerald-600 hover:bg-emerald-700 text-white`}
-                    onClick={guardarAudienciaActual}
-                  >
-                    <span className="material-symbols-outlined text-[20px]">save</span>
-                    Guardar Audiencia
-                  </button>
-                  <button
-                    disabled={prospectosFiltrados.length === 0}
-                    className={`font-bold py-2 px-5 rounded-xl flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.1)] transition-all ${prospectosFiltrados.length === 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-                    onClick={dispararCampanaDinamica}
-                  >
-                    <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
-                    Disparar Directo
-                  </button>
-                </div>
-              </div>
+              {!modoConstructor ? (
+                <>
+                  <div className="flex justify-between items-center">
+                     <h2 className="text-xl font-bold text-slate-800">Segmentos de Audiencia</h2>
+                     <button 
+                       onClick={() => setModoConstructor(true)}
+                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
+                     >
+                       <span className="material-symbols-outlined text-[20px]">add</span>
+                       Nueva Audiencia
+                     </button>
+                  </div>
+                  
+                  {audienciasGuardadas.length === 0 ? (
+                    <div className="text-center py-20 bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-slate-400">
+                       <span className="material-symbols-outlined text-5xl mb-3">groups</span>
+                       <p className="font-bold">Aún no tienes audiencias segmentadas.</p>
+                       <p className="text-sm">Personaliza filtros y guárdalos para lanzar campañas precisas.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                       {audienciasGuardadas.map(aud => (
+                         <div key={aud.id} className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all group">
+                            <div className="flex justify-between items-start mb-4">
+                               <div>
+                                  <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{aud.nombre}</h3>
+                                  <div className="flex items-center gap-1.5 mt-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full w-fit">
+                                     <span className="material-symbols-outlined text-[14px]">person</span>
+                                     <span className="text-xs font-bold">{aud.total_estimado} contactos</span>
+                                  </div>
+                               </div>
+                               <button 
+                                 onClick={() => eliminarAudiencia(aud.id)}
+                                 className="text-slate-300 hover:text-red-500 transition-colors"
+                               >
+                                 <span className="material-symbols-outlined text-[20px]">delete</span>
+                               </button>
+                            </div>
+                            
+                            <div className="space-y-2 mt-4 pt-4 border-t border-slate-100">
+                               {aud.filtro_estado !== 'Todos' && (
+                                 <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                    Estado: {aud.filtro_estado}
+                                 </div>
+                               )}
+                               {aud.filtro_curso !== 'Todos' && (
+                                 <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                                    Curso: {aud.filtro_curso}
+                                 </div>
+                               )}
+                               {(aud.filtro_edad_min || aud.filtro_edad_max) && (
+                                 <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                    Edad: {aud.filtro_edad_min || 0} - {aud.filtro_edad_max || '∞'} años
+                                 </div>
+                               )}
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="animate-fade-in-up">
+                  <div className="flex items-center gap-4 mb-6">
+                    <button onClick={() => setModoConstructor(false)} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200 transition-colors">
+                      <span className="material-symbols-outlined">arrow_back</span>
+                    </button>
+                    <h2 className="text-xl font-bold text-slate-800">Constructor de Audiencias</h2>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 {/* Panel de Filtros */}
-                 <div className="md:col-span-2 bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
-                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
-                     <span className="material-symbols-outlined text-blue-600">tune</span>
-                     Filtros de Segmentación
-                   </h3>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div className="flex flex-col gap-1.5">
-                       <label className="text-xs font-bold text-slate-500">Estado del Lead</label>
-                       <select 
-                         className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700"
-                         value={filtrosAud.estado} onChange={e => setFiltrosAud({...filtrosAud, estado: e.target.value})}
-                       >
-                         <option>Todos</option>
-                         <option value="nuevo">Nuevo</option>
-                         <option value="contactado">Contactado</option>
-                         <option value="en_proceso">En Proceso</option>
-                         <option value="agendado">Agendado</option>
-                         <option value="inscrito">Inscrito</option>
-                       </select>
-                     </div>
-                     <div className="flex flex-col gap-1.5">
-                       <label className="text-xs font-bold text-slate-500">Curso de Interés</label>
-                       <select 
-                         className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700"
-                         value={filtrosAud.curso} onChange={e => setFiltrosAud({...filtrosAud, curso: e.target.value})}
-                       >
-                         <option>Todos</option>
-                         {cursosDisponibles.map(c => (
-                           <option key={c.id} value={c.nombre}>{c.nombre}</option>
-                         ))}
-                       </select>
-                     </div>
-                     <div className="flex flex-col gap-1.5">
-                       <label className="text-xs font-bold text-slate-500">Edad Minima (Ej: 5)</label>
-                       <input 
-                         type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" 
-                         value={filtrosAud.edad_min} onChange={e => setFiltrosAud({...filtrosAud, edad_min: e.target.value})}
-                       />
-                     </div>
-                     <div className="flex flex-col gap-1.5">
-                       <label className="text-xs font-bold text-slate-500">Edad Máxima (Ej: 60)</label>
-                       <input 
-                         type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" 
-                         value={filtrosAud.edad_max} onChange={e => setFiltrosAud({...filtrosAud, edad_max: e.target.value})}
-                       />
-                     </div>
-                     <div className="flex flex-col gap-1.5 sm:col-span-2">
-                       <label className="text-xs font-bold text-slate-500">Flexibilidad de Horario</label>
-                       <select 
-                         className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700"
-                         value={filtrosAud.flexibilidad} onChange={e => setFiltrosAud({...filtrosAud, flexibilidad: e.target.value})}
-                       >
-                         <option>Indistinto</option>
-                         <option>Horario Fijo</option>
-                         <option>Horario Flexible</option>
-                       </select>
-                     </div>
-                   </div>
-                 </div>
-
-                 {/* Panel de Simulación (Estimador de Alcance) */}
-                 <div className="bg-gradient-to-br from-blue-600 to-[#00236f] p-6 rounded-2xl shadow-md text-white flex flex-col justify-center text-center relative overflow-hidden">
-                   <span className="material-symbols-outlined text-[120px] absolute -right-6 -bottom-6 opacity-10">radar</span>
-                   <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-2 z-10">Alcance Estimado</p>
-                   <p className="text-5xl font-black mb-4 z-10">{prospectosFiltrados.length}</p>
-                   <p className="text-sm text-blue-100 z-10">Prospectos coinciden con estos filtros en tu base de datos y podrían recibir la campaña.</p>
-                   {prospectosFiltrados.length > 0 && (
-                     <button className="mt-4 text-xs font-bold underline text-blue-200 hover:text-white z-10" onClick={() => document.getElementById('preview_aud').scrollIntoView()}>Ver Vista Previa</button>
-                   )}
-                 </div>
-              </div>
-
-              {/* Lista Previa Visual de los prospectos matcheados */}
-              {prospectosFiltrados.length > 0 && (
-                <div id="preview_aud" className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm mt-6">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4">Vista Previa de Audiencia Muestra (Primeros 15)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {prospectosFiltrados.slice(0, 15).map(p => (
-                      <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                            {(p.nombre_alumno || p.nombre || '?')[0].toUpperCase()}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-6">
+                      <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-sm">
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2">
+                          <span className="material-symbols-outlined text-blue-600">tune</span>
+                          Filtros de Segmentación
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-slate-500">Estado del Lead</label>
+                            <select 
+                              className="border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all font-semibold"
+                              value={filtrosAud.estado} onChange={e => setFiltrosAud({...filtrosAud, estado: e.target.value})}
+                            >
+                              <option>Todos</option>
+                              <option value="nuevo">Nuevo</option>
+                              <option value="contactado">Contactado</option>
+                              <option value="en_proceso">En Proceso</option>
+                              <option value="agendado">Agendado</option>
+                              <option value="inscrito">Inscrito</option>
+                            </select>
                           </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-700 truncate w-32">{p.nombre_alumno || p.nombre}</p>
-                            <p className="text-[10px] text-slate-500 truncate w-32">{p.telefono || 'Sin WhatsApp'}</p>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-slate-500">Diplomado de Interés</label>
+                            <select 
+                              className="border border-slate-200 rounded-xl p-3 text-sm bg-slate-50 text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 transition-all font-semibold"
+                              value={filtrosAud.curso} onChange={e => setFiltrosAud({...filtrosAud, curso: e.target.value})}
+                            >
+                              <option>Todos</option>
+                              {cursosDisponibles.map(c => (
+                                <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                              ))}
+                            </select>
                           </div>
                         </div>
-                        <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold uppercase">{p.estado}</span>
                       </div>
-                    ))}
+
+                      {prospectosFiltrados.length > 0 && (
+                        <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-sm">
+                          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-6">Muestra de Audiencia</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {prospectosFiltrados.slice(0, 10).map(p => (
+                              <div key={p.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                                  {(p.nombre_alumno || p.nombre || '?')[0].toUpperCase()}
+                                </div>
+                                <div className="overflow-hidden">
+                                  <p className="text-sm font-bold text-slate-800 truncate">{p.nombre_alumno || p.nombre}</p>
+                                  <p className="text-[11px] text-slate-500 font-medium">WhatsApp: {p.telefono}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="bg-gradient-to-br from-blue-600 to-[#00236f] p-8 rounded-3xl shadow-xl text-white relative overflow-hidden">
+                        <span className="material-symbols-outlined text-[160px] absolute -right-10 -bottom-10 opacity-10">groups</span>
+                        <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-4 relative z-10">Público Estimado</p>
+                        <p className="text-7xl font-black mb-6 relative z-10">{prospectosFiltrados.length}</p>
+                        <p className="text-sm text-blue-100/80 font-medium relative z-10 mb-8 leading-relaxed">
+                          Este es el número total de personas que cumplen con tus criterios de filtrado actuales.
+                        </p>
+                        <button 
+                          onClick={guardarAudienciaActual}
+                          disabled={prospectosFiltrados.length === 0}
+                          className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 ${prospectosFiltrados.length === 0 ? 'bg-white/10 text-white/30' : 'bg-white text-blue-600 hover:bg-blue-50 shadow-lg'}`}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">save</span>
+                          Guardar Segmentos
+                        </button>
+
+                        <button 
+                          onClick={dispararCampanaDinamica}
+                          disabled={prospectosFiltrados.length === 0}
+                          className={`w-full mt-4 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all relative z-10 border border-white/30 text-white hover:bg-white/10 ${prospectosFiltrados.length === 0 ? 'opacity-30' : ''}`}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
+                          Lanzar Campaña Directa
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

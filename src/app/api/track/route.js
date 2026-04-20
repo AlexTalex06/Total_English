@@ -17,9 +17,12 @@ export async function GET(request) {
           actualizado_en: new Date().toISOString() 
         })
         .eq('id', prospectoId)
-
-      // Opcional: Podrías insertar en una tabla "logs_campanas" si deseas granularidad
-      // await supabase.from('logs_campanas').insert({ prospecto_id: prospectoId, campana_id: campanaId, accion: 'click' })
+      
+      // 2. Incrementar contador de interacciones en la campaña para métricas reales
+      const { data: c } = await supabase.from('campanas').select('interacciones').eq('id', campanaId).single();
+      if (c) {
+        await supabase.from('campanas').update({ interacciones: (c.interacciones || 0) + 1 }).eq('id', campanaId);
+      }
 
     } catch (e) {
       console.warn('⚠️ Error silencioso al registrar tracking de campaña:', e.message)

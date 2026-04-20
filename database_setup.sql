@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS prospectos (
   lead_score text DEFAULT 'FRÍO', -- CALIENTE, TIBIO, FRIO
   pipeline_stage text DEFAULT 'nuevos', -- Kanban phase
   ultimo_contacto timestamp with time zone,
-  creado_en timestamp with time zone DEFAULT timezone('utc'::text, now())
+  notas_internas text, -- Para recomendación 5 (Colaboración)
+  creado_en timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  actualizado_en timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
 -- 4. Tabla de Citas

@@ -253,6 +253,18 @@ export default function PaginaInbox() {
     return `${dias}d`
   }
 
+  const guardarNotaInterna = async (idProspecto, nota) => {
+    try {
+      await supabase.from('prospectos').update({ notas_internas: nota }).eq('id', idProspecto)
+      // Recargar prospectos relacionados para ver reflejada la nota
+      if (chatActivo.prospectos) {
+         cargarProspectosRelacionados(chatActivo.id_plataforma)
+      }
+    } catch (e) {
+      console.error('Error guardando nota:', e)
+    }
+  }
+
   // Group messages by date
   const agruparMensajesPorFecha = (msgs) => {
     const grupos = []
@@ -719,33 +731,30 @@ export default function PaginaInbox() {
             </div>
           )}
 
-          {/* Single prospect appointments */}
-          {prospectosRelacionados.length <= 1 && prospectosRelacionados[0]?.citas?.length > 0 && (
-            <div className="p-4 border-b border-slate-100">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">event</span>
-                Citas
-              </h4>
-              <div className="space-y-2">
-                {prospectosRelacionados[0].citas.map(cita => (
-                  <div key={cita.id} className="bg-slate-50 rounded-lg p-2.5 flex items-center justify-between border border-slate-100">
-                    <div className="text-[12px]">
-                      <span className="font-semibold text-slate-700">{cita.fecha}</span>
-                      <span className="text-slate-400 ml-1">{cita.hora}</span>
-                    </div>
-                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                      cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' :
-                      cita.estado === 'completada' ? 'bg-blue-100 text-blue-700' :
-                      cita.estado === 'cancelada' ? 'bg-red-100 text-red-700' :
-                      'bg-amber-100 text-amber-700'
-                    }`}>{cita.estado}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
+
+          {/* INTERNAL NOTES (Colaboración) */}
+          <div className="p-4 border-b border-slate-100 flex-1 flex flex-col">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">sticky_note_2</span>
+              Notas Internas (Colaboración)
+            </h4>
+            <textarea
+              className="w-full h-32 bg-amber-50/50 rounded-xl border border-amber-100 p-3 text-[12px] text-slate-800 outline-none focus:bg-amber-50 transition-colors placeholder:text-slate-400"
+              placeholder="Escribe comentarios privados aquí (ej: Prefiere que le marquemos por la tarde)..."
+              defaultValue={chatActivo.prospectos?.notas_internas || ''}
+              onBlur={(e) => {
+                if (e.target.value !== (chatActivo.prospectos?.notas_internas || '')) {
+                  guardarNotaInterna(chatActivo.prospectos?.id, e.target.value)
+                }
+              }}
+            ></textarea>
+            <p className="text-[9px] text-slate-400 mt-2 italic">Estas notas solo son visibles para los asesores del CRM.</p>
+          </div>
         </div>
       )}
+
 
       {/* MODAL: Nuevo Chat */}
       {modalNuevoChat && (

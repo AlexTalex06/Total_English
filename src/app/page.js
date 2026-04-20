@@ -117,27 +117,53 @@ export default function PaginaPanel() {
           </div>
         </div>
 
-        {/* Tarjeta de Insight */}
+        {/* Tarjeta de Insight (Funnel) */}
         <div className="bg-[#1e3a8a] rounded-xl p-8 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-[#00236f] to-[#1e3a8a] opacity-90 -z-10"></div>
           <div className="z-10">
-            <span className="material-symbols-outlined text-4xl mb-4">auto_awesome</span>
-            <h3 className="text-2xl font-bold leading-tight mb-4">Resumen del Sistema</h3>
-            <p className="text-blue-200 font-medium opacity-90 leading-relaxed mb-6">
-              Tu sistema está listo para gestionar prospectos, cursos y citas. Comienza agregando datos para ver las métricas en acción.
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+               <span className="material-symbols-outlined">filter_alt</span>
+               Funnel de Conversión
+            </h3>
+            
+            <div className="space-y-4">
+               {/* Paso 1: Nuevos */}
+               <div>
+                  <div className="flex justify-between text-xs font-bold uppercase mb-1">
+                     <span>Leads Nuevos</span>
+                     <span>{Math.round((prospectos.filter(p => p.estado === 'nuevo').length / (prospectos.length || 1)) * 100)}%</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                     <div className="h-full bg-blue-400" style={{ width: `${(prospectos.filter(p => p.estado === 'nuevo').length / (prospectos.length || 1)) * 100}%` }}></div>
+                  </div>
+               </div>
+
+               {/* Paso 2: Agendados */}
+               <div>
+                  <div className="flex justify-between text-xs font-bold uppercase mb-1">
+                     <span>Citas Agendadas</span>
+                     <span>{Math.round((prospectos.filter(p => p.estado === 'agendado').length / (prospectos.length || 1)) * 100)}%</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                     <div className="h-full bg-amber-400" style={{ width: `${(prospectos.filter(p => p.estado === 'agendado').length / (prospectos.length || 1)) * 100}%` }}></div>
+                  </div>
+               </div>
+
+               {/* Paso 3: Inscritos */}
+               <div>
+                  <div className="flex justify-between text-xs font-bold uppercase mb-1 font-black text-emerald-300">
+                     <span>Inscripciones</span>
+                     <span>{Math.round((prospectos.filter(p => p.estado === 'cerrado' || p.estado === 'convertido').length / (prospectos.length || 1)) * 100)}%</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                     <div className="h-full bg-emerald-400" style={{ width: `${(prospectos.filter(p => p.estado === 'cerrado' || p.estado === 'convertido').length / (prospectos.length || 1)) * 100}%` }}></div>
+                  </div>
+               </div>
+            </div>
+
+            <p className="text-[11px] text-blue-200 mt-6 leading-relaxed opacity-80">
+              * Tasas calculadas en tiempo real para toda la base de datos de Total English.
             </p>
-            <Link href="/campanas" className="inline-block bg-white text-[#00236f] px-6 py-3 rounded-lg font-bold text-sm hover:bg-blue-50 transition-colors">
-              Crear Campaña
-            </Link>
-          </div>
-          <div className="mt-8 border-t border-white/10 pt-6">
-            <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest opacity-60">
-              <span>Estado del Sistema</span>
-              <span>Óptimo</span>
-            </div>
-            <div className="mt-2 h-2 bg-white/20 rounded-full overflow-hidden">
-              <div className="h-full bg-white w-4/5 rounded-full"></div>
-            </div>
           </div>
         </div>
       </div>
