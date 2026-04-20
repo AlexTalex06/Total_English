@@ -406,7 +406,8 @@ export default function PaginaInbox() {
                       </span>
                       <button 
                         onClick={(e) => eliminarConversacion(e, conv.id)}
-                        className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                        className="material-symbols-outlined text-[18px] text-slate-300 hover:text-red-500 transition-colors p-1"
+                        title="Eliminar conversación"
                       >
                         delete
                       </button>
@@ -456,6 +457,16 @@ export default function PaginaInbox() {
               >
                 <span className="material-symbols-outlined text-[12px] mr-1 align-middle">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
                 {chatActivo.asignado_a_humano ? 'HUMANO' : 'ALEX IA'}
+              </button>
+
+              <div className="w-px h-6 bg-slate-200 mx-1"></div>
+
+              <button
+                onClick={(e) => eliminarConversacion(e, chatActivo.id)}
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                title="Eliminar esta conversación"
+              >
+                <span className="material-symbols-outlined">delete</span>
               </button>
             </div>
           </div>

@@ -13,7 +13,7 @@ export default function PaginaProspectos() {
   const [prospectoSeleccionado, setProspectoSeleccionado] = useState(null)
   const [modalAbierto, setModalAbierto] = useState(false)
   const [prospectoEditando, setProspectoEditando] = useState(null)
-  const [vista, setVista] = useState('kanban') // Poner kanban por defecto como evolución
+  const [vista, setVista] = useState('tabla') // Lista por defecto
   const { setUltimoToast } = useNotifications()
 
   const camposProspecto = [
@@ -77,7 +77,7 @@ export default function PaginaProspectos() {
   }
 
   const handleDeleteProspecto = async (id) => {
-    if (!confirm('¿Estás seguro de eliminar este prospecto permanentemente? Se borrarán también sus conversaciones y mensajes. Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Estás seguro de eliminar este prospecto? Las conversaciones se mantendrán pero dejarán de estar vinculadas a este registro. Esta acción no se puede deshacer.')) return
     try {
       const res = await fetch(`/api/prospectos?id=${id}`, { method: 'DELETE' })
       if (!res.ok) {
