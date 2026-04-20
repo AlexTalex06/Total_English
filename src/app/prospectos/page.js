@@ -77,16 +77,19 @@ export default function PaginaProspectos() {
   }
 
   const handleDeleteProspecto = async (id) => {
-    if (!confirm('¿Estás seguro de eliminar este prospecto permanentemente? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Estás seguro de eliminar este prospecto permanentemente? Se borrarán también sus conversaciones y mensajes. Esta acción no se puede deshacer.')) return
     try {
-      const { error } = await supabase.from('prospectos').delete().eq('id', id)
-      if (error) throw error
+      const res = await fetch(`/api/prospectos?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error desconocido')
+      }
       setUltimoToast({ tipo: 'exito', titulo: 'Eliminado', mensaje: 'Prospecto eliminado correctamente' })
       setProspectoSeleccionado(null)
       cargarProspectos()
     } catch (error) {
       console.error('Error eliminando:', error)
-      setUltimoToast({ tipo: 'error', titulo: 'Error', mensaje: 'No se pudo eliminar el prospecto' })
+      setUltimoToast({ tipo: 'error', titulo: 'Error', mensaje: error.message || 'No se pudo eliminar el prospecto' })
     }
   }
 

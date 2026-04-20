@@ -291,11 +291,11 @@ export default function PaginaInbox() {
     e.stopPropagation()
     if (!confirm('¿Seguro que quieres eliminar esta conversación? Se borrarán todos los mensajes.')) return
     try {
-      // 1. Borrar mensajes
-      await supabase.from('mensajes').delete().eq('conversacion_id', id)
-      // 2. Borrar conversación
-      await supabase.from('conversaciones').delete().eq('id', id)
-      
+      const res = await fetch(`/api/conversaciones?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Error desconocido')
+      }
       if (chatActivo?.id === id) setChatActivo(null)
       cargarConversaciones()
     } catch (err) { console.error('Error eliminando:', err) }
@@ -625,11 +625,35 @@ export default function PaginaInbox() {
                   <span className="material-symbols-outlined text-[#00a884] text-[20px]">image</span>
                   <span className="text-[13px] font-medium">Fotos y Videos</span>
                 </button>
-                <button type="button" onClick={() => { alert('Función de Documentos en desarrollo'); setMostrarClipMenu(false); }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                <button type="button" onClick={() => {
+                  const url = prompt('Ingresa la URL pública del documento (PDF, DOC, etc.):')
+                  if (url && url.startsWith('http')) {
+                    enviarMensaje(null, url)
+                  } else if (url) {
+                    alert('Por favor ingresa una URL válida que empiece con http')
+                  }
+                  setMostrarClipMenu(false)
+                }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
                   <span className="material-symbols-outlined text-[#7f66ff] text-[20px]">description</span>
                   <span className="text-[13px] font-medium">Documento</span>
                 </button>
-                <button type="button" onClick={() => { alert('Función de Ubicación en desarrollo'); setMostrarClipMenu(false); }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                <button type="button" onClick={async () => {
+                  if (!chatActivo) return
+                  const ubicacion = '🏫 Total English School\n📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima\n🗺️ https://share.google/e08MtvtfxfbGAKmz1\n🕒 Lun-Vie 2-9pm | Sáb 8am-2pm'
+                  try {
+                    const res = await fetch('/api/enviar-mensaje', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ to: chatActivo.id_plataforma, text: ubicacion, plataforma: 'whatsapp' })
+                    })
+                    if (res.ok) {
+                      await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: ubicacion, tipo: 'texto' })
+                      await supabase.from('conversaciones').update({ ultimo_mensaje: '📍 Ubicación enviada', actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
+                      cargarMensajes(chatActivo.id)
+                    }
+                  } catch (err) { console.error(err) }
+                  setMostrarClipMenu(false)
+                }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
                   <span className="material-symbols-outlined text-[#f05950] text-[20px]">location_on</span>
                   <span className="text-[13px] font-medium">Ubicación</span>
                 </button>
