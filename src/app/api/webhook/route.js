@@ -238,6 +238,8 @@ export async function POST(solicitud) {
               if (datos.horario) updateData.horario = datos.horario;
               if (datos.curso_interes) updateData.curso_interes = datos.curso_interes;
               if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
+              if (datos.parentesco) updateData.parentesco = datos.parentesco;
+              if (datos.lead_score) updateData.lead_score = datos.lead_score;
 
               const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
               if (crmError) console.error('Error actualizando prospecto:', crmError.message);
