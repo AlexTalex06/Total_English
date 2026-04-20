@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/componentes/AuthProvider'
 
 // Emojis frecuentes para el picker rápido
-const EMOJIS_RAPIDOS = ['😊','👍','❤️','🎉','🙌','😄','🤔','👋','✅','🔥','💪','📚','⭐','🎓','💯','😃','🙏','👏','📝','🏫']
+const EMOJIS_RAPIDOS = ['😊', '👍', '❤️', '🎉', '🙌', '😄', '🤔', '👋', '✅', '🔥', '💪', '📚', '⭐', '🎓', '💯', '😃', '🙏', '👏', '📝', '🏫']
 
 export default function PaginaInbox() {
   const { token } = useAuth()
@@ -132,9 +132,9 @@ export default function PaginaInbox() {
         body: JSON.stringify(payload)
       })
       if (res.ok) {
-        await supabase.from('mensajes').insert({ 
-          conversacion_id: chatActivo.id, 
-          remitente: 'humano', 
+        await supabase.from('mensajes').insert({
+          conversacion_id: chatActivo.id,
+          remitente: 'humano',
           contenido: texto,
           tipo: imageUrl ? 'imagen' : 'texto',
           url_archivo: imageUrl || null
@@ -181,11 +181,11 @@ export default function PaginaInbox() {
     setToggling(true)
     const nuevoValor = !chatActivo.asignado_a_humano
     let updates = { asignado_a_humano: nuevoValor }
-    
+
     // Si lo estamos devolviendo al bot (o tomando siendo humano), limpiamos la alerta
     if (!nuevoValor || chatActivo.escalation_reason) {
-        updates.escalation_reason = null
-        updates.escalation_category = null
+      updates.escalation_reason = null
+      updates.escalation_category = null
     }
 
     await supabase.from('conversaciones').update(updates).eq('id', chatActivo.id)
@@ -196,10 +196,10 @@ export default function PaginaInbox() {
   const resolverEscalamiento = async () => {
     if (!chatActivo || toggling) return;
     setToggling(true);
-    let updates = { 
-        asignado_a_humano: true,
-        escalation_reason: null, 
-        escalation_category: null 
+    let updates = {
+      asignado_a_humano: true,
+      escalation_reason: null,
+      escalation_category: null
     };
     await supabase.from('conversaciones').update(updates).eq('id', chatActivo.id);
     setChatActivo(prev => ({ ...prev, ...updates }));
@@ -232,9 +232,9 @@ export default function PaginaInbox() {
     setNombreNuevo('')
   }
 
-  const conversacionesFiltradas = conversaciones.filter(c => 
-    (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
-    (c.prospectos?.nombre_alumno || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) || 
+  const conversacionesFiltradas = conversaciones.filter(c =>
+    (c.prospectos?.nombre || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
+    (c.prospectos?.nombre_alumno || '').toLowerCase().includes(filtroBusqueda.toLowerCase()) ||
     c.id_plataforma.includes(filtroBusqueda)
   )
 
@@ -258,7 +258,7 @@ export default function PaginaInbox() {
       await supabase.from('prospectos').update({ notas_internas: nota }).eq('id', idProspecto)
       // Recargar prospectos relacionados para ver reflejada la nota
       if (chatActivo.prospectos) {
-         cargarProspectosRelacionados(chatActivo.id_plataforma)
+        cargarProspectosRelacionados(chatActivo.id_plataforma)
       }
     } catch (e) {
       console.error('Error guardando nota:', e)
@@ -286,7 +286,7 @@ export default function PaginaInbox() {
 
   return (
     <div className="h-[calc(100vh-65px)] w-full flex overflow-hidden bg-[#eae6df] font-sans">
-      
+
       {/* 1. SIDEBAR DE CONVERSACIONES */}
       <div className={`${chatActivo ? 'hidden md:flex' : 'flex'} w-full md:w-[340px] lg:w-[380px] bg-white border-r border-slate-200/80 flex-col h-full shrink-0`}>
         {/* Header Sidebar */}
@@ -297,8 +297,8 @@ export default function PaginaInbox() {
             </div>
             <h2 className="text-[16px] font-bold text-[#1e3a8a]">Inbox Alex</h2>
           </div>
-          <button 
-            onClick={() => setModalNuevoChat(true)} 
+          <button
+            onClick={() => setModalNuevoChat(true)}
             className="w-9 h-9 rounded-full hover:bg-slate-200/80 flex items-center justify-center transition-colors"
             title="Nuevo chat"
           >
@@ -310,12 +310,12 @@ export default function PaginaInbox() {
         <div className="p-2 bg-[#f0f2f5]">
           <div className="bg-white rounded-lg px-3 py-2 flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px] text-slate-400">search</span>
-            <input 
-              type="text" 
-              placeholder="Buscar o empezar un chat nuevo" 
-              className="bg-transparent w-full text-sm outline-none text-slate-700 placeholder:text-slate-400" 
-              value={filtroBusqueda} 
-              onChange={(e) => setFiltroBusqueda(e.target.value)} 
+            <input
+              type="text"
+              placeholder="Buscar o empezar un chat nuevo"
+              className="bg-transparent w-full text-sm outline-none text-slate-700 placeholder:text-slate-400"
+              value={filtroBusqueda}
+              onChange={(e) => setFiltroBusqueda(e.target.value)}
             />
           </div>
         </div>
@@ -331,17 +331,15 @@ export default function PaginaInbox() {
             const unreadCount = conv.mensajes?.filter(m => !m.leido && m.remitente === 'usuario').length || 0
             const isActive = chatActivo?.id === conv.id
             return (
-              <div 
-                key={conv.id} 
-                onClick={() => cambiarChat(conv)} 
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all hover:bg-[#f5f6f6] ${
-                  isActive ? 'bg-[#f0f2f5]' : ''
-                }`}
+              <div
+                key={conv.id}
+                onClick={() => cambiarChat(conv)}
+                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all hover:bg-[#f5f6f6] ${isActive ? 'bg-[#f0f2f5]' : ''
+                  }`}
               >
                 <div className="relative">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm uppercase ${
-                    isActive ? 'bg-[#1e3a8a] text-white' : 'bg-gradient-to-br from-slate-500 to-slate-700 text-white'
-                  }`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm uppercase ${isActive ? 'bg-[#1e3a8a] text-white' : 'bg-gradient-to-br from-slate-500 to-slate-700 text-white'
+                    }`}>
                     {(conv.prospectos?.nombre_alumno || conv.prospectos?.nombre)?.[0] || '?'}
                   </div>
                   {unreadCount > 0 && (
@@ -394,12 +392,11 @@ export default function PaginaInbox() {
             </div>
             <div className="flex items-center gap-2">
               {/* Bot/Human Toggle */}
-              <button 
+              <button
                 onClick={toggleBotHumano}
                 disabled={toggling}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 ${
-                  chatActivo.asignado_a_humano ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#00a884] hover:bg-[#008f72]'
-                } disabled:opacity-50`}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-bold text-white shadow-sm transition-all active:scale-95 ${chatActivo.asignado_a_humano ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#00a884] hover:bg-[#008f72]'
+                  } disabled:opacity-50`}
                 title={chatActivo.asignado_a_humano ? 'Cambiar a Bot' : 'Tomar control manual'}
               >
                 <span className="material-symbols-outlined text-[12px] mr-1 align-middle">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
@@ -416,12 +413,12 @@ export default function PaginaInbox() {
                 <div>
                   <h4 className="text-[13px] font-bold text-red-800">ATENCIÓN REQUERIDA</h4>
                   <p className="text-[12px] text-red-600 leading-tight">
-                    Alex pausó esta conversación por el siguiente motivo: <br/>
-                    <strong className="text-red-900">"{chatActivo.escalation_reason}"</strong> 
+                    Alex pausó esta conversación por el siguiente motivo: <br />
+                    <strong className="text-red-900">"{chatActivo.escalation_reason}"</strong>
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={resolverEscalamiento}
                 disabled={toggling}
                 className="bg-white border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-semibold px-4 py-1.5 rounded-lg text-xs shadow-sm whitespace-nowrap transition-colors"
@@ -433,9 +430,9 @@ export default function PaginaInbox() {
           )}
 
           {/* Messages */}
-          <div 
-            className="flex-1 overflow-y-auto px-4 py-2 md:px-16" 
-            style={{ 
+          <div
+            className="flex-1 overflow-y-auto px-4 py-2 md:px-16"
+            style={{
               backgroundColor: '#efeae2',
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cdefs%3E%3Cstyle%3E.a%7Bfill:%23ddd6c8;opacity:0.15%7D%3C/style%3E%3C/defs%3E%3Cpath class='a' d='M20 10 Q25 5 30 10 Q25 15 20 10Z'/%3E%3Cpath class='a' d='M60 40 Q65 35 70 40 Q65 45 60 40Z'/%3E%3Cpath class='a' d='M140 20 Q145 15 150 20 Q145 25 140 20Z'/%3E%3Cpath class='a' d='M100 80 Q105 75 110 80 Q105 85 100 80Z'/%3E%3Cpath class='a' d='M30 120 Q35 115 40 120 Q35 125 30 120Z'/%3E%3Cpath class='a' d='M170 70 Q175 65 180 70 Q175 75 170 70Z'/%3E%3Cpath class='a' d='M80 150 Q85 145 90 150 Q85 155 80 150Z'/%3E%3Cpath class='a' d='M150 130 Q155 125 160 130 Q155 135 150 130Z'/%3E%3Cpath class='a' d='M10 170 Q15 165 20 170 Q15 175 10 170Z'/%3E%3Cpath class='a' d='M120 180 Q125 175 130 180 Q125 185 120 180Z'/%3E%3Ccircle class='a' cx='50' cy='95' r='3'/%3E%3Ccircle class='a' cx='180' cy='160' r='2'/%3E%3Ccircle class='a' cx='90' cy='25' r='2'/%3E%3Crect class='a' x='150' y='90' width='6' height='4' rx='1'/%3E%3Crect class='a' x='20' y='60' width='5' height='3' rx='1'/%3E%3C/svg%3E")`,
             }}
@@ -460,13 +457,13 @@ export default function PaginaInbox() {
                       </div>
                     )
                   }
-                  
+
                   const msj = item.data
                   const esBot = msj.remitente === 'bot'
                   const esHumano = msj.remitente === 'humano'
                   const soyYo = esBot || esHumano
                   const esImagen = msj.tipo === 'imagen' || msj.url_archivo
-                  
+
                   return (
                     <div key={msj.id} className={`flex w-full ${soyYo ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[65%] relative group`}>
@@ -483,25 +480,23 @@ export default function PaginaInbox() {
                             <span className="material-symbols-outlined text-[10px] text-blue-500">person</span>
                           </div>
                         )}
-                        
+
                         {/* Message bubble */}
-                        <div className={`px-3 py-2 text-[13.5px] leading-relaxed shadow-sm relative ${
-                          esBot ? 'bg-[#d9fdd3] text-[#111b21] rounded-lg rounded-tr-none' :
-                          esHumano ? 'bg-[#d9fdd3] text-[#111b21] rounded-lg rounded-tr-none' :
-                          'bg-white text-[#111b21] rounded-lg rounded-tl-none'
-                        }`}>
-                          {/* Tail */}
-                          <div className={`absolute top-0 w-3 h-3 ${
-                            soyYo ? '-right-1.5 text-[#d9fdd3]' : '-left-1.5 text-white'
+                        <div className={`px-3 py-2 text-[13.5px] leading-relaxed shadow-sm relative ${esBot ? 'bg-[#d9fdd3] text-[#111b21] rounded-lg rounded-tr-none' :
+                            esHumano ? 'bg-[#d9fdd3] text-[#111b21] rounded-lg rounded-tr-none' :
+                              'bg-white text-[#111b21] rounded-lg rounded-tl-none'
                           }`}>
+                          {/* Tail */}
+                          <div className={`absolute top-0 w-3 h-3 ${soyYo ? '-right-1.5 text-[#d9fdd3]' : '-left-1.5 text-white'
+                            }`}>
                             <svg viewBox="0 0 8 13" className={`w-full h-full ${soyYo ? 'fill-[#d9fdd3]' : 'fill-white'}`}>
-                              {soyYo 
-                                ? <path d="M1,0 L8,0 L8,13 C5,10 2,6 1,0Z" /> 
+                              {soyYo
+                                ? <path d="M1,0 L8,0 L8,13 C5,10 2,6 1,0Z" />
                                 : <path d="M7,0 L0,0 L0,13 C3,10 6,6 7,0Z" />
                               }
                             </svg>
                           </div>
-                          
+
                           {esImagen && msj.url_archivo ? (
                             <div className="flex flex-col gap-2">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -511,10 +506,10 @@ export default function PaginaInbox() {
                           ) : (
                             <p className="whitespace-pre-wrap">{msj.contenido}</p>
                           )}
-                          
+
                           {/* Timestamp + checks */}
                           <span className={`text-[10px] float-right ml-3 mt-1 flex items-center gap-0.5 ${soyYo ? 'text-slate-500/70' : 'text-slate-400'}`}>
-                            {new Date(msj.creado_en).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                            {new Date(msj.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             {soyYo && (
                               <span className={`material-symbols-outlined text-[14px] ${msj.leido ? 'text-[#53bdeb]' : 'text-slate-400/60'}`}>
                                 done_all
@@ -533,16 +528,16 @@ export default function PaginaInbox() {
                     <div className="bg-white rounded-lg rounded-tl-none px-4 py-3 shadow-sm">
                       <div className="flex items-center gap-1.5">
                         <div className="flex gap-1">
-                          <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
-                          <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
-                          <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
+                          <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                         </div>
                         <span className="text-[10px] text-slate-400 ml-1">Alex está escribiendo...</span>
                       </div>
                     </div>
                   </div>
                 )}
-                
+
                 <div ref={scrollRef}></div>
               </div>
             )}
@@ -553,8 +548,8 @@ export default function PaginaInbox() {
             <div className="bg-[#f0f2f5] px-4 py-3 border-t border-slate-200/50">
               <div className="flex flex-wrap gap-1.5">
                 {EMOJIS_RAPIDOS.map(emoji => (
-                  <button 
-                    key={emoji} 
+                  <button
+                    key={emoji}
                     onClick={() => insertarEmoji(emoji)}
                     className="w-9 h-9 rounded-lg hover:bg-white flex items-center justify-center text-xl transition-colors active:scale-90"
                   >
@@ -567,32 +562,32 @@ export default function PaginaInbox() {
 
           {/* Message Input */}
           <form onSubmit={enviarMensaje} className="px-4 py-2.5 bg-[#f0f2f5] flex items-end gap-2">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setMostrarEmojis(!mostrarEmojis)}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0 ${mostrarEmojis ? 'text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <span className="material-symbols-outlined text-[24px]">mood</span>
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shrink-0"
               title="Adjuntar archivo por URL"
               onClick={enviarImagenPorURL}
             >
               <span className="material-symbols-outlined text-[24px] rotate-45">attach_file</span>
             </button>
-            <textarea 
+            <textarea
               ref={textareaRef}
-              value={nuevoMensaje} 
-              onChange={(e) => setNuevoMensaje(e.target.value)} 
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }} 
-              placeholder="Escribe un mensaje" 
-              className="flex-1 bg-white rounded-lg px-4 py-2.5 outline-none resize-none text-[14px] text-[#111b21] placeholder:text-slate-400 focus:ring-0 border-none shadow-sm" 
-              rows={1} 
+              value={nuevoMensaje}
+              onChange={(e) => setNuevoMensaje(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje(e); } }}
+              placeholder="Escribe un mensaje"
+              className="flex-1 bg-white rounded-lg px-4 py-2.5 outline-none resize-none text-[14px] text-[#111b21] placeholder:text-slate-400 focus:ring-0 border-none shadow-sm"
+              rows={1}
             />
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-[#1e3a8a] transition-colors shrink-0"
             >
               <span className="material-symbols-outlined text-[24px]">{nuevoMensaje.trim() ? 'send' : 'mic'}</span>
@@ -626,11 +621,10 @@ export default function PaginaInbox() {
             <h3 className="text-[18px] font-bold text-white">{chatActivo.prospectos?.nombre_alumno || chatActivo.prospectos?.nombre || 'Prospecto'}</h3>
             <p className="text-[12px] text-blue-200 mt-0.5">{chatActivo.id_plataforma}</p>
             {chatActivo.prospectos?.lead_score && (
-              <div className={`mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                chatActivo.prospectos.lead_score === 'CALIENTE' ? 'bg-red-500/20 text-red-200' : 
-                chatActivo.prospectos.lead_score === 'TIBIO' ? 'bg-amber-500/20 text-amber-200' : 
-                'bg-white/10 text-white/70'
-              }`}>
+              <div className={`mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase ${chatActivo.prospectos.lead_score === 'CALIENTE' ? 'bg-red-500/20 text-red-200' :
+                  chatActivo.prospectos.lead_score === 'TIBIO' ? 'bg-amber-500/20 text-amber-200' :
+                    'bg-white/10 text-white/70'
+                }`}>
                 {chatActivo.prospectos.lead_score}
               </div>
             )}
@@ -639,17 +633,17 @@ export default function PaginaInbox() {
           {/* Quick Actions */}
           <div className="p-4 border-b border-slate-100">
             <div className="grid grid-cols-4 gap-2">
-              <button onClick={() => { if(chatActivo.prospectos?.estado !== 'contactado') { supabase.from('prospectos').update({estado:'contactado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); } }}
+              <button onClick={() => { if (chatActivo.prospectos?.estado !== 'contactado') { supabase.from('prospectos').update({ estado: 'contactado' }).eq('id', chatActivo.prospectos?.id).then(() => cargarConversaciones()); } }}
                 className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-blue-50 transition-colors bg-white border border-slate-100">
                 <span className="material-symbols-outlined text-[16px] text-[#1e3a8a]">call</span>
                 <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Contactado</span>
               </button>
-              <button onClick={() => { supabase.from('prospectos').update({estado:'agendado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); }}
+              <button onClick={() => { supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', chatActivo.prospectos?.id).then(() => cargarConversaciones()); }}
                 className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors bg-white border border-slate-100">
                 <span className="material-symbols-outlined text-[16px] text-orange-600">event_available</span>
                 <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Agendar</span>
               </button>
-              <button onClick={() => { supabase.from('prospectos').update({estado:'cerrado'}).eq('id',chatActivo.prospectos?.id).then(()=>cargarConversaciones()); }}
+              <button onClick={() => { supabase.from('prospectos').update({ estado: 'cerrado' }).eq('id', chatActivo.prospectos?.id).then(() => cargarConversaciones()); }}
                 className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-green-50 transition-colors bg-white border border-slate-100">
                 <span className="material-symbols-outlined text-[16px] text-green-600">verified</span>
                 <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Cerrar</span>
@@ -699,12 +693,11 @@ export default function PaginaInbox() {
                   <div key={p.id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[13px] font-bold text-slate-800">{p.nombre_alumno || p.nombre}</span>
-                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                        p.estado === 'agendado' ? 'bg-green-100 text-green-700' :
-                        p.estado === 'en_proceso' ? 'bg-blue-100 text-blue-700' :
-                        p.estado === 'contactado' ? 'bg-amber-100 text-amber-700' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>{p.estado}</span>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.estado === 'agendado' ? 'bg-green-100 text-green-700' :
+                          p.estado === 'en_proceso' ? 'bg-blue-100 text-blue-700' :
+                            p.estado === 'contactado' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-600'
+                        }`}>{p.estado}</span>
                     </div>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
                       {p.edad && <span>{p.edad} años</span>}
@@ -718,9 +711,8 @@ export default function PaginaInbox() {
                           <div key={cita.id} className="flex items-center gap-1.5 text-[10px] bg-white rounded p-1.5 border border-slate-100">
                             <span className="material-symbols-outlined text-[12px] text-[#1e3a8a]">event</span>
                             <span className="text-slate-600 font-medium">{cita.fecha} {cita.hora}</span>
-                            <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ml-auto ${
-                              cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                            }`}>{cita.estado}</span>
+                            <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ml-auto ${cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                              }`}>{cita.estado}</span>
                           </div>
                         ))}
                       </div>
@@ -731,79 +723,82 @@ export default function PaginaInbox() {
             </div>
           )}
 
-            </div>
-          )}
-
-          {/* INTERNAL NOTES (Colaboración) */}
-          <div className="p-4 border-b border-slate-100 flex-1 flex flex-col">
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">sticky_note_2</span>
-              Notas Internas (Colaboración)
-            </h4>
-            <textarea
-              className="w-full h-32 bg-amber-50/50 rounded-xl border border-amber-100 p-3 text-[12px] text-slate-800 outline-none focus:bg-amber-50 transition-colors placeholder:text-slate-400"
-              placeholder="Escribe comentarios privados aquí (ej: Prefiere que le marquemos por la tarde)..."
-              defaultValue={chatActivo.prospectos?.notas_internas || ''}
-              onBlur={(e) => {
-                if (e.target.value !== (chatActivo.prospectos?.notas_internas || '')) {
-                  guardarNotaInterna(chatActivo.prospectos?.id, e.target.value)
-                }
-              }}
-            ></textarea>
-            <p className="text-[9px] text-slate-400 mt-2 italic">Estas notas solo son visibles para los asesores del CRM.</p>
-          </div>
         </div>
       )}
 
-
-      {/* MODAL: Nuevo Chat */}
-      {modalNuevoChat && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalNuevoChat(false)}></div>
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-[fadeIn_0.2s_ease-out]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-[#1e3a8a]">Nuevo Chat</h2>
-              <button onClick={() => setModalNuevoChat(false)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100">
-                <span className="material-symbols-outlined text-slate-400">close</span>
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">Número de WhatsApp</label>
-                <input 
-                  type="tel" 
-                  placeholder="Ej: 5213412345678" 
-                  className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
-                  value={telefonoNuevo}
-                  onChange={(e) => setTelefonoNuevo(e.target.value)}
-                />
-                <span className="text-[11px] text-slate-400">Con código de país sin + (Ej: 521 para México móvil)</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-slate-700">Nombre (opcional)</label>
-                <input 
-                  type="text" 
-                  placeholder="Ej: Juan Pérez" 
-                  className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
-                  value={nombreNuevo}
-                  onChange={(e) => setNombreNuevo(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button onClick={() => setModalNuevoChat(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-                  Cancelar
-                </button>
-                <button 
-                  onClick={crearNuevoChat}
-                  className="px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg hover:opacity-90 transition-all active:scale-95"
-                >
-                  Iniciar Chat
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* INTERNAL NOTES (Colaboración) */}
+      <div className="p-4 border-b border-slate-100 flex-1 flex flex-col">
+        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+          <span className="material-symbols-outlined text-[14px]">sticky_note_2</span>
+          Notas Internas (Colaboración)
+        </h4>
+        <textarea
+          className="w-full h-32 bg-amber-50/50 rounded-xl border border-amber-100 p-3 text-[12px] text-slate-800 outline-none focus:bg-amber-50 transition-colors placeholder:text-slate-400"
+          placeholder="Escribe comentarios privados aquí (ej: Prefiere que le marquemos por la tarde)..."
+          defaultValue={chatActivo.prospectos?.notas_internas || ''}
+          onBlur={(e) => {
+            if (e.target.value !== (chatActivo.prospectos?.notas_internas || '')) {
+              guardarNotaInterna(chatActivo.prospectos?.id, e.target.value)
+            }
+          }}
+        ></textarea>
+        <p className="text-[9px] text-slate-400 mt-2 italic">Estas notas solo son visibles para los asesores del CRM.</p>
+      </div>
     </div>
+  )
+}
+
+
+{/* MODAL: Nuevo Chat */ }
+{
+  modalNuevoChat && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalNuevoChat(false)}></div>
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-[fadeIn_0.2s_ease-out]">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-[#1e3a8a]">Nuevo Chat</h2>
+          <button onClick={() => setModalNuevoChat(false)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100">
+            <span className="material-symbols-outlined text-slate-400">close</span>
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">Número de WhatsApp</label>
+            <input
+              type="tel"
+              placeholder="Ej: 5213412345678"
+              className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
+              value={telefonoNuevo}
+              onChange={(e) => setTelefonoNuevo(e.target.value)}
+            />
+            <span className="text-[11px] text-slate-400">Con código de país sin + (Ej: 521 para México móvil)</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">Nombre (opcional)</label>
+            <input
+              type="text"
+              placeholder="Ej: Juan Pérez"
+              className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
+              value={nombreNuevo}
+              onChange={(e) => setNombreNuevo(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <button onClick={() => setModalNuevoChat(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={crearNuevoChat}
+              className="px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg hover:opacity-90 transition-all active:scale-95"
+            >
+              Iniciar Chat
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+    </div >
   )
 }
