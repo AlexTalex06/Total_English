@@ -657,7 +657,7 @@ export default function PaginaInbox() {
           </div>
 
           {/* CRM Data */}
-          <div className="p-4 border-b border-slate-100">
+          <div className="p-4 border-b border-slate-100 font-sans">
             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px]">person</span>
               Datos del Prospecto
@@ -681,124 +681,94 @@ export default function PaginaInbox() {
             </div>
           </div>
 
+          {/* INTERNAL NOTES (Colaboración) */}
+          <div className="p-4 border-b border-slate-100 flex-1 flex flex-col">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+              <span className="material-symbols-outlined text-[14px]">sticky_note_2</span>
+              Notas Internas
+            </h4>
+            <textarea
+              className="w-full h-32 bg-amber-50/50 rounded-xl border border-amber-100 p-3 text-[12px] text-slate-800 outline-none focus:bg-amber-50 transition-colors placeholder:text-slate-400"
+              placeholder="Notas privadas..."
+              defaultValue={chatActivo.prospectos?.notas_internas || ''}
+              onBlur={(e) => {
+                if (e.target.value !== (chatActivo.prospectos?.notas_internas || '')) {
+                  guardarNotaInterna(chatActivo.prospectos?.id, e.target.value)
+                }
+              }}
+            ></textarea>
+          </div>
+
           {/* Related prospects */}
           {prospectosRelacionados.length > 1 && (
             <div className="p-4 border-b border-slate-100">
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
                 <span className="material-symbols-outlined text-[14px]">group</span>
-                Alumnos Asociados ({prospectosRelacionados.length})
+                Alumnos ({prospectosRelacionados.length})
               </h4>
               <div className="space-y-2">
                 {prospectosRelacionados.map((p) => (
                   <div key={p.id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[13px] font-bold text-slate-800">{p.nombre_alumno || p.nombre}</span>
-                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.estado === 'agendado' ? 'bg-green-100 text-green-700' :
-                          p.estado === 'en_proceso' ? 'bg-blue-100 text-blue-700' :
-                            p.estado === 'contactado' ? 'bg-amber-100 text-amber-700' :
-                              'bg-slate-100 text-slate-600'
-                        }`}>{p.estado}</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-bold text-slate-800">{p.nombre_alumno || p.nombre}</span>
+                      <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">{p.estado}</span>
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
-                      {p.edad && <span>{p.edad} años</span>}
-                      {p.categoria_edad && <span>• {p.categoria_edad}</span>}
-                      {p.nivel && <span>• {p.nivel}</span>}
-                      {p.curso_interes && <span>• {p.curso_interes}</span>}
-                    </div>
-                    {p.citas && p.citas.filter(c => c.estado === 'pendiente' || c.estado === 'confirmada').length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-slate-200/50">
-                        {p.citas.filter(c => c.estado === 'pendiente' || c.estado === 'confirmada').map(cita => (
-                          <div key={cita.id} className="flex items-center gap-1.5 text-[10px] bg-white rounded p-1.5 border border-slate-100">
-                            <span className="material-symbols-outlined text-[12px] text-[#1e3a8a]">event</span>
-                            <span className="text-slate-600 font-medium">{cita.fecha} {cita.hora}</span>
-                            <span className={`text-[8px] font-bold uppercase px-1 py-0.5 rounded ml-auto ${cita.estado === 'confirmada' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                              }`}>{cita.estado}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <p className="text-[10px] text-slate-500">{p.curso_interes || 'Interés general'}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
         </div>
       )}
 
-      {/* INTERNAL NOTES (Colaboración) */}
-      <div className="p-4 border-b border-slate-100 flex-1 flex flex-col">
-        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
-          <span className="material-symbols-outlined text-[14px]">sticky_note_2</span>
-          Notas Internas (Colaboración)
-        </h4>
-        <textarea
-          className="w-full h-32 bg-amber-50/50 rounded-xl border border-amber-100 p-3 text-[12px] text-slate-800 outline-none focus:bg-amber-50 transition-colors placeholder:text-slate-400"
-          placeholder="Escribe comentarios privados aquí (ej: Prefiere que le marquemos por la tarde)..."
-          defaultValue={chatActivo.prospectos?.notas_internas || ''}
-          onBlur={(e) => {
-            if (e.target.value !== (chatActivo.prospectos?.notas_internas || '')) {
-              guardarNotaInterna(chatActivo.prospectos?.id, e.target.value)
-            }
-          }}
-        ></textarea>
-        <p className="text-[9px] text-slate-400 mt-2 italic">Estas notas solo son visibles para los asesores del CRM.</p>
-      </div>
-    </div>
-  )
-}
-
-
-{/* MODAL: Nuevo Chat */ }
-{
-  modalNuevoChat && (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalNuevoChat(false)}></div>
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-[fadeIn_0.2s_ease-out]">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-[#1e3a8a]">Nuevo Chat</h2>
-          <button onClick={() => setModalNuevoChat(false)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100">
-            <span className="material-symbols-outlined text-slate-400">close</span>
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Número de WhatsApp</label>
-            <input
-              type="tel"
-              placeholder="Ej: 5213412345678"
-              className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
-              value={telefonoNuevo}
-              onChange={(e) => setTelefonoNuevo(e.target.value)}
-            />
-            <span className="text-[11px] text-slate-400">Con código de país sin + (Ej: 521 para México móvil)</span>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Nombre (opcional)</label>
-            <input
-              type="text"
-              placeholder="Ej: Juan Pérez"
-              className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
-              value={nombreNuevo}
-              onChange={(e) => setNombreNuevo(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-            <button onClick={() => setModalNuevoChat(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-              Cancelar
-            </button>
-            <button
-              onClick={crearNuevoChat}
-              className="px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg hover:opacity-90 transition-all active:scale-95"
-            >
-              Iniciar Chat
-            </button>
+      {/* MODAL: Nuevo Chat */}
+      {modalNuevoChat && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalNuevoChat(false)}></div>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-[fadeIn_0.2s_ease-out]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-[#1e3a8a]">Nuevo Chat</h2>
+              <button onClick={() => setModalNuevoChat(false)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100">
+                <span className="material-symbols-outlined text-slate-400">close</span>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">Número de WhatsApp</label>
+                <input
+                  type="tel"
+                  placeholder="Ej: 5213412345678"
+                  className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
+                  value={telefonoNuevo}
+                  onChange={(e) => setTelefonoNuevo(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-slate-700">Nombre (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm p-3"
+                  value={nombreNuevo}
+                  onChange={(e) => setNombreNuevo(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-3">
+                <button onClick={() => setModalNuevoChat(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={crearNuevoChat}
+                  className="px-5 py-2.5 bg-gradient-to-r from-[#00236f] to-[#1e3a8a] text-white text-sm font-semibold rounded-xl shadow-lg hover:opacity-90 transition-all active:scale-95"
+                >
+                  Iniciar Chat
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
-  )
-}
-    </div >
   )
 }
