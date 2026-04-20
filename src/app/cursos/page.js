@@ -182,7 +182,7 @@ export default function PaginaCursos() {
                 <img
                   alt={curso.nombre}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  src={curso.imagen_url}
+                  src={curso.imagen_url.startsWith('http') || curso.imagen_url.startsWith('/cursos/') ? curso.imagen_url : '/cursos/' + curso.imagen_url.replace(/^\//, '')}
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
