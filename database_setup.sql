@@ -86,17 +86,31 @@ CREATE TABLE IF NOT EXISTS configuracion_bot (
   actualizado_en timestamp with time zone
 );
 
--- 8. Tabla de Campañas de Marketing
+-- 8. Tabla de Audiencias (Segmentos guardados)
+CREATE TABLE IF NOT EXISTS audiencias (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  nombre text NOT NULL,
+  filtro_estado text DEFAULT 'Todos',
+  filtro_curso text DEFAULT 'Todos',
+  filtro_edad_min integer,
+  filtro_edad_max integer,
+  filtro_flexibilidad text DEFAULT 'Indistinto',
+  total_estimado integer DEFAULT 0,
+  creado_en timestamp with time zone DEFAULT timezone('utc'::text, now())
+);
+
+-- 9. Tabla de Campañas de Marketing
 CREATE TABLE IF NOT EXISTS campanas (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   nombre text NOT NULL,
-  nombre_plantilla text NOT NULL,
+  nombre_plantilla text,
   mensaje text,
-  estado text DEFAULT 'borrador', -- borrador, activa, completada
+  estado text DEFAULT 'borrador', -- borrador, pendiente, aprobada, activa, completada, rechazada
+  audiencia_id uuid REFERENCES audiencias(id) ON DELETE SET NULL,
   publico_estado text DEFAULT 'Todos',
   publico_curso text DEFAULT 'Todos',
   canal text DEFAULT 'WhatsApp',
-  imagen_url text, -- Imagen flyer promocional
+  imagen_url text,
   alcance integer DEFAULT 0,
   creado_en timestamp with time zone DEFAULT timezone('utc'::text, now())
 );

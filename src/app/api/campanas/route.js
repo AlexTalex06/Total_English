@@ -29,6 +29,7 @@ export async function POST(solicitud) {
     imagen_url: cuerpo.imagen_url || null,
     publico_estado: cuerpo.publico_estado || 'Todos',
     publico_curso: cuerpo.publico_curso || 'Todos',
+    audiencia_id: cuerpo.audiencia_id || null,
     nombre_plantilla: cuerpo.nombre_plantilla || null
   }
 

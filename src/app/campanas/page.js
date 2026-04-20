@@ -17,6 +17,7 @@ export default function PaginaCampanas() {
   // Estados para Audiencias
   const [prospectosAud, setProspectosAud] = useState([])
   const [cursosDisponibles, setCursosDisponibles] = useState([])
+  const [audienciasGuardadas, setAudienciasGuardadas] = useState([])
   const [filtrosAud, setFiltrosAud] = useState({
     estado: 'Todos',
     curso: 'Todos',
@@ -46,6 +47,13 @@ export default function PaginaCampanas() {
     },
     { nombre: 'mensaje', etiqueta: 'Notas Internas', tipo: 'textarea', placeholder: 'Notas sobre esta campaña...', requerido: false },
     {
+      nombre: 'audiencia_id', etiqueta: 'Audiencia Previa (Segmento)', tipo: 'select', requerido: false,
+      opciones: [
+        { valor: '', etiqueta: 'Usar filtros básicos de abajo o manual' },
+        ...audienciasGuardadas.map(a => ({ valor: a.id, etiqueta: `${a.nombre} (${a.total_estimado} pers.)` }))
+      ]
+    },
+    {
       nombre: 'publico_estado', etiqueta: 'Público (Estado de Lead)', tipo: 'select', requerido: false,
       opciones: [
         { valor: 'Todos', etiqueta: 'Todos los Prospectos' },
@@ -64,15 +72,16 @@ export default function PaginaCampanas() {
       ]
     },
     {
-      nombre: 'estado', etiqueta: 'Estado Visual', tipo: 'select', requerido: false,
+      nombre: 'estado', etiqueta: 'Estado de la Campaña', tipo: 'select', requerido: false,
       opciones: [
-        { valor: 'borrador', etiqueta: 'Borrador' },
-        { valor: 'programada', etiqueta: 'Programada' },
-        { valor: 'activa', etiqueta: 'Activa' },
+        { valor: 'borrador', etiqueta: 'Borrador (Edición)' },
+        { valor: 'pendiente', etiqueta: 'Enviar a Revisión' },
+        { valor: 'aprobada', etiqueta: 'Aprobada (Lista para lanzar)' },
+        { valor: 'activa', etiqueta: 'Activa (En curso)' },
         { valor: 'completada', etiqueta: 'Completada' },
       ]
     },
-    { nombre: 'imagen_url', etiqueta: 'URL de imagen (Opcional si la plantilla Meta lo requiere)', tipo: 'url', placeholder: 'https://...', requerido: false },
+    { nombre: 'imagen_url', etiqueta: 'URL de imagen (Opcional)', tipo: 'url', placeholder: 'https://...', requerido: false },
   ]
 
   const cargarCampanas = async () => {
@@ -130,6 +139,17 @@ export default function PaginaCampanas() {
       }
     }
     cargarCursos()
+    // Cargar audiencias guardadas
+    const cargarAudiencias = async () => {
+      try {
+        const resp = await fetch('/api/audiencias')
+        const datos = await resp.json()
+        setAudienciasGuardadas(Array.isArray(datos) ? datos : [])
+      } catch (e) {
+        console.error('Error cargando audiencias', e)
+      }
+    }
+    cargarAudiencias()
   }, [])
 
   // Calculo dinamico de audiencia en tiempo real
@@ -270,6 +290,55 @@ export default function PaginaCampanas() {
   const abrirEditar = (campana) => {
     setCampanaEditando(campana)
     setModalAbierto(true)
+  }
+
+  const guardarAudienciaActual = async () => {
+    const nombre = prompt('Ingresa un nombre para este segmento de audiencia (ej: Interesados Young Adults 18-25):');
+    if (!nombre) return;
+
+    try {
+      const resp = await fetch('/api/audiencias', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre,
+          filtro_estado: filtrosAud.estado,
+          filtro_curso: filtrosAud.curso,
+          filtro_edad_min: filtrosAud.edad_min,
+          filtro_edad_max: filtrosAud.edad_max,
+          filtro_flexibilidad: filtrosAud.flexibilidad,
+          total_estimado: prospectosFiltrados.length
+        })
+      });
+
+      if (resp.ok) {
+        alert('✅ Audiencia guardada con éxito.');
+        // Recargar audiencias
+        const r2 = await fetch('/api/audiencias');
+        const d2 = await r2.json();
+        setAudienciasGuardadas(Array.isArray(d2) ? d2 : []);
+      } else {
+        const err = await resp.json();
+        alert('❌ Error al guardar: ' + (err.error || 'Desconocido'));
+      }
+    } catch (e) {
+      alert('❌ Error de conexión: ' + e.message);
+    }
+  }
+
+  const cambiarEstadoCampana = async (id, nuevoEstado) => {
+    try {
+      const resp = await fetch('/api/campanas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, estado: nuevoEstado })
+      });
+      if (resp.ok) {
+        cargarCampanas();
+      }
+    } catch (e) {
+      console.error('Error cambiando estado', e);
+    }
   }
 
   const cerrarModal = () => {
@@ -469,17 +538,47 @@ export default function PaginaCampanas() {
                             </button>
                             <button 
                               onClick={() => dispararCampana(campana.id)}
-                              disabled={enviando === campana.id}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}`}
-                              title="Disparar Campaña"
+                              disabled={enviando === campana.id || !['aprobada', 'activa', 'completada'].includes(campana.estado)}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : !['aprobada', 'activa', 'completada'].includes(campana.estado) ? 'text-slate-300 bg-slate-50 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}`}
+                              title={['aprobada', 'activa', 'completada'].includes(campana.estado) ? 'Disparar Campaña' : 'Requiere Aprobación'}
                             >
-                              <span className="material-symbols-outlined text-[18px]">{enviando === campana.id ? 'hourglass_top' : 'send'}</span>
+                              <span className="material-symbols-outlined text-[18px]">{enviando === campana.id ? 'hourglass_top' : 'rocket_launch'}</span>
                             </button>
                             <button onClick={() => eliminarCampana(campana.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                               <span className="material-symbols-outlined text-[18px]">delete</span>
                             </button>
                           </div>
                         </div>
+
+                        {/* ACCIONES DE ESTADO RÁPIDAS (REVISIÓN) */}
+                        {['borrador', 'pendiente', 'rechazada'].includes(campana.estado) && (
+                          <div className="flex gap-2 mb-4">
+                            {campana.estado === 'borrador' && (
+                              <button 
+                                onClick={() => cambiarEstadoCampana(campana.id, 'pendiente')}
+                                className="text-[10px] font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-lg hover:bg-amber-200 transition-colors uppercase"
+                              >
+                                Mandar a Revisión
+                              </button>
+                            )}
+                            {campana.estado === 'pendiente' && (
+                              <>
+                                <button 
+                                  onClick={() => cambiarEstadoCampana(campana.id, 'aprobada')}
+                                  className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-3 py-1 rounded-lg hover:bg-emerald-200 transition-colors uppercase"
+                                >
+                                  Aprobar
+                                </button>
+                                <button 
+                                  onClick={() => cambiarEstadoCampana(campana.id, 'rechazada')}
+                                  className="text-[10px] font-bold bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 transition-colors uppercase"
+                                >
+                                  Rechazar
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {/* DETALLE DE AUDIENCIA Y PLANTILLA EN LA TARJETA */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-medium mb-5">
@@ -490,9 +589,13 @@ export default function PaginaCampanas() {
                           <div>
                             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">AUDIENCIA (FILTROS)</span>
                             <span className="text-slate-700 bg-blue-50/50 px-2 py-1 rounded inline-block border border-blue-100/50">
-                              {campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
-                              {campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''}
-                              {campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
+                              {campana.audiencia_id ? `📍 Segmento: ${audienciasGuardadas.find(a => a.id === campana.audiencia_id)?.nombre || 'Cargando...'}` : (
+                                <>
+                                  {campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
+                                  {campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''}
+                                  {campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
+                                </>
+                              )}
                             </span>
                           </div>
                         </div>
@@ -530,14 +633,23 @@ export default function PaginaCampanas() {
             <div className="animate-fade-in space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <h2 className="text-xl font-bold text-slate-800">Constructor de Audiencias</h2>
-                <button
-                  disabled={prospectosFiltrados.length === 0}
-                  className={`font-bold py-2 px-5 rounded-xl flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.1)] transition-all ${prospectosFiltrados.length === 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-                  onClick={dispararCampanaDinamica}
-                >
-                  <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
-                  Disparar a esta Audiencia
-                </button>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    className={`font-bold py-2 px-5 rounded-xl flex items-center gap-2 shadow-sm transition-all bg-emerald-600 hover:bg-emerald-700 text-white`}
+                    onClick={guardarAudienciaActual}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">save</span>
+                    Guardar Audiencia
+                  </button>
+                  <button
+                    disabled={prospectosFiltrados.length === 0}
+                    className={`font-bold py-2 px-5 rounded-xl flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.1)] transition-all ${prospectosFiltrados.length === 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                    onClick={dispararCampanaDinamica}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
+                    Disparar Directo
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -655,10 +767,11 @@ export default function PaginaCampanas() {
           mensaje: campanaEditando.mensaje,
           publico_estado: campanaEditando.publico_estado,
           publico_curso: campanaEditando.publico_curso,
+          audiencia_id: campanaEditando.audiencia_id,
           canal: campanaEditando.canal,
           estado: campanaEditando.estado,
           imagen_url: campanaEditando.imagen_url,
-        } : null}
+        } : { estado: 'borrador' }}
       />
     </div >
   )

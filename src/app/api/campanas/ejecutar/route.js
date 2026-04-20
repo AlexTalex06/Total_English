@@ -27,6 +27,10 @@ export async function POST(solicitud) {
       return NextResponse.json({ error: 'Campaña no encontrada' }, { status: 404 })
     }
 
+    if (!['aprobada', 'activa', 'completada'].includes(campana.estado)) {
+       return NextResponse.json({ error: `La campaña no puede ejecutarse porque está en estado: ${campana.estado}. Primero debe ser aprobada.` }, { status: 400 })
+    }
+
     if (!campana.nombre_plantilla && campana.canal === 'whatsapp') {
        return NextResponse.json({ error: 'Falta configurar el "Nombre de Plantilla" de Meta en la campaña' }, { status: 400 })
     }
@@ -35,26 +39,42 @@ export async function POST(solicitud) {
     let prospectos = []
     
     if (cuerpoSolicitud.prospectos_ids && Array.isArray(cuerpoSolicitud.prospectos_ids) && cuerpoSolicitud.prospectos_ids.length > 0) {
-      // Audiencia Dinámica generada en el Frontend
-      console.log('📌 Usando prospectos_ids personalizados desde la Audiencia UI');
+      // Audiencia Dinámica temporal (desde UI rápida)
+      console.log('📌 Usando prospectos_ids personalizados');
       const { data: pDatos, error: errP } = await supabase
         .from('prospectos')
         .select('id, telefono, nombre, nombre_alumno, estado, curso_interes')
         .in('id', cuerpoSolicitud.prospectos_ids);
         
-      if (errP) return NextResponse.json({ error: 'Error obteniendo audiencia personalizada: ' + errP.message }, { status: 500 });
+      if (errP) return NextResponse.json({ error: 'Error obteniendo audiencia: ' + errP.message }, { status: 500 });
       prospectos = pDatos || [];
+    } else if (campana.audiencia_id) {
+      // USAR AUDIENCIA GUARDADA
+      console.log('📌 Usando Audiencia Guardada ID:', campana.audiencia_id);
+      const { data: aud, error: errAud } = await supabase.from('audiencias').select('*').eq('id', campana.audiencia_id).single();
+      
+      if (errAud || !aud) return NextResponse.json({ error: 'Audiencia vinculada no encontrada' }, { status: 404 });
+
+      let query = supabase.from('prospectos').select('id, telefono, nombre, nombre_alumno, estado, curso_interes');
+      
+      if (aud.filtro_estado && aud.filtro_estado !== 'Todos') query = query.eq('estado', aud.filtro_estado);
+      if (aud.filtro_curso && aud.filtro_curso !== 'Todos') query = query.ilike('curso_interes', `%${aud.filtro_curso}%`);
+      if (aud.filtro_edad_min) query = query.gte('edad', aud.filtro_edad_min);
+      if (aud.filtro_edad_max) query = query.lte('edad', aud.filtro_edad_max);
+      
+      // Filtrado por flexibilidad (requiere lógica extra si es un string complejo, pero aplicamos el básico)
+      const { data: pros, error: errPros } = await query;
+      if (errPros) return NextResponse.json({ error: 'Error en audiencia guardada: ' + errPros.message }, { status: 500 });
+      prospectos = pros || [];
     } else {
-      // Audiencia Estática Tradicional (por selects básicos)
+      // Audiencia Estática Tradicional (filtros directos en la campaña)
       let query = supabase.from('prospectos').select('id, telefono, nombre, nombre_alumno, estado, curso_interes')
       
-      // Filtrar por Estado
       if (campana.publico_estado && campana.publico_estado !== 'Todos') {
         const dbEstado = campana.publico_estado.toLowerCase().replace(' ', '_')
         query = query.eq('estado', dbEstado)
       }
 
-      // Filtrar por Curso de interés
       if (campana.publico_curso && campana.publico_curso !== 'Todos') {
         query = query.ilike('curso_interes', `%${campana.publico_curso}%`)
       }
