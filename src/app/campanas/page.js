@@ -71,7 +71,7 @@ export default function PaginaCampanas() {
   const cargarCampanas = async () => {
     setCargando(true)
     try {
-      const respuesta = await fetch(`/api/campanas?t=\${Date.now()}`, { cache: 'no-store' })
+      const respuesta = await fetch(`/api/campanas?t=${Date.now()}`, { cache: 'no-store' })
       const datos = await respuesta.json()
       setCampanas(Array.isArray(datos) ? datos : [])
     } catch (error) {
@@ -143,7 +143,7 @@ export default function PaginaCampanas() {
   const eliminarCampana = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta campaña?')) return
     try {
-      const respuesta = await fetch(`/api/campanas?id=\${id}`, { method: 'DELETE' })
+      const respuesta = await fetch(`/api/campanas?id=${id}`, { method: 'DELETE' })
       if (respuesta.ok) {
         await cargarCampanas()
       } else {
@@ -156,7 +156,7 @@ export default function PaginaCampanas() {
   }
 
   const dispararCampana = async (id) => {
-    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros.\\n\\n¿Estás absolutamente seguro de continuar?')) return
+    if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros.\n\n¿Estás absolutamente seguro de continuar?')) return
     
     setEnviando(id)
     try {
@@ -169,7 +169,7 @@ export default function PaginaCampanas() {
       const resData = await respuesta.json()
       
       if (respuesta.ok) {
-        alert(\`✅ ¡Campaña Disparada!\\nAudiencia encontrada: \${resData.alcance_esperado}\\nMensajes enviados: \${resData.envios_exitosos}\`)
+        alert(`✅ ¡Campaña Disparada!\nAudiencia encontrada: ${resData.alcance_esperado}\nMensajes enviados: ${resData.envios_exitosos}`)
         cargarCampanas()
       } else {
         alert('❌ Error al disparar: ' + (resData.error || 'Error desconocido'))
@@ -217,7 +217,7 @@ export default function PaginaCampanas() {
         {/* NAVEGACIÓN POR PESTAÑAS (TABS) */}
         <div className="flex border-b border-slate-200 px-6">
           <button 
-            className={\`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative \${tabActivo === 'general' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}\`}
+            className={`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative ${tabActivo === 'general' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             onClick={() => setTabActivo('general')}
           >
             <span className="material-symbols-outlined text-[20px]">monitoring</span>
@@ -226,7 +226,7 @@ export default function PaginaCampanas() {
           </button>
           
           <button 
-            className={\`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative \${tabActivo === 'plantillas' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}\`}
+            className={`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative ${tabActivo === 'plantillas' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             onClick={() => setTabActivo('plantillas')}
           >
             <span className="material-symbols-outlined text-[20px]">chat_bubble</span>
@@ -235,7 +235,7 @@ export default function PaginaCampanas() {
           </button>
           
           <button 
-            className={\`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative \${tabActivo === 'campanas' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}\`}
+            className={`px-6 py-4 text-sm font-semibold flex items-center gap-2 transition-colors relative ${tabActivo === 'campanas' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
             onClick={() => setTabActivo('campanas')}
           >
             <span className="material-symbols-outlined text-[20px]">send</span>
@@ -255,19 +255,19 @@ export default function PaginaCampanas() {
                  <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl shadow-sm border border-blue-100 flex flex-col justify-center items-center">
                    <div className="p-3 bg-blue-100 text-blue-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">mark_email_read</span></div>
                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Alcance Real</p>
-                   <p className="text-4xl font-black text-blue-700 mt-2">\${estadisticas.alcanceTotal}</p>
+                   <p className="text-4xl font-black text-blue-700 mt-2">${estadisticas.alcanceTotal}</p>
                    <p className="text-xs text-slate-400 mt-1">Personas contactadas</p>
                  </div>
                  <div className="bg-gradient-to-br from-emerald-50 to-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col justify-center items-center">
                    <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">task_alt</span></div>
                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Completadas</p>
-                   <p className="text-4xl font-black text-emerald-700 mt-2">\${estadisticas.completadas}</p>
+                   <p className="text-4xl font-black text-emerald-700 mt-2">${estadisticas.completadas}</p>
                    <p className="text-xs text-slate-400 mt-1">Satisfechas exitosamente</p>
                  </div>
                  <div className="bg-gradient-to-br from-amber-50 to-white p-6 rounded-2xl shadow-sm border border-amber-100 flex flex-col justify-center items-center">
                    <div className="p-3 bg-amber-100 text-amber-600 rounded-xl mb-3"><span className="material-symbols-outlined text-3xl">pending_actions</span></div>
                    <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Configuradas</p>
-                   <p className="text-4xl font-black text-amber-700 mt-2">\${estadisticas.activas}</p>
+                   <p className="text-4xl font-black text-amber-700 mt-2">${estadisticas.activas}</p>
                    <p className="text-xs text-slate-400 mt-1">Listas o en espera</p>
                  </div>
                </div>
@@ -284,7 +284,7 @@ export default function PaginaCampanas() {
                   disabled={cargandoMeta}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-lg flex items-center gap-2 transition-colors"
                 >
-                  <span className={\`material-symbols-outlined text-sm \${cargandoMeta ? 'animate-spin' : ''}\`}>refresh</span>
+                  <span className={`material-symbols-outlined text-sm ${cargandoMeta ? 'animate-spin' : ''}`}>refresh</span>
                   Actualizar Status
                 </button>
               </div>
@@ -303,11 +303,11 @@ export default function PaginaCampanas() {
                     <div key={plt.id} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-start mb-4">
                         <span className="font-bold text-slate-800 uppercase tracking-tight break-all" title={plt.name}>{plt.name}</span>
-                        <span className={\`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider \${
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${
                           plt.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
                           plt.status === 'PENDING' ? 'bg-orange-100 text-orange-700' :
                           'bg-red-100 text-red-700'
-                        }\`}>
+                        }`}>
                           {plt.status}
                         </span>
                       </div>
@@ -353,12 +353,12 @@ export default function PaginaCampanas() {
                           <div>
                             <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{campana.nombre}</h3>
                             <div className="flex gap-2 mt-2">
-                              <span className={\`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider \${
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
                                 campana.estado === 'activa' ? 'bg-green-50 text-green-600 border-green-200' : 
                                 campana.estado === 'borrador' ? 'bg-amber-50 text-amber-600 border-amber-200' :
                                 campana.estado === 'completada' ? 'bg-slate-100 text-slate-500 border-slate-200' :
                                 'bg-blue-50 text-blue-600 border-blue-200'
-                              }\`}>
+                              }`}>
                                 {campana.estado}
                               </span>
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider">
@@ -375,7 +375,7 @@ export default function PaginaCampanas() {
                             <button 
                               onClick={() => dispararCampana(campana.id)}
                               disabled={enviando === campana.id}
-                              className={\`w-8 h-8 rounded-full flex items-center justify-center transition-colors \${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}\`}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}`}
                               title="Disparar Campaña"
                             >
                               <span className="material-symbols-outlined text-[18px]">{enviando === campana.id ? 'hourglass_top' : 'send'}</span>
@@ -395,9 +395,9 @@ export default function PaginaCampanas() {
                           <div>
                             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">AUDIENCIA (FILTROS)</span>
                             <span className="text-slate-700 bg-blue-50/50 px-2 py-1 rounded inline-block border border-blue-100/50">
-                              \${campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
-                              \${campana.publico_estado !== 'Todos' ? \`Estado: \${campana.publico_estado} \` : ''} 
-                              \${campana.publico_curso !== 'Todos' ? \`| Diplomado: \${campana.publico_curso}\` : ''}
+                              ${campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
+                              ${campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''} 
+                              ${campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
                             </span>
                           </div>
                         </div>
