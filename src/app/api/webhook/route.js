@@ -50,14 +50,19 @@ export async function POST(solicitud) {
         // 1 & 2. Conversación y Prospecto: Buscar o Crear
         let { data: convExist } = await supabase.from('conversaciones').select('*').eq('id_plataforma', remitenteId).eq('plataforma', 'whatsapp').maybeSingle()
 
-        // --- FILTRO DE PALABRAS MÁGICAS PARA NUEVOS PROSPECTOS ---
-        const PALABRAS_CLAVE = ['total', 'english', 'ingles']
+        // --- FILTRO DE DISPARADORES PARA NUEVOS PROSPECTOS ---
+        const PALABRAS_CLAVE = [
+          'info', 'información', 'clases', 'hola', 'horarios', 'detalles', 
+          'cursos', 'diplomado', 'ingles', 'inglés', 'costo', 'precio', 
+          'inscripción', 'mensualidad', 'total'
+        ]
         const textoMin = texto.toLowerCase()
         const dijoPalabraClave = PALABRAS_CLAVE.some(palabra => textoMin.includes(palabra))
+        const vieneDeAnuncio = mensajeObj.referral // Detecta clics en anuncios CTWA
 
-        if (!convExist && !dijoPalabraClave) {
-          console.log(`🚫 Ignorando mensaje de ${remitenteId}: No es conversación activa y no dijo la palabra mágica.`)
-          return NextResponse.json({ estado: 'ignorado_por_palabra_clave' }, { status: 200 })
+        if (!convExist && !dijoPalabraClave && !vieneDeAnuncio) {
+          console.log(`🚫 Ignorando mensaje de ${remitenteId}: No es charla activa, no dijo keyword y no viene de anuncio.`)
+          return NextResponse.json({ estado: 'ignorado_sin_disparador' }, { status: 200 })
         }
         // --------------------------------------------------------
 
