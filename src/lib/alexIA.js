@@ -98,7 +98,7 @@ Estructura exacta:
 {
   "respuesta": "tu mensaje final para el usuario bajo las reglas estrictas",
   "datos": {
-    "nombre_alumno": "Juan Perez" (Limpiar nombre de pila del HUMANO, diferenciándolo del padre si es para el hijo. ej: "Para mi hijo Luis" -> "Luis"),
+    "nombre_alumno": "Nombre" (Filtra solo Primera letre mayúscula. Si es padre/madre ej. 'Soy la mamá de Luis' agarra el nombre del padre si está 'Soy Maria mamá de Luis'->'Maria'. Si solo dice el del hijo-> null. Quita palabras de relleno),
     "parentesco": "Para mí | Para mi hijo | Para empleados" (Deducido según la conversación),
     "edad": 15 (edad exacta en numero, o estimacion inferida si no la da directamente),
     "nivel": "básico" (deducido: "Inglés Previo: Sí" o "No"),
