@@ -366,17 +366,21 @@ export default function PaginaInbox() {
   }
 
   const eliminarConversacion = async (e, id) => {
-    e.stopPropagation()
-    if (!confirm('¿Seguro que quieres eliminar esta conversación? Se borrarán todos los mensajes.')) return
+    if (e) e.stopPropagation()
     try {
       const res = await fetch(`/api/conversaciones?id=${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const err = await res.json()
-        throw new Error(err.error || 'Error desconocido')
+        alert('Error al eliminar: ' + (err.error || 'Desconocido'))
+        return
       }
+      alert('Conversación eliminada con éxito.')
       if (chatActivo?.id === id) setChatActivo(null)
-      cargarConversaciones()
-    } catch (err) { console.error('Error eliminando:', err) }
+      await cargarConversaciones()
+    } catch (err) { 
+      console.error('Error eliminando:', err)
+      alert('Error de conexión al eliminar.')
+    }
   }
 
   const guardarNotaInterna = async (idProspecto, nota) => {
