@@ -122,7 +122,12 @@ export async function POST(solicitud) {
 
         // 4. Consultar AlexIA
         const { data: historialRaw } = await supabase.from('mensajes').select('remitente, contenido').eq('conversacion_id', convExist.id).order('creado_en', { ascending: false }).limit(30)
-        const { data: freshPros } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).single()
+        
+        let freshPros = prosExist || {};
+        if (prosExist?.id) {
+          const { data: pData } = await supabase.from('prospectos').select('*').eq('id', prosExist.id).maybeSingle()
+          if (pData) freshPros = pData;
+        }
 
         const historialFormat = (historialRaw || []).reverse().map(m => ({
           role: m.remitente === 'usuario' ? 'user' : 'assistant',

@@ -238,7 +238,12 @@ export default function PaginaInbox() {
     if (!telefonoNuevo.trim()) { alert('Escribe un número de teléfono'); return }
     
     // Normalizar teléfono (solo números)
-    const telLimpio = telefonoNuevo.replace(/\D/g, '')
+    let telLimpio = telefonoNuevo.replace(/\D/g, '')
+    
+    // Si tiene 10 dígitos (formato MX), agregar prefijo 521
+    if (telLimpio.length === 10) {
+      telLimpio = '521' + telLimpio
+    }
 
     try {
       // 1. Ver si ya existe la conversación
