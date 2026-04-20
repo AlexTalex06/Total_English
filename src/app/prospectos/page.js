@@ -21,6 +21,7 @@ export default function PaginaProspectos() {
     { nombre: 'nombre', etiqueta: 'Nombre del Tutor/Contacto', tipo: 'text', placeholder: 'Ej: María Ruiz' },
     { nombre: 'telefono', etiqueta: 'Teléfono (WhatsApp)', tipo: 'text', placeholder: '521...', requerido: true },
     { nombre: 'curso_interes', etiqueta: 'Curso de Interés', tipo: 'text', placeholder: 'Ej: Children' },
+    { nombre: 'parentesco', etiqueta: 'Relación con el Alumno', tipo: 'text', placeholder: 'Ej: Para mi hijo, Para mí' },
     { nombre: 'edad', etiqueta: 'Edad', tipo: 'number', placeholder: 'Ej: 8' },
     { nombre: 'nivel', etiqueta: 'Nivel', tipo: 'text', placeholder: 'Ej: Básico' },
     { 
@@ -113,9 +114,9 @@ export default function PaginaProspectos() {
   }, [])
 
   const exportarCSV = () => {
-    const csvHeader = 'Alumno,Contacto/Tutor,Teléfono,Curso,Edad,Nivel,Estado,Lead Score,Creado\n'
+    const csvHeader = 'Alumno,Contacto/Tutor,Parentesco,Teléfono,Curso,Edad,Nivel,Estado,Lead Score,Creado\n'
     const csvRows = prospectos.map(p => 
-      `"${p.nombre_alumno || ''}","${p.nombre || ''}","${p.telefono || ''}","${p.curso_interes || ''}","${p.edad || ''}","${p.nivel || ''}","${p.estado || ''}","${p.lead_score || ''}","${p.creado_en || ''}"`
+      `"${p.nombre_alumno || ''}","${p.nombre || ''}","${p.parentesco || ''}","${p.telefono || ''}","${p.curso_interes || ''}","${p.edad || ''}","${p.nivel || ''}","${p.estado || ''}","${p.lead_score || ''}","${p.creado_en || ''}"`
     ).join('\n')
     const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -426,18 +427,23 @@ export default function PaginaProspectos() {
             {/* Contacto y Citas */}
             <div className="p-6">
               <div className="mb-6">
-                <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Contacto Origen</h4>
+                <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Contacto Origen (Tutor / Mismo)</h4>
                 <div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
                   <span className="material-symbols-outlined text-green-600 text-3xl">chat</span>
                   <div className="flex-1">
                     <p className="font-bold text-[#191c1d] text-sm">{prospectoSeleccionado.nombre}</p>
                     <p className="text-xs text-slate-500 font-medium">{prospectoSeleccionado.telefono}</p>
                   </div>
+                  {prospectoSeleccionado.parentesco && (
+                    <div className="px-2 py-1 bg-white rounded border border-blue-100 text-[10px] text-blue-700 font-bold whitespace-nowrap">
+                      {prospectoSeleccionado.parentesco}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {prospectoSeleccionado.citas && prospectoSeleccionado.citas.length > 0 && (
-                <div>
+                <div className="mb-6">
                   <h4 className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-3">Historial de Citas</h4>
                   <div className="space-y-2">
                     {prospectoSeleccionado.citas.map(cita => (
