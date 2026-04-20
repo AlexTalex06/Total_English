@@ -229,6 +229,41 @@ export default function PaginaInbox() {
     setToggling(false);
   }
 
+  const crearProspectoRapido = async () => {
+    if (!chatActivo) return
+    try {
+      const { data: nuevoP, error } = await supabase.from('prospectos').insert({
+        nombre: 'Interesado',
+        telefono: chatActivo.id_plataforma,
+        estado: 'nuevo'
+      }).select('*').single()
+      
+      if (error) throw error
+      
+      await supabase.from('conversaciones').update({ prospecto_id: nuevoP.id }).eq('id', chatActivo.id)
+      await cargarConversaciones()
+      alert('Prospecto creado y vinculado correctamente.')
+    } catch (err) {
+      console.error(err)
+      alert('Error al crear prospecto.')
+    }
+  }
+
+  const actualizarEstadoProspecto = async (nuevoEstado) => {
+    if (!chatActivo?.prospectos?.id) {
+      alert('Primero vincula un prospecto a esta conversación.')
+      return
+    }
+    try {
+      const { error } = await supabase.from('prospectos').update({ estado: nuevoEstado }).eq('id', chatActivo.prospectos.id)
+      if (error) throw error
+      await cargarConversaciones()
+    } catch (err) {
+      console.error(err)
+      alert('Error al actualizar estado.')
+    }
+  }
+
   const insertarEmoji = (emoji) => {
     setNuevoMensaje(prev => prev + emoji)
     textareaRef.current?.focus()
@@ -676,6 +711,7 @@ export default function PaginaInbox() {
                 <button type="button" onClick={async () => {
                   if (!chatActivo) return
                   const ubicacion = '🏫 Total English School\n📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima\n🗺️ https://maps.app.goo.gl/e08MtvtfxfbGAKmz1\n🕒 Lun-Vie 2-9pm | Sáb 8am-2pm'
+                  if (!confirm('¿Enviar ubicación al cliente?')) return
                   try {
                     const res = await fetch('/api/enviar-mensaje', {
                       method: 'POST',
@@ -686,8 +722,9 @@ export default function PaginaInbox() {
                       await supabase.from('mensajes').insert({ conversacion_id: chatActivo.id, remitente: 'humano', contenido: ubicacion, tipo: 'texto' })
                       await supabase.from('conversaciones').update({ ultimo_mensaje: '📍 Ubicación enviada', actualizado_en: new Date().toISOString() }).eq('id', chatActivo.id)
                       cargarMensajes(chatActivo.id)
+                      alert('📍 Ubicación enviada correctamente')
                     }
-                  } catch (err) { console.error(err) }
+                  } catch (err) { console.error(err); alert('Error al enviar ubicación') }
                   setMostrarClipMenu(false)
                 }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
                   <span className="material-symbols-outlined text-[#f05950] text-[20px]">location_on</span>
@@ -767,25 +804,25 @@ export default function PaginaInbox() {
           {/* Quick Actions */}
           <div className="p-4 border-b border-slate-100">
             <div className="grid grid-cols-4 gap-2">
-              <button onClick={() => { if (chatActivo.prospectos?.estado !== 'contactado') { supabase.from('prospectos').update({ estado: 'contactado' }).eq('id', chatActivo.prospectos?.id).then(() => cargarConversaciones()); } }}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-blue-50 transition-colors bg-white border border-slate-100">
+              <button onClick={() => actualizarEstadoProspecto('contactado')}
+                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors bg-white border ${chatActivo.prospectos?.estado === 'contactado' ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:bg-blue-50'}`}>
                 <span className="material-symbols-outlined text-[16px] text-[#1e3a8a]">call</span>
                 <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Contactado</span>
               </button>
-              <button onClick={() => { supabase.from('prospectos').update({ estado: 'agendado' }).eq('id', chatActivo.prospectos?.id).then(() => cargarConversaciones()); }}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-orange-50 transition-colors bg-white border border-slate-100">
+              <button onClick={() => actualizarEstadoProspecto('agendado')}
+                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors bg-white border ${chatActivo.prospectos?.estado === 'agendado' ? 'border-orange-500 bg-orange-50' : 'border-slate-100 hover:bg-orange-50'}`}>
                 <span className="material-symbols-outlined text-[16px] text-orange-600">event_available</span>
                 <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Agendar</span>
               </button>
-              <button onClick={() => { supabase.from('prospectos').update({ estado: 'cerrado' }).eq('id', chatActivo.prospectos?.id).then(() => cargarConversaciones()); }}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-green-50 transition-colors bg-white border border-slate-100">
+              <button onClick={() => actualizarEstadoProspecto('cerrado')}
+                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors bg-white border ${chatActivo.prospectos?.estado === 'cerrado' ? 'border-green-500 bg-green-50' : 'border-slate-100 hover:bg-green-50'}`}>
                 <span className="material-symbols-outlined text-[16px] text-green-600">verified</span>
                 <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">Cerrar</span>
               </button>
               <button onClick={toggleBotHumano}
-                className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl hover:bg-amber-50 transition-colors bg-white border border-slate-100">
-                <span className="material-symbols-outlined text-[16px] text-amber-600">{chatActivo.asignado_a_humano ? 'smart_toy' : 'person'}</span>
-                <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">{chatActivo.asignado_a_humano ? 'Bot' : 'Tomar'}</span>
+                className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-colors bg-white border ${chatActivo.asignado_a_humano ? 'border-amber-500 bg-amber-50' : 'border-slate-100 hover:bg-amber-50'}`}>
+                <span className="material-symbols-outlined text-[16px] text-amber-600">{chatActivo.asignado_a_humano ? 'person' : 'smart_toy'}</span>
+                <span className="text-[9px] text-slate-500 font-semibold truncate w-full text-center">{chatActivo.asignado_a_humano ? 'Humano' : 'Bot'}</span>
               </button>
             </div>
           </div>
@@ -853,6 +890,35 @@ export default function PaginaInbox() {
               </div>
             </div>
           )}
+
+          {/* New: Quick Create Prospect if missing */}
+          {!chatActivo.prospecto_id && (
+            <div className="p-4 border-b border-slate-100">
+              <button 
+                onClick={crearProspectoRapido}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
+                Vincular como Prospecto
+              </button>
+              <p className="text-[10px] text-slate-400 mt-2 text-center">Este chat aún no tiene un prospecto creado en el CRM.</p>
+            </div>
+          )}
+
+          {/* Delete Conversation Button (Moved here per user request) */}
+          <div className="p-4 mt-auto">
+            <button
+              onClick={() => {
+                if (confirm('¿Estás seguro de eliminar esta conversación permanentemente?')) {
+                  eliminarConversacion(null, chatActivo.id)
+                }
+              }}
+              className="w-full py-3 border-2 border-red-100 text-red-500 rounded-xl text-xs font-bold hover:bg-red-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+              Eliminar Conversación
+            </button>
+          </div>
         </div>
       )}
 
