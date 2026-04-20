@@ -158,3 +158,4 @@ INSTRUCCIÓN CRÍTICA: Si el usuario quiere proponer una hora o día para venir,
     }
   }
 }
+// v1.0.1 - Fixed Template Literal Reference Error

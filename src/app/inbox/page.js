@@ -213,7 +213,12 @@ export default function PaginaInbox() {
 
   const crearNuevoChat = async () => {
     if (!telefonoNuevo.trim()) { alert('Escribe un número de teléfono'); return }
-    const { data: existing } = await supabase.from('conversaciones').select('*').eq('id_plataforma', telefonoNuevo).eq('plataforma', 'whatsapp').maybeSingle()
+    
+    // Normalizar teléfono (solo números)
+    const telLimpio = telefonoNuevo.replace(/\D/g, '')
+
+    const { data: existing } = await supabase.from('conversaciones').select('*').eq('id_plataforma', telLimpio).eq('plataforma', 'whatsapp').maybeSingle()
+    
     if (existing) {
       const conv = conversaciones.find(c => c.id === existing.id)
       if (conv) cambiarChat(conv)
@@ -222,10 +227,38 @@ export default function PaginaInbox() {
       setNombreNuevo('')
       return
     }
-    const { data: nuevoP } = await supabase.from('prospectos').insert({ nombre: nombreNuevo || telefonoNuevo, telefono: telefonoNuevo, estado: 'nuevo' }).select('id').single()
+
+    const { data: nuevoP, error: pError } = await supabase.from('prospectos').insert({ 
+      nombre: nombreNuevo || telLimpio, 
+      telefono: telLimpio, 
+      estado: 'nuevo',
+      notas_internas: 'Contacto iniciado manualmente'
+    }).select('id').single()
+
+    if (pError) {
+      console.error("Error pError:", pError)
+      alert("Error al crear el prospecto")
+      return
+    }
+
     if (nuevoP) {
-      await supabase.from('conversaciones').insert({ prospecto_id: nuevoP.id, plataforma: 'whatsapp', id_plataforma: telefonoNuevo })
+      const { data: nuevaC, error: cError } = await supabase.from('conversaciones').insert({ 
+        prospecto_id: nuevoP.id, 
+        plataforma: 'whatsapp', 
+        id_plataforma: telLimpio,
+        asignado_a_humano: true // Lo marcamos como humano de inicio para que el bot no interfiera si es manual
+      }).select('*').single()
+      
+      if (cError) {
+        console.error("Error cError:", cError)
+        return
+      }
+
       await cargarConversaciones()
+      if (nuevaC) {
+        setChatActivo(nuevaC)
+        setMensajes([])
+      }
     }
     setModalNuevoChat(false)
     setTelefonoNuevo('')
