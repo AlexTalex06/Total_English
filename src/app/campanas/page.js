@@ -12,7 +12,17 @@ export default function PaginaCampanas() {
   const [campanaEditando, setCampanaEditando] = useState(null)
   const [plantillasMeta, setPlantillasMeta] = useState([])
   const [cargandoMeta, setCargandoMeta] = useState(false)
-  const [tabActivo, setTabActivo] = useState('campanas') // 'general', 'plantillas', 'campanas'
+  const [tabActivo, setTabActivo] = useState('campanas') // 'general', 'plantillas', 'campanas', 'audiencias'
+  
+  // Estados para Audiencias
+  const [prospectosAud, setProspectosAud] = useState([])
+  const [filtrosAud, setFiltrosAud] = useState({
+    estado: 'Todos',
+    curso: 'Todos',
+    edad_min: '',
+    edad_max: '',
+    flexibilidad: 'Indistinto'
+  })
 
   // 1. Obtener plantillas únicas ya utilizadas en el CRM
   const plantillasDelProyecto = [...new Set(campanas.map(c => c.nombre_plantilla).filter(Boolean))]
@@ -99,7 +109,33 @@ export default function PaginaCampanas() {
   useEffect(() => {
     cargarCampanas()
     cargarPlantillasMeta()
+    
+    // Cargar base de datos prospectos para audiencias
+    const cargarProspectos = async () => {
+      try {
+        const resp = await fetch('/api/prospectos?t=' + Date.now())
+        const datos = await resp.json()
+        setProspectosAud(Array.isArray(datos) ? datos : [])
+      } catch (e) {
+        console.error('Error cargando base prospectos', e)
+      }
+    }
+    cargarProspectos()
   }, [])
+
+  // Calculo dinamico de audiencia en tiempo real
+  const prospectosFiltrados = prospectosAud.filter(p => {
+    if (filtrosAud.estado !== 'Todos' && p.estado !== filtrosAud.estado) return false;
+    if (filtrosAud.curso !== 'Todos' && p.curso_interes !== filtrosAud.curso) return false;
+    if (filtrosAud.edad_min && p.edad && parseInt(p.edad) < parseInt(filtrosAud.edad_min)) return false;
+    if (filtrosAud.edad_max && p.edad && parseInt(p.edad) > parseInt(filtrosAud.edad_max)) return false;
+    if (filtrosAud.flexibilidad !== 'Indistinto' && p.horario) {
+      const ph = p.horario.toLowerCase();
+      if (filtrosAud.flexibilidad === 'Horario Fijo' && (!ph.includes('fijo') && !ph.includes('fija'))) return false;
+      if (filtrosAud.flexibilidad === 'Horario Flexible' && !ph.includes('flex')) return false;
+    }
+    return true;
+  })
 
   const crearCampana = async (datos) => {
     try {
@@ -462,34 +498,49 @@ export default function PaginaCampanas() {
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div className="flex flex-col gap-1.5">
                        <label className="text-xs font-bold text-slate-500">Estado del Lead</label>
-                       <select className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700">
+                       <select 
+                         className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700"
+                         value={filtrosAud.estado} onChange={e => setFiltrosAud({...filtrosAud, estado: e.target.value})}
+                       >
                          <option>Todos</option>
-                         <option>Borrador</option>
-                         <option>Contactado</option>
-                         <option>Interesado</option>
-                         <option>Agendado</option>
+                         <option value="Borrador">Borrador</option>
+                         <option value="Contactado">Contactado</option>
+                         <option value="Interesado">Interesado</option>
+                         <option value="Agendado">Agendado</option>
                        </select>
                      </div>
                      <div className="flex flex-col gap-1.5">
                        <label className="text-xs font-bold text-slate-500">Curso de Interés</label>
-                       <select className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700">
+                       <select 
+                         className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700"
+                         value={filtrosAud.curso} onChange={e => setFiltrosAud({...filtrosAud, curso: e.target.value})}
+                       >
                          <option>Todos</option>
-                         <option>Children</option>
-                         <option>Pre-Teens</option>
-                         <option>Young & Adults</option>
+                         <option value="DIPLOMADO CHILDREN">DIPLOMADO CHILDREN</option>
+                         <option value="DIPLOMADO PRE-TEENS">DIPLOMADO PRE-TEENS</option>
+                         <option value="DIPLOMADO YOUNG & ADULTS">DIPLOMADO YOUNG & ADULTS</option>
                        </select>
                      </div>
                      <div className="flex flex-col gap-1.5">
                        <label className="text-xs font-bold text-slate-500">Edad Minima (Ej: 5)</label>
-                       <input type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" />
+                       <input 
+                         type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" 
+                         value={filtrosAud.edad_min} onChange={e => setFiltrosAud({...filtrosAud, edad_min: e.target.value})}
+                       />
                      </div>
                      <div className="flex flex-col gap-1.5">
                        <label className="text-xs font-bold text-slate-500">Edad Máxima (Ej: 60)</label>
-                       <input type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" />
+                       <input 
+                         type="number" placeholder="Sin límite" className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700" 
+                         value={filtrosAud.edad_max} onChange={e => setFiltrosAud({...filtrosAud, edad_max: e.target.value})}
+                       />
                      </div>
                      <div className="flex flex-col gap-1.5 sm:col-span-2">
                        <label className="text-xs font-bold text-slate-500">Flexibilidad de Horario</label>
-                       <select className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700">
+                       <select 
+                         className="border border-slate-200 rounded-lg p-2 text-sm bg-slate-50 text-slate-700"
+                         value={filtrosAud.flexibilidad} onChange={e => setFiltrosAud({...filtrosAud, flexibilidad: e.target.value})}
+                       >
                          <option>Indistinto</option>
                          <option>Horario Fijo</option>
                          <option>Horario Flexible</option>
@@ -502,15 +553,37 @@ export default function PaginaCampanas() {
                  <div className="bg-gradient-to-br from-blue-600 to-[#00236f] p-6 rounded-2xl shadow-md text-white flex flex-col justify-center text-center relative overflow-hidden">
                    <span className="material-symbols-outlined text-[120px] absolute -right-6 -bottom-6 opacity-10">radar</span>
                    <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-2 z-10">Alcance Estimado</p>
-                   <p className="text-5xl font-black mb-4 z-10">~14</p>
+                   <p className="text-5xl font-black mb-4 z-10">{prospectosFiltrados.length}</p>
                    <p className="text-sm text-blue-100 z-10">Prospectos coinciden con estos filtros en tu base de datos y podrían recibir la campaña.</p>
-                   <button 
-                     className="mt-6 bg-white text-blue-900 font-bold text-sm py-2 px-4 rounded-xl shadow-[0_4px_10px_rgba(0,0,0,0.1)] hover:bg-blue-50 transition z-10"
-                   >
-                     Recalcular Audiencia
-                   </button>
+                   {prospectosFiltrados.length > 0 && (
+                     <button className="mt-4 text-xs font-bold underline text-blue-200 hover:text-white z-10" onClick={() => document.getElementById('preview_aud').scrollIntoView()}>Ver Vista Previa</button>
+                   )}
                  </div>
               </div>
+
+              {/* Lista Previa Visual de los prospectos matcheados */}
+              {prospectosFiltrados.length > 0 && (
+                <div id="preview_aud" className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm mt-6">
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-4">Vista Previa de Audiencia Muestra (Primeros 15)</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {prospectosFiltrados.slice(0, 15).map(p => (
+                      <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                            {(p.nombre_alumno || p.nombre || '?')[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-700 truncate w-32">{p.nombre_alumno || p.nombre}</p>
+                            <p className="text-[10px] text-slate-500 truncate w-32">{p.telefono || 'Sin WhatsApp'}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold uppercase">{p.estado}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             </div>
           )}
 
