@@ -5,8 +5,14 @@ export const dynamic = 'force-dynamic'
 
 // DELETE - Eliminar una conversación y sus mensajes
 export async function DELETE(solicitud) {
-  const { searchParams } = new URL(solicitud.url)
-  const id = searchParams.get('id')
+  let id = null
+  try {
+    const cuerpo = await solicitud.json()
+    id = cuerpo.id
+  } catch (e) {
+    const { searchParams } = new URL(solicitud.url)
+    id = searchParams.get('id')
+  }
 
   if (!id) {
     return NextResponse.json({ error: 'Se requiere el ID de la conversación' }, { status: 400 })

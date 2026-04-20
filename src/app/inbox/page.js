@@ -710,7 +710,7 @@ export default function PaginaInbox() {
 
                 <button type="button" onClick={async () => {
                   if (!chatActivo) return
-                  const ubicacion = '🏫 Total English School\n📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima\n🗺️ https://maps.app.goo.gl/e08MtvtfxfbGAKmz1\n🕒 Lun-Vie 2-9pm | Sáb 8am-2pm'
+                  const ubicacion = '🏫 Total English School\n📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima\n🗺️ https://www.google.com/maps/search/?api=1&query=Total+English+School+Colima\n🕒 Lun-Vie 2-9pm | Sáb 8am-2pm'
                   if (!confirm('¿Enviar ubicación al cliente?')) return
                   try {
                     const res = await fetch('/api/enviar-mensaje', {
