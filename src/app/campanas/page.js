@@ -510,119 +510,111 @@ export default function PaginaCampanas() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-6">
-                  {datosMostrar.map((campana) => (
-                    <div key={campana.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all">
-                      <div className="p-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{campana.nombre}</h3>
-                            <div className="flex gap-2 mt-2">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                                campana.estado === 'activa' ? 'bg-green-50 text-green-600 border-green-200' : 
-                                campana.estado === 'borrador' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                campana.estado === 'completada' ? 'bg-slate-100 text-slate-500 border-slate-200' :
-                                'bg-blue-50 text-blue-600 border-blue-200'
-                              }`}>
-                                {campana.estado}
-                              </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider">
-                                Automática
+                  {datosMostrar.map((campana) => {
+                    const metaInfo = plantillasMeta.find(p => p.name === campana.nombre_plantilla);
+                    const metaStatus = metaInfo?.status || 'NOT_FOUND';
+                    const isMetaApproved = metaStatus === 'APPROVED';
+
+                    return (
+                      <div key={campana.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all">
+                        <div className="p-5">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{campana.nombre}</h3>
+                              <div className="flex gap-2 mt-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                                  campana.estado === 'activa' ? 'bg-green-50 text-green-600 border-green-200' : 
+                                  campana.estado === 'borrador' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                  campana.estado === 'completada' ? 'bg-slate-100 text-slate-500 border-slate-200' :
+                                  campana.estado === 'rechazada' ? 'bg-red-50 text-red-600 border-red-200' :
+                                  'bg-blue-50 text-blue-600 border-blue-200'
+                                }`}>
+                                  {campana.estado}
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider flex items-center gap-1 ${
+                                  isMetaApproved ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'
+                                }`}>
+                                  <span className="material-symbols-outlined text-[10px]">{isMetaApproved ? 'verified' : 'hourglass_empty'}</span>
+                                  META: {metaStatus}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {/* BOTONES DE ACCIÓN DE CADA CAMPAÑA */}
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => abrirEditar(campana)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                              </button>
+                              <button 
+                                onClick={() => dispararCampana(campana.id)}
+                                disabled={enviando === campana.id || !isMetaApproved}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : !isMetaApproved ? 'text-slate-300 bg-slate-50 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}`}
+                                title={isMetaApproved ? 'Lanzar Campaña por WhatsApp' : 'No se puede lanzar: La plantilla aún no está aprobada por Meta'}
+                              >
+                                <span className="material-symbols-outlined text-[18px]">{enviando === campana.id ? 'hourglass_top' : 'rocket_launch'}</span>
+                              </button>
+                              <button onClick={() => eliminarCampana(campana.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* ACCIÓN DE ENVÍO A REVISIÓN (INTERNA) */}
+                          {['borrador', 'rechazada'].includes(campana.estado) && (
+                            <div className="mb-4">
+                                <button 
+                                  onClick={() => cambiarEstadoCampana(campana.id, 'pendiente')}
+                                  className="text-[10px] font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-lg hover:bg-amber-200 transition-colors uppercase"
+                                >
+                                  Mandar a Revisión Interna
+                                </button>
+                            </div>
+                          )}
+
+                          {/* DETALLE DE AUDIENCIA Y PLANTILLA EN LA TARJETA */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-medium mb-5">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">PLANTILLA (META NAME)</span>
+                              <span className="text-slate-700 bg-slate-50 px-2 py-1 rounded inline-block border border-slate-100 font-mono text-[11px]">{campana.nombre_plantilla || 'No configurada'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">AUDIENCIA (FILTROS)</span>
+                              <span className="text-slate-700 bg-blue-50/50 px-2 py-1 rounded inline-block border border-blue-100/50">
+                                {campana.audiencia_id ? `📍 Segmento: ${audienciasGuardadas.find(a => a.id === campana.audiencia_id)?.nombre || 'Cargando...'}` : (
+                                  <>
+                                    {campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
+                                    {campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''}
+                                    {campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
+                                  </>
+                                )}
                               </span>
                             </div>
                           </div>
                           
-                          {/* BOTONES DE ACCIÓN DE CADA CAMPAÑA */}
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => abrirEditar(campana)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                              <span className="material-symbols-outlined text-[18px]">edit</span>
-                            </button>
-                            <button 
-                              onClick={() => dispararCampana(campana.id)}
-                              disabled={enviando === campana.id || !['aprobada', 'activa', 'completada'].includes(campana.estado)}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${enviando === campana.id ? 'text-amber-500 bg-amber-50 animate-pulse' : !['aprobada', 'activa', 'completada'].includes(campana.estado) ? 'text-slate-300 bg-slate-50 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-100 bg-blue-50'}`}
-                              title={['aprobada', 'activa', 'completada'].includes(campana.estado) ? 'Disparar Campaña' : 'Requiere Aprobación'}
-                            >
-                              <span className="material-symbols-outlined text-[18px]">{enviando === campana.id ? 'hourglass_top' : 'rocket_launch'}</span>
-                            </button>
-                            <button onClick={() => eliminarCampana(campana.id)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                            </button>
+                          {/* MÉTRICAS INFERIORES DE LA TARJETA */}
+                          <div className="grid grid-cols-4 divide-x divide-slate-100 bg-slate-50/50 -mx-5 px-5 -mb-5 py-4 border-t border-slate-100">
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-xl font-black text-blue-600">{campana.alcance || 0}</span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Enviados</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-xl font-black text-emerald-500">{campana.alcance || 0}</span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Entregados</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-xl font-black text-amber-500">0</span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Respuestas</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-xl font-black text-slate-500">0.0%</span>
+                              <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Tasa Respuesta</span>
+                            </div>
                           </div>
+                          
                         </div>
-
-                        {/* ACCIONES DE ESTADO RÁPIDAS (REVISIÓN) */}
-                        {['borrador', 'pendiente', 'rechazada'].includes(campana.estado) && (
-                          <div className="flex gap-2 mb-4">
-                            {campana.estado === 'borrador' && (
-                              <button 
-                                onClick={() => cambiarEstadoCampana(campana.id, 'pendiente')}
-                                className="text-[10px] font-bold bg-amber-100 text-amber-700 px-3 py-1 rounded-lg hover:bg-amber-200 transition-colors uppercase"
-                              >
-                                Mandar a Revisión
-                              </button>
-                            )}
-                            {campana.estado === 'pendiente' && (
-                              <>
-                                <button 
-                                  onClick={() => cambiarEstadoCampana(campana.id, 'aprobada')}
-                                  className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-3 py-1 rounded-lg hover:bg-emerald-200 transition-colors uppercase"
-                                >
-                                  Aprobar
-                                </button>
-                                <button 
-                                  onClick={() => cambiarEstadoCampana(campana.id, 'rechazada')}
-                                  className="text-[10px] font-bold bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200 transition-colors uppercase"
-                                >
-                                  Rechazar
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {/* DETALLE DE AUDIENCIA Y PLANTILLA EN LA TARJETA */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-medium mb-5">
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">PLANTILLA</span>
-                            <span className="text-slate-700 bg-slate-50 px-2 py-1 rounded inline-block border border-slate-100">{campana.nombre_plantilla || 'Sin plantilla'}</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">AUDIENCIA (FILTROS)</span>
-                            <span className="text-slate-700 bg-blue-50/50 px-2 py-1 rounded inline-block border border-blue-100/50">
-                              {campana.audiencia_id ? `📍 Segmento: ${audienciasGuardadas.find(a => a.id === campana.audiencia_id)?.nombre || 'Cargando...'}` : (
-                                <>
-                                  {campana.publico_estado === 'Todos' && campana.publico_curso === 'Todos' ? 'Masiva (Toda la base)' : ''}
-                                  {campana.publico_estado !== 'Todos' ? `Estado: ${campana.publico_estado} ` : ''}
-                                  {campana.publico_curso !== 'Todos' ? `| Diplomado: ${campana.publico_curso}` : ''}
-                                </>
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {/* MÉTRICAS INFERIORES DE LA TARJETA */}
-                        <div className="grid grid-cols-4 divide-x divide-slate-100 bg-slate-50/50 -mx-5 px-5 -mb-5 py-4 border-t border-slate-100">
-                          <div className="flex flex-col items-center justify-center">
-                            <span className="text-xl font-black text-blue-600">{campana.alcance || 0}</span>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Enviados</span>
-                          </div>
-                          <div className="flex flex-col items-center justify-center">
-                            <span className="text-xl font-black text-emerald-500">{campana.alcance || 0}</span>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Entregados</span>
-                          </div>
-                          <div className="flex flex-col items-center justify-center">
-                            <span className="text-xl font-black text-amber-500">0</span>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Respuestas</span>
-                          </div>
-                          <div className="flex flex-col items-center justify-center">
-                            <span className="text-xl font-black text-slate-500">0.0%</span>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 mt-1">Tasa Respuesta</span>
-                          </div>
-                        </div>
-                        
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
