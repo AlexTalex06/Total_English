@@ -584,7 +584,6 @@ export default function PaginaCampanas() {
                 </div>
               )}
             </div>
-            </div>
           )}
 
         </div>
