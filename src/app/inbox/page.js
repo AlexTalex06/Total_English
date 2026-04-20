@@ -22,6 +22,7 @@ export default function PaginaInbox() {
   const [nombreNuevo, setNombreNuevo] = useState('')
   const [escribiendo, setEscribiendo] = useState(false)
   const [toggling, setToggling] = useState(false)
+  const [mostrarClipMenu, setMostrarClipMenu] = useState(false)
 
   const chatActivoRef = useRef(null)
   const cargarMensajesRef = useRef(null)
@@ -286,11 +287,24 @@ export default function PaginaInbox() {
     return `${dias}d`
   }
 
+  const eliminarConversacion = async (e, id) => {
+    e.stopPropagation()
+    if (!confirm('¿Seguro que quieres eliminar esta conversación? Se borrarán todos los mensajes.')) return
+    try {
+      // 1. Borrar mensajes
+      await supabase.from('mensajes').delete().eq('conversacion_id', id)
+      // 2. Borrar conversación
+      await supabase.from('conversaciones').delete().eq('id', id)
+      
+      if (chatActivo?.id === id) setChatActivo(null)
+      cargarConversaciones()
+    } catch (err) { console.error('Error eliminando:', err) }
+  }
+
   const guardarNotaInterna = async (idProspecto, nota) => {
     try {
       await supabase.from('prospectos').update({ notas_internas: nota }).eq('id', idProspecto)
-      // Recargar prospectos relacionados para ver reflejada la nota
-      if (chatActivo.prospectos) {
+      if (chatActivo?.prospectos) {
         cargarProspectosRelacionados(chatActivo.id_plataforma)
       }
     } catch (e) {
@@ -382,13 +396,21 @@ export default function PaginaInbox() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline mb-0.5">
+                  <div className="flex justify-between items-baseline mb-0.5 group/header">
                     <h3 className={`text-[14px] truncate ${unreadCount > 0 ? 'font-bold text-[#111b21]' : 'font-medium text-[#111b21]'}`}>
                       {conv.prospectos?.nombre_alumno || conv.prospectos?.nombre || conv.id_plataforma}
                     </h3>
-                    <span className={`text-[11px] shrink-0 ml-2 ${unreadCount > 0 ? 'text-[#25D366] font-bold' : 'text-slate-400'}`}>
-                      {obtenerTiempoRelativo(conv.actualizado_en)}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-[11px] shrink-0 ml-2 ${unreadCount > 0 ? 'text-[#25D366] font-bold' : 'text-slate-400'}`}>
+                        {obtenerTiempoRelativo(conv.actualizado_en)}
+                      </span>
+                      <button 
+                        onClick={(e) => eliminarConversacion(e, conv.id)}
+                        className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        delete
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     {/* Double check for sent messages */}
@@ -594,19 +616,38 @@ export default function PaginaInbox() {
           )}
 
           {/* Message Input */}
-          <form onSubmit={enviarMensaje} className="px-4 py-2.5 bg-[#f0f2f5] flex items-end gap-2">
+          <form onSubmit={enviarMensaje} className="px-4 py-2.5 bg-[#f0f2f5] flex items-end gap-2 relative">
+            
+            {/* Clip Menu Popover */}
+            {mostrarClipMenu && (
+              <div className="absolute bottom-[60px] left-4 bg-white rounded-2xl shadow-xl border border-slate-100 p-2 flex flex-col gap-1 z-50 animate-in fade-in slide-in-from-bottom-2">
+                <button type="button" onClick={() => { enviarImagenPorURL(); setMostrarClipMenu(false); }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                  <span className="material-symbols-outlined text-[#00a884] text-[20px]">image</span>
+                  <span className="text-[13px] font-medium">Fotos y Videos</span>
+                </button>
+                <button type="button" onClick={() => { alert('Función de Documentos en desarrollo'); setMostrarClipMenu(false); }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                  <span className="material-symbols-outlined text-[#7f66ff] text-[20px]">description</span>
+                  <span className="text-[13px] font-medium">Documento</span>
+                </button>
+                <button type="button" onClick={() => { alert('Función de Ubicación en desarrollo'); setMostrarClipMenu(false); }} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-700 transition-colors rounded-xl text-left whitespace-nowrap">
+                  <span className="material-symbols-outlined text-[#f05950] text-[20px]">location_on</span>
+                  <span className="text-[13px] font-medium">Ubicación</span>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={() => setMostrarEmojis(!mostrarEmojis)}
+              onClick={() => { setMostrarEmojis(!mostrarEmojis); setMostrarClipMenu(false); }}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0 ${mostrarEmojis ? 'text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <span className="material-symbols-outlined text-[24px]">mood</span>
             </button>
             <button
               type="button"
-              className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shrink-0"
-              title="Adjuntar archivo por URL"
-              onClick={enviarImagenPorURL}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0 ${mostrarClipMenu ? 'text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}
+              title="Adjuntar archivo"
+              onClick={() => { setMostrarClipMenu(!mostrarClipMenu); setMostrarEmojis(false); }}
             >
               <span className="material-symbols-outlined text-[24px] rotate-45">attach_file</span>
             </button>
