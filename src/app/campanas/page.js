@@ -13,7 +13,7 @@ export default function PaginaCampanas() {
   const [plantillasMeta, setPlantillasMeta] = useState([])
   const [cargandoMeta, setCargandoMeta] = useState(false)
   const [tabActivo, setTabActivo] = useState('campanas') // 'general', 'plantillas', 'campanas', 'audiencias'
-  
+
   // Estados para Audiencias
   const [prospectosAud, setProspectosAud] = useState([])
   const [filtrosAud, setFiltrosAud] = useState({
@@ -35,13 +35,13 @@ export default function PaginaCampanas() {
 
   const camposCampana = [
     { nombre: 'nombre', etiqueta: 'Nombre de la campaña', tipo: 'text', placeholder: 'Ej: Promoción Buen Fin', requerido: true },
-    { 
-      nombre: 'nombre_plantilla', 
-      etiqueta: 'Plantilla de Meta', 
-      tipo: 'datalist', 
+    {
+      nombre: 'nombre_plantilla',
+      etiqueta: 'Plantilla de Meta',
+      tipo: 'datalist',
       placeholder: 'Escribe el nombre exacto o selecciona una existente...',
       opciones: plantillasSugeridas,
-      requerido: true 
+      requerido: true
     },
     { nombre: 'mensaje', etiqueta: 'Notas Internas', tipo: 'textarea', placeholder: 'Notas sobre esta campaña...', requerido: false },
     {
@@ -77,7 +77,7 @@ export default function PaginaCampanas() {
     },
     { nombre: 'imagen_url', etiqueta: 'URL de imagen (Opcional si la plantilla Meta lo requiere)', tipo: 'url', placeholder: 'https://...', requerido: false },
   ]
-  
+
   const cargarCampanas = async () => {
     setCargando(true)
     try {
@@ -109,7 +109,7 @@ export default function PaginaCampanas() {
   useEffect(() => {
     cargarCampanas()
     cargarPlantillasMeta()
-    
+
     // Cargar base de datos prospectos para audiencias
     const cargarProspectos = async () => {
       try {
@@ -193,7 +193,7 @@ export default function PaginaCampanas() {
 
   const dispararCampana = async (id) => {
     if (!confirm('⚠️ ESTO ENVIARÁ MENSAJES REALES POR WHATSAPP a todos los prospectos que cumplan los filtros.\n\n¿Estás absolutamente seguro de continuar?')) return
-    
+
     setEnviando(id)
     try {
       const respuesta = await fetch('/api/campanas/ejecutar', {
@@ -201,9 +201,9 @@ export default function PaginaCampanas() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
       })
-      
+
       const resData = await respuesta.json()
-      
+
       if (respuesta.ok) {
         alert(`✅ ¡Campaña Disparada!\nAudiencia encontrada: ${resData.alcance_esperado}\nMensajes enviados: ${resData.envios_exitosos}`)
         cargarCampanas()
@@ -607,6 +607,6 @@ export default function PaginaCampanas() {
           imagen_url: campanaEditando.imagen_url,
         } : null}
       />
-    </div>
+    </div >
   )
 }
