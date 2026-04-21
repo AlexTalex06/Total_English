@@ -54,7 +54,7 @@ export default function PaginaPanel() {
           Bienvenido de vuelta, {usuario?.nombre?.split(' ')[0] || 'Administrador'}.
         </h2>
         <p className="text-[#444651] text-lg max-w-2xl leading-relaxed">
-          Aquí está el pulso actual de Total English Academy. Los datos se sincronizan en todos los módulos.
+          Aquí está el pulso actual de Total English School. Los datos se sincronizan en todos los módulos.
         </p>
       </section>
 

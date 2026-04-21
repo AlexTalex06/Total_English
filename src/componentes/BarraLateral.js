@@ -96,7 +96,7 @@ export default function BarraLateral() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-bold text-blue-900 truncate">{usuario?.nombre || 'Total English'}</span>
-            <span className="text-[10px] text-slate-500 truncate">{usuario?.email || 'Academia de Inglés'}</span>
+            <span className="text-[10px] text-slate-500 truncate">{usuario?.email || 'Escuela de Inglés'}</span>
           </div>
         </div>
       </aside>
