@@ -434,13 +434,114 @@ export async function POST(solicitud) {
           await enviarMensajeWhatsApp(remitenteId, msgEspera)
 
           // 2. Enviar Imagen + Recomendación (Burbuja única)
-          if (datos && datos.imagen && datos.imagen !== 'null') {
+          // 2. Enviar Imagen con caption corto y luego el resto del texto
+// 2. Enviar Imagen y luego recomendación (texto separado)
+if (datos && datos.imagen && datos.imagen !== 'null') {
+  // Construir URL segura de la imagen
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app';
+  const { protocol, host } = new URL(baseUrl);
+  const imgUrl = `${protocol}//${host}/cursos/${datos.imagen}`;
+
+  // Enviar solo la imagen (sin caption)
+  console.log('📤 Enviando Imagen sola:', imgUrl);
+  const enviadoImg = await enviarMensajeWhatsApp(remitenteId, '', imgUrl);
+
+  // Guardar la imagen en el Inbox
+  await supabase.from('mensajes').insert({
+    conversacion_id: convExist.id,
+    remitente: 'bot',
+    contenido: '[Imagen del curso]',
+    tipo: 'imagen',
+    url_archivo: imgUrl
+  });
+
+  // Enviar el texto de la recomendación
+  await marcarEscribiendo(remitenteId);
+  await sleep(1500);
+  await enviarMensajeWhatsApp(remitenteId, restoTexto);
+
+  // Guardar el texto en el Inbox
+  await supabase.from('mensajes').insert({
+    conversacion_id: convExist.id,
+    remitente: 'bot',
+    contenido: restoTexto,
+    tipo: 'texto'
+  });
+
+  // Si la imagen falla, reenviar solo el texto (el mensaje ya se envió)
+  if (!enviadoImg) {
+    console.warn('⚠️ Meta no aceptó la imagen, enviando solo texto...');
+    await enviarMensajeWhatsApp(remitenteId, restoTexto);
+  }
+} else {
+  // No hay imagen, envía solo el texto
+  await enviarMensajeWhatsApp(remitenteId, restoTexto);
+  await supabase.from('mensajes').insert({
+    conversacion_id: convExist.id,
+    remitente: 'bot',
+    contenido: restoTexto,
+    tipo: 'texto'
+  });
+}
+  // Construir URL segura de la imagen
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app';
+  const { protocol, host } = new URL(baseUrl);
+  const imgUrl = `${protocol}//${host}/cursos/${datos.imagen}`;
+
+  // Dividir texto para cumplir con límite de caption (<=1024)
+  const maxCaption = 1000; // margen de seguridad
+  const caption = restoTexto.length > maxCaption ? restoTexto.slice(0, maxCaption) : restoTexto;
+  const textoPosterior = restoTexto.length > maxCaption ? restoTexto.slice(maxCaption).trim() : '';
+
+  // Enviar Imagen con caption corto
+  console.log('📤 Enviando Imagen con caption corto:', imgUrl);
+  const enviadoImg = await enviarMensajeWhatsApp(remitenteId, caption, imgUrl);
+
+  // Guardar en Inbox (imagen + caption)
+  await supabase.from('mensajes').insert({
+    conversacion_id: convExist.id,
+    remitente: 'bot',
+    contenido: caption,
+    tipo: 'imagen',
+    url_archivo: imgUrl
+  });
+
+  // Texto restante después de la imagen
+  if (textoPosterior) {
+    await marcarEscribiendo(remitenteId);
+    await sleep(1500);
+    await enviarMensajeWhatsApp(remitenteId, textoPosterior);
+    await supabase.from('mensajes').insert({
+      conversacion_id: convExist.id,
+      remitente: 'bot',
+      contenido: textoPosterior,
+      tipo: 'texto'
+    });
+  }
+
+  // Plan B: si la imagen falla, reenviar todo el texto
+  if (!enviadoImg) {
+    console.warn('⚠️ Meta no aceptó la imagen, reenviando mensaje completo como texto...');
+    await enviarMensajeWhatsApp(remitenteId, restoTexto);
+  }
+} else {
+  // No hay imagen, envía el texto completo
+  await enviarMensajeWhatsApp(remitenteId, restoTexto);
+  await supabase.from('mensajes').insert({
+    conversacion_id: convExist.id,
+    remitente: 'bot',
+    contenido: restoTexto,
+    tipo: 'texto'
+  });
+}
             await marcarEscribiendo(remitenteId)
             await sleep(2000)
             
             // Forzar siempre URL dinámica basada en Vercel (la que funcionaba al inicio)
-            const host = solicitud.headers.get('x-forwarded-host') || solicitud.headers.get('host') || 'total-english.vercel.app'
-            const protocol = host.includes('localhost') ? 'http' : 'https'
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app';
+            const urlObj = new URL(baseUrl);
+            const protocol = urlObj.protocol.replace(':', ''); // http or https
+            const host = urlObj.host;
             const imgUrl = `${protocol}://${host}/cursos/${datos.imagen}`
             
             console.log('📤 Enviando Imagen de Vercel + Texto:', imgUrl)
