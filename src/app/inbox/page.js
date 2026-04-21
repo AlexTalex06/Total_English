@@ -118,6 +118,30 @@ export default function PaginaInbox() {
     }
   }, [mensajes.length, escribiendo, chatActivo?.id])
 
+  // Limpiar burbuja de no leídos si el chat está activo y llegan mensajes nuevos
+  useEffect(() => {
+    if (!chatActivo) return;
+    const convActual = conversaciones.find(c => c.id === chatActivo.id);
+    if (!convActual) return;
+    
+    const unreadCount = convActual.mensajes?.filter(m => !m.leido && m.remitente === 'usuario').length || 0;
+    if (unreadCount > 0) {
+      // Optimistic update
+      setConversaciones(prev => prev.map(conv => {
+        if (conv.id === chatActivo.id) {
+          return { ...conv, mensajes: conv.mensajes.map(m => m.remitente === 'usuario' ? { ...m, leido: true } : m) };
+        }
+        return conv;
+      }));
+      // DB update
+      fetch('/api/mensajes/leer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversacion_id: chatActivo.id })
+      }).catch(err => console.error('Error marcando leido:', err));
+    }
+  }, [conversaciones, chatActivo]);
+
   const subirArchivo = async (e, tipo = 'imagen') => {
     const file = e.target.files?.[0]
     if (!file || !chatActivo) return
