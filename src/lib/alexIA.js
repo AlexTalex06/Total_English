@@ -112,7 +112,7 @@ export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plat
   try {
     const mensajeSistemaCrm = mensajesOriginales.find(m => m.role === 'system')?.content || '';
     const historialDeUsuario = mensajesOriginales.filter(m => m.role !== 'system');
-    
+
     const promptFinal = MEGA_SYSTEM_PROMPT
       .replace('{Nombre}', nombreUsuario || 'amigo(a)')
       .replace('\${CONTEXTO_CRM}', mensajeSistemaCrm)
@@ -136,7 +136,7 @@ export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plat
       if (jsonStart !== -1 && jsonEnd !== -1) {
         jsonStr = text.substring(jsonStart, jsonEnd + 1);
       }
-      
+
       const parsed = JSON.parse(jsonStr);
       return {
         respuesta: parsed.respuesta || text,
