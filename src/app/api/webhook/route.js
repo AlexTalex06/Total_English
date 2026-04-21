@@ -444,72 +444,78 @@ export async function POST(solicitud) {
 
         // Si es recomendación de curso -> FLUJO ESPECIAL con imagen y texto
         if (intencion === 'COURSE_RECOMMENDED') {
-          const partesRespuesta = respuesta.split(/\n\s*\n/)
-          let msgEspera = "Un momento estoy buscando el mejor diplomado.."
+          // 1. Intentar extraer el mensaje de espera "Un momento..."
+          const partesRespuesta = respuesta.split(/\n\s*\n/).filter(p => p.trim() !== '')
+          let msgEspera = "Un momento estoy buscando el mejor diplomado.. 🔍"
           let restoTexto = respuesta
           
-          if (partesRespuesta[0].toLowerCase().includes("un momento")) {
-            msgEspera = partesRespuesta[0].trim()
-            restoTexto = partesRespuesta.slice(1).join("\n\n").trim()
+          if (partesRespuesta.length > 1) {
+            const primerParte = partesRespuesta[0].toLowerCase()
+            if (primerParte.includes("un momento") || primerParte.includes("buscando")) {
+              msgEspera = partesRespuesta[0].trim()
+              restoTexto = partesRespuesta.slice(1).join("\n\n").trim()
+            }
           }
 
-          // 1. Enviar mensaje de espera
-          await marcarEscribiendo(remitenteId)
-          await sleep(1000)
-          await enviarMensajeWhatsApp(remitenteId, msgEspera)
+          // 2. Enviar mensaje de espera primero
+          try {
+            await marcarEscribiendo(remitenteId)
+            await sleep(800)
+            await enviarMensajeWhatsApp(remitenteId, msgEspera)
+          } catch (e) {
+            console.error('❌ Error enviando mensaje de espera:', e.message)
+          }
 
-          // 2. Enviar imagen (vía CDN) y luego texto
+          // 3. Enviar imagen (vía CDN)
           let imgUrl = null
-          if (datos?.imagen && datos.imagen !== 'null') {
-            imgUrl = await obtenerImagenCDN(datos.imagen)
+          try {
+            if (datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...') {
+              imgUrl = await obtenerImagenCDN(datos.imagen)
+            }
+
+            if (imgUrl) {
+              console.log('📤 Enviando Imagen vía CDN:', imgUrl)
+              await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información de tu diplomado!', imgUrl)
+
+              // Guardar imagen en CRM
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id,
+                remitente: 'bot',
+                contenido: '[Imagen del curso]',
+                tipo: 'imagen',
+                url_archivo: imgUrl
+              })
+            }
+          } catch (imgErr) {
+            console.error('❌ Error crítico en flujo de imagen:', imgErr.message)
           }
 
-          if (imgUrl) {
-            console.log('📤 Enviando Imagen vía CDN:', imgUrl)
-            // Agregamos un pequeño caption para asegurar que Meta no rechace el mensaje por estar vacío
-            const enviadoImg = await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información de tu diplomado!', imgUrl)
-
-            // Guardar imagen en CRM
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id,
-              remitente: 'bot',
-              contenido: '[Imagen del curso]',
-              tipo: 'imagen',
-              url_archivo: imgUrl
-            })
-
-            // Pausa y enviar el texto (con botones si hay)
+          // 4. Pausa y enviar el texto principal (con botones si hay)
+          // Esto se envía SIEMPRE, incluso si la imagen falló
+          try {
             await marcarEscribiendo(remitenteId)
             await sleep(1500)
             
+            // CRÍTICO: Meta requiere que el body text no sea nulo ni vacío para botones
+            let cuerpoMensaje = restoTexto && restoTexto.trim() !== '' ? restoTexto : respuesta
+            if (cuerpoMensaje.trim() === '') cuerpoMensaje = "¡Aquí tienes los detalles de tu curso!"
+
             if (opcionesLimpias) {
-              await enviarMensajeWhatsApp(remitenteId, restoTexto, null, opcionesLimpias)
+              console.log('📤 Enviando Botones con texto:', cuerpoMensaje)
+              await enviarMensajeWhatsApp(remitenteId, cuerpoMensaje, null, opcionesLimpias)
             } else {
-              await enviarMensajeWhatsApp(remitenteId, restoTexto)
+              await enviarMensajeWhatsApp(remitenteId, cuerpoMensaje)
             }
 
             // Guardar texto en CRM
             await supabase.from('mensajes').insert({
               conversacion_id: convExist.id,
               remitente: 'bot',
-              contenido: restoTexto,
+              contenido: cuerpoMensaje,
               tipo: 'texto'
             })
-
-            if (!enviadoImg) console.warn('⚠️ Falló el envío de la imagen por Meta')
-          } else {
-            // Sin imagen (o falló CDN), enviar solo el texto (con botones si hay)
-            if (opcionesLimpias) {
-              await enviarMensajeWhatsApp(remitenteId, restoTexto, null, opcionesLimpias)
-            } else {
-              await enviarMensajeWhatsApp(remitenteId, restoTexto)
-            }
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id,
-              remitente: 'bot',
-              contenido: restoTexto,
-              tipo: 'texto'
-            })
+          } catch (txtErr) {
+            console.error('❌ Error enviando texto principal:', txtErr.message)
           }
           
           await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
