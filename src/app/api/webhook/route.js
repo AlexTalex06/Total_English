@@ -234,7 +234,20 @@ export async function POST(solicitud) {
           });
           await supabase.from('conversaciones').update({ ultimo_mensaje: msjEscalamiento }).eq('id', convExist.id);
 
-          // Buscar al primer administrador y mandarle correo con Resend
+          // --- NOTIFICACIONES AL ADMINISTRADOR ---
+          const adminPhone = process.env.ADMIN_PHONE_NUMBER;
+          if (adminPhone) {
+            const msgAdminEscalamiento = `🚨 *¡SE REQUIERE UN ASESOR HUMANO!* 🚨\n\n` +
+              `👤 *Prospecto:* ${prosExist?.nombre_alumno || prosExist?.nombre || nombrePerfil || 'Desconocido'}\n` +
+              `📞 *Teléfono:* ${remitenteId}\n` +
+              `💬 *Motivo:* El usuario ha solicitado ayuda o el bot no pudo responder.\n\n` +
+              `🔗 *Ver en Inbox:* https://total-english-crm.vercel.app/inbox`;
+            
+            console.log('📢 Notificando al admin por WhatsApp (Escalamiento):', adminPhone);
+            await enviarMensajeWhatsApp(adminPhone, msgAdminEscalamiento);
+          }
+
+          // Notificación por correo con Resend
           try {
             const { data: admins } = await supabase.from('usuarios').select('email').eq('rol', 'admin');
             const adminEmail = admins && admins.length > 0 ? admins[0].email : null;
