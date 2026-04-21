@@ -331,10 +331,10 @@ export async function POST(solicitud) {
 
 
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
-          if (prosExist) {
-            const { data: citasExistentes } = await supabase.from('citas')
-              .select('id, fecha, hora')
-              .eq('prospecto_id', prosExist.id)
+        if (intencion === 'CIERRE_CITA' && prosExist) {
+          const { data: citasExistentes } = await supabase.from('citas')
+            .select('id, fecha, hora')
+            .eq('prospecto_id', prosExist.id)
             .eq('estado', 'pendiente')
             .order('creado_en', { ascending: false })
             .limit(1);
