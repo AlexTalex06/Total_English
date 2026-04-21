@@ -406,7 +406,7 @@ export async function POST(solicitud) {
             imagenUrl = datos.imagen
           } else {
             // Dominio de producción - Meta necesita una URL pública accesible
-            const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english-crm.vercel.app'
+            const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
             imagenUrl = `${origin}/cursos/${datos.imagen}`
           }
           console.log('🖼️ Imagen URL construida:', imagenUrl)
@@ -522,7 +522,8 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
 
   if (imagen) {
     payload.type = "image"
-    payload.image = { link: imagen, caption: mensaje }
+    // WhatsApp limita el caption a 1024 caracteres
+    payload.image = { link: imagen, caption: mensaje ? mensaje.substring(0, 1024) : '' }
   } else if (opciones && opciones.length > 0) {
     payload.type = "interactive"
     payload.interactive = {
@@ -545,7 +546,8 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
   }
 
   try {
-    await axios.post(url, payload, headers)
+    const response = await axios.post(url, payload, headers)
+    console.log('✅ Meta API respuesta:', JSON.stringify(response.data))
     return true
   } catch (error) {
     console.warn(`⚠️ Error en primer intento para ${to}:`, error.response?.data || error.message)
