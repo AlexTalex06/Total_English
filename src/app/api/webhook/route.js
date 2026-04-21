@@ -405,9 +405,11 @@ export async function POST(solicitud) {
           if (datos.imagen.startsWith('http')) {
             imagenUrl = datos.imagen
           } else {
-            const origin = new URL(solicitud.url).origin
+            // Usar dominio de producción directamente
+            const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(solicitud.url).origin
             imagenUrl = `${origin}/cursos/${datos.imagen}`
           }
+          console.log('🖼️ Imagen URL construida:', imagenUrl)
         }
 
         // Preparar opciones (sanitizar)
@@ -415,45 +417,50 @@ export async function POST(solicitud) {
           ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
           : null;
 
-        // Dividir la respuesta en partes para enviar mensajes con pausas (si no es imagen)
-        if (!imagenUrl && !opcionesLimpias && respuesta.includes('\n\n')) {
-          const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
-          
-          for (let i = 0; i < partes.length; i++) {
-            await marcarEscribiendo(remitenteId)
-            // Pausa proporcional a la longitud del texto (min 1s, max 3s)
-            const delay = Math.min(Math.max(partes[i].length * 30, 1000), 3000)
-            await sleep(delay)
-            
-            await enviarMensajeWhatsApp(remitenteId, partes[i])
-            
-            // Guardar en DB cada burbuja
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id,
-              remitente: 'bot',
-              contenido: partes[i],
-              tipo: 'texto'
-            })
-          }
-          await supabase.from('conversaciones').update({ ultimo_mensaje: partes[partes.length - 1] }).eq('id', convExist.id)
-        } else {
-          // Envío tradicional para imágenes u opciones
+        // SIEMPRE dividir la respuesta en burbujas de texto con pausas
+        const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
+        
+        for (let i = 0; i < partes.length; i++) {
           await marcarEscribiendo(remitenteId)
-          await sleep(1500)
-          const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, opcionesLimpias)
-          const respuestaFinal = enviadoCorrectamente ? respuesta : `[⚠️ WHATSAPP BLOQUEÓ EL ENVÍO]\n${respuesta}`
-
-          const { error: insertErr } = await supabase.from('mensajes').insert({
+          const delay = Math.min(Math.max(partes[i].length * 30, 1000), 3000)
+          await sleep(delay)
+          
+          // Si es la última parte Y hay opciones, enviar con opciones
+          if (i === partes.length - 1 && opcionesLimpias) {
+            await enviarMensajeWhatsApp(remitenteId, partes[i], null, opcionesLimpias)
+          } else {
+            await enviarMensajeWhatsApp(remitenteId, partes[i])
+          }
+          
+          await supabase.from('mensajes').insert({
             conversacion_id: convExist.id,
             remitente: 'bot',
-            contenido: respuestaFinal,
-            tipo: imagenUrl ? 'imagen' : 'texto',
-            url_archivo: imagenUrl || null
+            contenido: partes[i],
+            tipo: 'texto'
           })
-          if (insertErr) console.error("Error insertando mensaje en DB:", insertErr.message)
-          
-          await supabase.from('conversaciones').update({ ultimo_mensaje: respuestaFinal }).eq('id', convExist.id)
         }
+
+        // Si hay imagen, enviarla DESPUÉS del texto como mensaje separado
+        if (imagenUrl) {
+          await marcarEscribiendo(remitenteId)
+          await sleep(1500)
+          console.log('📤 Enviando imagen a WhatsApp:', imagenUrl)
+          const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '📚 Tu diplomado recomendado:', imagenUrl)
+          console.log('📤 Resultado envío imagen:', imgEnviada)
+          
+          const { error: insertImgErr } = await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id,
+            remitente: 'bot',
+            contenido: imgEnviada ? '🖼️ [Imagen del diplomado]' : `[⚠️ Error al enviar imagen: ${imagenUrl}]`,
+            tipo: 'imagen',
+            url_archivo: imagenUrl
+          })
+          if (insertImgErr) console.error("Error insertando imagen en DB:", insertImgErr.message)
+        }
+
+        await supabase.from('conversaciones').update({ 
+          ultimo_mensaje: partes[partes.length - 1] 
+        }).eq('id', convExist.id)
       }
     }
     return NextResponse.json({ estado: 'procesado' }, { status: 200 })
