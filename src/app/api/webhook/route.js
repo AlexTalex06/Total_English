@@ -523,13 +523,13 @@ async function obtenerImagenCDN(nombreArchivo) {
     const rutaStorage = `cursos/${nombreArchivo}`
     
     // Verificar si ya existe en Supabase Storage
-    const { data: archivos, error: listError } = await supabase.storage.from('recursos').list('cursos', { search: nombreArchivo })
+    const { data: archivos, error: listError } = await supabase.storage.from('chat-media').list('cursos', { search: nombreArchivo })
     
     if (listError) console.error('❌ Error listando bucket Supabase:', listError.message)
     console.log('📂 Archivos encontrados en cursos/:', JSON.stringify(archivos))
     
     if (archivos && archivos.length > 0) {
-      const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
+      const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
       console.log('🖼️ Imagen ya en Supabase:', data.publicUrl)
       return data.publicUrl
     }
@@ -544,7 +544,7 @@ async function obtenerImagenCDN(nombreArchivo) {
       const buffer = Buffer.from(response.data)
       
       const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
-      const { error: uploadErr } = await supabase.storage.from('recursos').upload(rutaStorage, buffer, {
+      const { error: uploadErr } = await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
         contentType,
         upsert: true
       })
@@ -554,7 +554,7 @@ async function obtenerImagenCDN(nombreArchivo) {
         return urlVercel 
       }
       
-      const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
+      const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
       console.log('🖼️ Imagen subida con éxito:', data.publicUrl)
       return data.publicUrl
     } catch (fetchErr) {
