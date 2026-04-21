@@ -177,6 +177,15 @@ export async function POST(solicitud) {
           content: m.contenido
         }))
 
+        // OBTENER CITAS PRÓXIMAS PARA EVITAR CONFLICTOS
+        const { data: citasFuturas } = await supabase.from('citas')
+          .select('fecha, hora')
+          .gte('fecha', new Date().toISOString().split('T')[0])
+          .order('fecha', { ascending: true })
+          .limit(20)
+        
+        const listaCitas = (citasFuturas || []).map(c => `- ${c.fecha} a las ${c.hora}`).join('\n')
+
         // Inyectar contexto de lo que YA sabemos
         const fechaActualTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' });
         const contextoCrm = `CONTEXTO ACTUAL DEL PROSPECTO:
@@ -187,6 +196,10 @@ export async function POST(solicitud) {
         Nivel: ${freshPros.nivel || 'Desconocido'}
         Horario: ${freshPros.horario || 'Desconocido'}
         Curso de Interés: ${freshPros.curso_interes || 'Desconocido'}
+        
+        CITAS OCUPADAS (NO AGENDAR AQUÍ):
+        ${listaCitas || 'No hay citas agendadas aún.'}
+
         IMPORTANTE: Si ya conoces estos datos, NO los preguntes de nuevo. Solo avanza al siguiente paso del flujo.`;
 
         // OBTENER CURSOS REALES DE LA BASE DE DATOS
@@ -490,30 +503,34 @@ export async function POST(solicitud) {
             console.error('❌ Error crítico en flujo de imagen:', imgErr.message)
           }
 
-          // 4. Pausa y enviar el texto principal (con botones si hay)
-          // Esto se envía SIEMPRE, incluso si la imagen falló
+          // 4. Pausa y enviar el texto principal dividido en burbujas
           try {
-            await marcarEscribiendo(remitenteId)
-            await sleep(1500)
+            const burbujasTexto = restoTexto.split(/\n\s*\n/).filter(b => b.trim() !== '')
             
-            // CRÍTICO: Meta requiere que el body text no sea nulo ni vacío para botones
-            let cuerpoMensaje = restoTexto && restoTexto.trim() !== '' ? restoTexto : respuesta
-            if (cuerpoMensaje.trim() === '') cuerpoMensaje = "¡Aquí tienes los detalles de tu curso!"
+            for (let i = 0; i < burbujasTexto.length; i++) {
+              const esUltima = (i === burbujasTexto.length - 1)
+              const burbujaActual = burbujasTexto[i].trim()
+              
+              if (!burbujaActual) continue;
 
-            if (opcionesLimpias) {
-              console.log('📤 Enviando Botones con texto:', cuerpoMensaje)
-              await enviarMensajeWhatsApp(remitenteId, cuerpoMensaje, null, opcionesLimpias)
-            } else {
-              await enviarMensajeWhatsApp(remitenteId, cuerpoMensaje)
+              await marcarEscribiendo(remitenteId)
+              await sleep(1500)
+
+              if (esUltima && opcionesLimpias) {
+                console.log('📤 Enviando Botones con burbuja final:', burbujaActual)
+                await enviarMensajeWhatsApp(remitenteId, burbujaActual, null, opcionesLimpias)
+              } else {
+                await enviarMensajeWhatsApp(remitenteId, burbujaActual)
+              }
+
+              // Guardar en CRM
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id,
+                remitente: 'bot',
+                contenido: burbujaActual,
+                tipo: 'texto'
+              })
             }
-
-            // Guardar texto en CRM
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id,
-              remitente: 'bot',
-              contenido: cuerpoMensaje,
-              tipo: 'texto'
-            })
           } catch (txtErr) {
             console.error('❌ Error enviando texto principal:', txtErr.message)
           }
