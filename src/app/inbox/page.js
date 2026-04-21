@@ -53,10 +53,48 @@ export default function PaginaInbox() {
     setProspectosRelacionados(data || [])
   }, [])
 
+  const cambiarChat = async (c) => {
+    setChatActivo(c)
+    cargarMensajes(c.id)
+    cargarProspectosRelacionados(c.id_plataforma)
+    setMostrarEmojis(false)
+    setEscribiendo(false)
+
+    const unreadCount = c.mensajes?.filter(m => !m.leido && m.remitente === 'usuario').length || 0;
+    if (unreadCount > 0) {
+      // Actualización optimista del estado local
+      setConversaciones(prev => prev.map(conv => {
+        if (conv.id === c.id) {
+          return { ...conv, mensajes: conv.mensajes.map(m => m.remitente === 'usuario' ? { ...m, leido: true } : m) };
+        }
+        return conv;
+      }));
+      
+      try {
+        await fetch('/api/mensajes/leer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversacion_id: c.id })
+        });
+        // No necesitamos cargarConversaciones aquí por la actualización optimista
+      } catch (err) { console.error('Error marcando leido:', err) }
+    }
+  }
+
   const cargarConversaciones = useCallback(async () => {
     const { data, error } = await supabase.from('conversaciones').select('*, prospectos(*), mensajes(id, leido, remitente)').order('actualizado_en', { ascending: false })
     if (!error && data) {
       setConversaciones(data)
+      const queryId = new URLSearchParams(window.location.search).get('id')
+      if (queryId) {
+        const conv = data.find(c => c.id === queryId)
+        if (conv) {
+          cambiarChat(conv)
+          // Limpiar la url sin recargar
+          window.history.replaceState(null, '', '/inbox')
+          return
+        }
+      }
       if (!chatActivoRef.current && data.length > 0) {
         setChatActivo(data[0])
         cargarMensajes(data[0].id)
@@ -203,33 +241,7 @@ export default function PaginaInbox() {
     } catch (err) { console.error(err) }
   }
 
-  const cambiarChat = async (c) => {
-    setChatActivo(c)
-    cargarMensajes(c.id)
-    cargarProspectosRelacionados(c.id_plataforma)
-    setMostrarEmojis(false)
-    setEscribiendo(false)
 
-    const unreadCount = c.mensajes?.filter(m => !m.leido && m.remitente === 'usuario').length || 0;
-    if (unreadCount > 0) {
-      // Actualización optimista del estado local
-      setConversaciones(prev => prev.map(conv => {
-        if (conv.id === c.id) {
-          return { ...conv, mensajes: conv.mensajes.map(m => m.remitente === 'usuario' ? { ...m, leido: true } : m) };
-        }
-        return conv;
-      }));
-      
-      try {
-        await fetch('/api/mensajes/leer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversacion_id: c.id })
-        });
-        // No necesitamos cargarConversaciones aquí por la actualización optimista
-      } catch (err) { console.error('Error marcando leido:', err) }
-    }
-  }
 
   const toggleBotHumano = async () => {
     if (!chatActivo || toggling) return

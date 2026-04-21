@@ -58,16 +58,26 @@ export function NotificationProvider({ children }) {
     }
   }, [agregarNotificacion])
 
+  const router = require('next/navigation').useRouter()
+
   return (
     <NotificationContext.Provider value={{ notificaciones, ultimoToast, setUltimoToast }}>
       {children}
       
       {/* Toast Flotante */}
       {ultimoToast && (
-        <div className={`fixed bottom-5 right-5 z-[9999] animate-bounce-in`}>
+        <div 
+          onClick={() => {
+            if (ultimoToast.link) {
+              router.push(ultimoToast.link)
+            }
+            setUltimoToast(null)
+          }}
+          className={`fixed bottom-5 right-5 z-[9999] animate-bounce-in cursor-pointer`}
+        >
           <div className={`p-4 rounded-2xl shadow-2xl border flex items-center gap-4 min-w-[300px] ${
-            ultimoToast.tipo === 'escalamiento' ? 'bg-red-600 text-white border-red-700' : 'bg-white text-slate-800 border-slate-200'
-          }`}>
+            ultimoToast.tipo === 'escalamiento' ? 'bg-red-600 text-white border-red-700 hover:bg-red-700' : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+          } transition-colors`}>
             <span className="material-symbols-outlined text-2xl">
               {ultimoToast.tipo === 'escalamiento' ? 'emergency_home' : 'chat_bubble'}
             </span>
@@ -75,7 +85,7 @@ export function NotificationProvider({ children }) {
               <p className="font-bold text-sm">{ultimoToast.titulo}</p>
               <p className="text-xs opacity-90 truncate max-w-[200px]">{ultimoToast.mensaje}</p>
             </div>
-            <button onClick={() => setUltimoToast(null)} className="p-1 hover:bg-black/10 rounded-full">
+            <button onClick={(e) => { e.stopPropagation(); setUltimoToast(null); }} className="p-1 hover:bg-black/10 rounded-full">
               <span className="material-symbols-outlined text-sm">close</span>
             </button>
           </div>
