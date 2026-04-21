@@ -304,9 +304,9 @@ export async function POST(solicitud) {
               let idTarget = prosExist.id;
 
               // Bifurcación multi-alumno
-              const incomingName = datos.nombre_alumno ? datos.nombre_alumno.trim() : null;
-              const currentName = prosExist.nombre_alumno ? prosExist.nombre_alumno.trim() : null;
-              const isInvalidName = (n) => !n || ['...', 'desconocido', 'n/a', 'null'].includes(n.toLowerCase());
+               const incomingName = datos.nombre_alumno ? String(datos.nombre_alumno).trim() : null;
+               const currentName = prosExist.nombre_alumno ? String(prosExist.nombre_alumno).trim() : null;
+               const isInvalidName = (n) => !n || ['...', 'desconocido', 'n/a', 'null'].includes(String(n).toLowerCase());
               
               if (incomingName && !isInvalidName(incomingName) && currentName && !isInvalidName(currentName) && incomingName.toLowerCase() !== currentName.toLowerCase()) {
                 console.log(`Bifurcando prospecto de ${currentName} a -> ${incomingName}`);
@@ -434,14 +434,18 @@ export async function POST(solicitud) {
           await enviarMensajeWhatsApp(remitenteId, msgEspera)
 
           // 2. Enviar Imagen + Recomendación (como Caption)
-          // Esto es lo que hace ManyChat y es más fiable
           if (datos && datos.imagen && datos.imagen !== 'null') {
             await marcarEscribiendo(remitenteId)
             await sleep(2000)
             
-            // Usar la URL directa de producción como primer intento
-            const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-            const imgUrl = `${origin}/cursos/${datos.imagen}`
+            // Intentar CDN de Supabase (más fiable para Meta)
+            let imgUrl = await obtenerImagenCDN(datos.imagen)
+            
+            // Fallback a Vercel si falla Supabase
+            if (!imgUrl) {
+              const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+              imgUrl = `${origin}/cursos/${datos.imagen}`
+            }
             
             console.log('📤 Enviando Imagen + Texto:', imgUrl)
             const enviado = await enviarMensajeWhatsApp(remitenteId, restoTexto, imgUrl)
