@@ -116,7 +116,7 @@ export default function PaginaInbox() {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [mensajes, escribiendo])
+  }, [mensajes.length, escribiendo, chatActivo?.id])
 
   const subirArchivo = async (e, tipo = 'imagen') => {
     const file = e.target.files?.[0]
