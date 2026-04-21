@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server'
+// Vercel build fix - Clean version 1.0
+import { NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { consultarAlex } from '@/lib/alexIA'
 import { escalarAHumano } from '@/lib/prospectoSync'
