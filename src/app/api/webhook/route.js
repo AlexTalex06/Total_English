@@ -438,27 +438,27 @@ export async function POST(solicitud) {
             await marcarEscribiendo(remitenteId)
             await sleep(2000)
             
-            // Intentar obtener del CDN de Supabase primero
-            let imgUrl = await obtenerImagenCDN(datos.imagen)
+            // Forzar siempre URL dinámica basada en Vercel (la que funcionaba al inicio)
+            const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'total-english.vercel.app'
+            const protocol = host.includes('localhost') ? 'http' : 'https'
+            const imgUrl = `${protocol}://${host}/cursos/${datos.imagen}`
             
-            // Si falla el CDN, construir URL dinámica basada en el host actual
-            if (!imgUrl) {
-              const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'total-english.vercel.app'
-              const protocol = host.includes('localhost') ? 'http' : 'https'
-              imgUrl = `${protocol}://${host}/cursos/${datos.imagen}`
-            }
-            
-            console.log('📤 Reintentando Imagen + Texto:', imgUrl)
+            console.log('📤 Enviando Imagen de Vercel + Texto:', imgUrl)
             const enviado = await enviarMensajeWhatsApp(remitenteId, restoTexto, imgUrl)
             
-            if (enviado) {
-              await supabase.from('mensajes').insert({
-                conversacion_id: convExist.id,
-                remitente: 'bot',
-                contenido: restoTexto, // Importante: el texto debe ir aquí para que se vea en el Inbox
-                tipo: 'imagen',
-                url_archivo: imgUrl
-              })
+            // Guardar en CRM (Inbox) SIEMPRE para no perder el contexto visual, incluso si Meta lo rechaza
+            await supabase.from('mensajes').insert({
+              conversacion_id: convExist.id,
+              remitente: 'bot',
+              contenido: restoTexto,
+              tipo: 'imagen',
+              url_archivo: imgUrl
+            })
+
+            // Si Meta rechaza la imagen (ej. fallo de red), enviar SOLO el texto para no cortar el flujo
+            if (!enviado) {
+              console.warn('⚠️ Meta rechazó la imagen, enviando texto como plan B...')
+              await enviarMensajeWhatsApp(remitenteId, restoTexto)
             }
           } else {
             await enviarMensajeWhatsApp(remitenteId, restoTexto)
