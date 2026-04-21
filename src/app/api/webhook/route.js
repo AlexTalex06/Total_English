@@ -419,8 +419,6 @@ export async function POST(solicitud) {
 
         // Si es recomendación de curso -> FLUJO ESPECIAL con imagen y texto
         if (intencion === 'COURSE_RECOMMENDED') {
-          // --- PASO 1: Separar el mensaje de "Un momento..." del resto ---
-          // Usamos regex para detectar saltos de línea (\n o \n\n)
           const partesRespuesta = respuesta.split(/\n\s*\n/)
           let msgEspera = "Un momento estoy buscando el mejor diplomado.."
           let restoTexto = respuesta
@@ -430,50 +428,37 @@ export async function POST(solicitud) {
             restoTexto = partesRespuesta.slice(1).join("\n\n").trim()
           }
 
-          // Enviar mensaje de espera PRIMERO
+          // 1. Enviar mensaje de espera
           await marcarEscribiendo(remitenteId)
-          await sleep(1500)
+          await sleep(1000)
           await enviarMensajeWhatsApp(remitenteId, msgEspera)
-          await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: msgEspera, tipo: 'texto'
-          })
 
-          // --- PASO 2: Imagen del diplomado (via Supabase Storage CDN) ---
+          // 2. Enviar Imagen + Recomendación (como Caption)
+          // Esto es lo que hace ManyChat y es más fiable
           if (datos && datos.imagen && datos.imagen !== 'null') {
             await marcarEscribiendo(remitenteId)
             await sleep(2000)
             
-            let imgUrlFinal = await obtenerImagenCDN(datos.imagen)
+            // Usar la URL directa de producción como primer intento
+            const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+            const imgUrl = `${origin}/cursos/${datos.imagen}`
             
-            // Fallback directo si falló el CDN
-            if (!imgUrlFinal) {
-              const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-              imgUrlFinal = `${origin}/cursos/${datos.imagen}`
-              console.log('⚠️ CDN falló, usando fallback directo:', imgUrlFinal)
-            }
+            console.log('📤 Enviando Imagen + Texto:', imgUrl)
+            const enviado = await enviarMensajeWhatsApp(remitenteId, restoTexto, imgUrl)
             
-            if (imgUrlFinal) {
-              console.log('📤 Enviando imagen final:', imgUrlFinal)
-              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '', imgUrlFinal)
-              console.log('📤 Resultado envío imagen WhatsApp:', imgEnviada)
-              
+            if (enviado) {
               await supabase.from('mensajes').insert({
                 conversacion_id: convExist.id,
                 remitente: 'bot',
-                contenido: '🖼️ [Imagen del diplomado]',
+                contenido: restoTexto,
                 tipo: 'imagen',
-                url_archivo: imgUrlFinal
+                url_archivo: imgUrl
               })
             }
+          } else {
+            // Si por algo no hay imagen, mandar solo texto
+            await enviarMensajeWhatsApp(remitenteId, restoTexto)
           }
-
-          // --- PASO 3: Enviar recomendación final ---
-          await marcarEscribiendo(remitenteId)
-          await sleep(2500)
-          await enviarMensajeWhatsApp(remitenteId, restoTexto)
-          await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: restoTexto, tipo: 'texto'
-          })
           
           await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
         } else {
