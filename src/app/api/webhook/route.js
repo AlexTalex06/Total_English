@@ -226,13 +226,17 @@ export async function POST(solicitud) {
           const categoria = datos?.escalation_category || 'pregunta_especifica';
           await escalarAHumano(convExist.id, prosExist.id, motivo, categoria);
           
-          const msjEscalamiento = respuesta || "Voy a transferir tu solicitud ahora mismo con uno de nuestros asesores. Revisará tu caso para darte una respuesta personalizada en unos momentos. ¡Gracias por tu paciencia!";
+          const msjEscalamiento = "Voy a transferir tu solicitud ahora mismo con uno de nuestros asesores.\n\nRevisará tu caso para darte una respuesta personalizada en unos momentos.\n\nUn asesor se pondrá en contacto contigo a la brevedad por este medio para darte seguimiento puntual. ¡Gracias por tu paciencia!";
           
           await enviarMensajeWhatsApp(remitenteId, msjEscalamiento);
-          await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: msjEscalamiento, tipo: 'texto'
-          });
-          await supabase.from('conversaciones').update({ ultimo_mensaje: msjEscalamiento }).eq('id', convExist.id);
+          // Dividir por saltos de línea para simular el envío de varios mensajes
+          const partesEscalamiento = msjEscalamiento.split('\n\n');
+          for (let i = 0; i < partesEscalamiento.length; i++) {
+             await supabase.from('mensajes').insert({
+               conversacion_id: convExist.id, remitente: 'bot', contenido: partesEscalamiento[i], tipo: 'texto'
+             });
+          }
+          await supabase.from('conversaciones').update({ ultimo_mensaje: partesEscalamiento[partesEscalamiento.length - 1] }).eq('id', convExist.id);
 
           // --- NOTIFICACIONES AL ADMINISTRADOR ---
           const adminPhone = process.env.ADMIN_PHONE_NUMBER;
