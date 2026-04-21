@@ -117,6 +117,19 @@ export async function POST(solicitud) {
             convExist = cExist
             prosExist = cExist.prospectos
           } else {
+            // Si no hay prospecto detectado previamente, lo creamos con el nombre del perfil de WhatsApp
+            if (!prosExist) {
+              const { data: nuevoP } = await supabase.from('prospectos').insert({
+                nombre: nombrePerfil || 'Prospecto WhatsApp',
+                telefono: remitenteId,
+                estado: 'nuevo'
+              }).select('*').single()
+              if (nuevoP) {
+                prosExist = nuevoP
+                console.log(`✅ Prospecto inicial creado con nombre de perfil: ${nombrePerfil}`)
+              }
+            }
+
             const { data: nuevaC } = await supabase.from('conversaciones').insert({ 
               prospecto_id: prosExist ? prosExist.id : null, 
               plataforma: 'whatsapp', 
@@ -190,13 +203,27 @@ export async function POST(solicitud) {
           `).join('\n\n')
         }
 
-        // Obtener configuración del bot (horarios, brechas)
+        // Obtener configuración del bot (horarios, brechas) y citas existentes para evitar cruces
         let configBot = null;
+        let citasExistentes = [];
+        
         const { data: cnf } = await supabase.from('configuracion_bot').select('*').eq('id', 1).single();
         if (cnf) configBot = cnf;
 
+        // Consultar citas de los próximos 7 días para que la IA sepa qué está ocupado
+        const hoy = new Date().toISOString().split('T')[0];
+        const { data: citasFuturas } = await supabase.from('citas')
+          .select('fecha, hora')
+          .gte('fecha', hoy)
+          .eq('estado', 'pendiente');
+        if (citasFuturas) citasExistentes = citasFuturas;
+
+        const contextoCrmPlus = `${contextoCrm}\n\n## CITAS OCUPADAS ACTUALMENTE:\n${citasExistentes.length > 0 
+          ? citasExistentes.map(c => `- ${c.fecha} a las ${c.hora}`).join('\n')
+          : 'No hay citas agendadas aún, todos los horarios están libres.'}`;
+
         const { respuesta, datos, opciones, intencion } = await consultarAlex([
-          { role: 'system', content: contextoCrm },
+          { role: 'system', content: contextoCrmPlus },
           ...historialFormat
         ], nombrePerfil, 'WhatsApp', tablaDinamicaCursos, configBot)
 
@@ -280,27 +307,22 @@ export async function POST(solicitud) {
         // 5. Actualizar CRM o Crear Prospecto si ya hay datos suficientes
         if (datos && Object.keys(datos).length > 0) {
           try {
-            // Si NO hay prospecto pero AlexIA ya obtuvo datos, lo creamos ahora
+            // Si NO hay prospecto pero AlexIA ya obtuvo datos, lo creamos ahora (Fallback si falló el inicio)
             if (!prosExist) {
-              // Requisito mínimo para crear prospecto: Nombre y al menos otro dato (edad o nivel)
-              const hasValidName = datos.nombre_alumno && !['...', 'desconocido', 'n/a', 'null'].includes(datos.nombre_alumno.toLowerCase())
-              if (hasValidName || datos.nombre || datos.edad || datos.nivel) {
-                const { data: nuevoP } = await supabase.from('prospectos').insert({
-                  nombre: datos.nombre || nombrePerfil || 'Interesado',
-                  nombre_alumno: datos.nombre_alumno || null,
-                  telefono: remitenteId,
-                  edad: datos.edad ? parseInt(datos.edad) : null,
-                  nivel: datos.nivel || null,
-                  horario: datos.horario || null,
-                  curso_interes: datos.curso_interes || null,
-                  estado: 'nuevo'
-                }).select('*').single()
-                
-                if (nuevoP) {
-                  prosExist = nuevoP
-                  await supabase.from('conversaciones').update({ prospecto_id: nuevoP.id }).eq('id', convExist.id)
-                  console.log(`✅ Prospecto creado dinámicamente para ${remitenteId} al obtener datos.`)
-                }
+              const { data: nuevoP } = await supabase.from('prospectos').insert({
+                nombre: datos.nombre || nombrePerfil || 'Interesado',
+                nombre_alumno: datos.nombre_alumno || null,
+                telefono: remitenteId,
+                edad: datos.edad ? parseInt(datos.edad) : null,
+                nivel: datos.nivel || null,
+                horario: datos.horario || null,
+                curso_interes: datos.curso_interes || null,
+                estado: 'nuevo'
+              }).select('*').single()
+              
+              if (nuevoP) {
+                prosExist = nuevoP
+                await supabase.from('conversaciones').update({ prospecto_id: nuevoP.id }).eq('id', convExist.id)
               }
             } else {
               // Si ya existe, actualizamos
@@ -444,7 +466,8 @@ export async function POST(solicitud) {
 
           if (imgUrl) {
             console.log('📤 Enviando Imagen vía CDN:', imgUrl)
-            const enviadoImg = await enviarMensajeWhatsApp(remitenteId, '', imgUrl)
+            // Agregamos un pequeño caption para asegurar que Meta no rechace el mensaje por estar vacío
+            const enviadoImg = await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información de tu diplomado!', imgUrl)
 
             // Guardar imagen en CRM
             await supabase.from('mensajes').insert({
@@ -536,45 +559,40 @@ async function obtenerImagenCDN(nombreArchivo) {
   try {
     const rutaStorage = `cursos/${nombreArchivo}`
     
-    // Verificar si ya existe en Supabase Storage
-    const { data: archivos, error: listError } = await supabase.storage.from('chat-media').list('cursos', { search: nombreArchivo })
-    
-    if (listError) console.error('❌ Error listando bucket Supabase:', listError.message)
-    console.log('📂 Archivos encontrados en cursos/:', JSON.stringify(archivos))
-    
-    if (archivos && archivos.length > 0) {
-      const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-      console.log('🖼️ Imagen ya en Supabase:', data.publicUrl)
-      return data.publicUrl
-    }
-    
-    // Si no existe, descargar de Vercel y subir a Supabase
-    const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-    const urlVercel = `${origin}/cursos/${nombreArchivo}`
-    console.log('🖼️ Descargando imagen de:', urlVercel)
-    
-    try {
-      const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
-      const buffer = Buffer.from(response.data)
+      const { data: archivos, error: listError } = await supabase.storage.from('chat-media').list('cursos', { search: nombreArchivo })
+      if (listError) console.error('❌ Error listando bucket Supabase:', listError.message)
       
-      const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
-      const { error: uploadErr } = await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
-        contentType,
-        upsert: true
-      })
-      
-      if (uploadErr) {
-        console.error('❌ Error subiendo imagen a Supabase:', uploadErr.message)
-        return urlVercel 
+      if (archivos && archivos.length > 0) {
+        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
+        console.log('🖼️ Imagen ya en Supabase:', data.publicUrl)
+        return data.publicUrl
       }
       
-      const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-      console.log('🖼️ Imagen subida con éxito:', data.publicUrl)
-      return data.publicUrl
-    } catch (fetchErr) {
-      console.error(`❌ Error descargando de Vercel (${urlVercel}):`, fetchErr.message)
-      return null
-    }
+      const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+      const urlVercel = `${origin}/cursos/${nombreArchivo}`
+      console.log('🖼️ Intentando descargar de Vercel para CDN:', urlVercel)
+      
+      try {
+        const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 8000 })
+        const buffer = Buffer.from(response.data)
+        const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
+        
+        const { error: uploadErr } = await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
+          contentType,
+          upsert: true
+        })
+        
+        if (uploadErr) {
+          console.error('❌ Error subiendo a Supabase Storage:', uploadErr.message)
+          return urlVercel 
+        }
+        
+        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
+        return data.publicUrl
+      } catch (fetchErr) {
+        console.error(`❌ Falló descarga de Vercel (${urlVercel}):`, fetchErr.message)
+        return urlVercel // Fallback a URL directa si falla la descarga
+      }
   } catch (err) {
     console.error('❌ Error en obtenerImagenCDN:', err.message)
     return null
@@ -643,7 +661,8 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
     console.log('✅ Meta API respuesta:', JSON.stringify(response.data))
     return true
   } catch (error) {
-    console.warn(`⚠️ Error en primer intento para ${to}:`, JSON.stringify(error.response?.data) || error.message)
+    const errorData = error.response?.data;
+    console.error(`❌ ERROR META API para ${to}:`, JSON.stringify(errorData, null, 2) || error.message)
 
     // LÓGICA DE MÉXICO: Si falla con 521, intentar con 52
     if (to.startsWith('521') && to.length === 13) {
