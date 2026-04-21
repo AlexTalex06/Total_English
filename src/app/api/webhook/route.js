@@ -428,14 +428,13 @@ export async function POST(solicitud) {
             console.log('🖼️ Imagen CDN URL:', imgUrlCDN)
             
             if (imgUrlCDN) {
-              const cursoNombre = datos.curso_interes || 'Tu diplomado recomendado'
-              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, `📚 ${cursoNombre}`, imgUrlCDN)
+              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '📚', imgUrlCDN)
               console.log('📤 Resultado envío imagen:', imgEnviada)
               
               await supabase.from('mensajes').insert({
                 conversacion_id: convExist.id,
                 remitente: 'bot',
-                contenido: `📚 ${cursoNombre}`,
+                contenido: '🖼️ [Imagen del diplomado]',
                 tipo: 'imagen',
                 url_archivo: imgUrlCDN
               })
