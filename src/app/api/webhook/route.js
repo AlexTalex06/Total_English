@@ -439,7 +439,7 @@ export async function POST(solicitud) {
             await sleep(2000)
             
             // Forzar siempre URL dinámica basada en Vercel (la que funcionaba al inicio)
-            const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'total-english.vercel.app'
+            const host = solicitud.headers.get('x-forwarded-host') || solicitud.headers.get('host') || 'total-english.vercel.app'
             const protocol = host.includes('localhost') ? 'http' : 'https'
             const imgUrl = `${protocol}://${host}/cursos/${datos.imagen}`
             
