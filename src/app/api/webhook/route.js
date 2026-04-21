@@ -434,50 +434,48 @@ export async function POST(solicitud) {
           await sleep(1000)
           await enviarMensajeWhatsApp(remitenteId, msgEspera)
 
-          // 2. Enviar imagen primero, luego el texto de recomendacion por separado
-          if (datos && datos.imagen && datos.imagen !== 'null') {
-            // Construir URL segura de la imagen
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app';
-            const { protocol, host } = new URL(baseUrl);
-            const imgUrl = `${protocol}//${host}/cursos/${datos.imagen}`;
+          // 2. Enviar imagen (vía CDN) y luego texto
+          let imgUrl = null
+          if (datos?.imagen && datos.imagen !== 'null') {
+            imgUrl = await obtenerImagenCDN(datos.imagen)
+          }
 
-            console.log('📤 Enviando Imagen sola:', imgUrl);
-            const enviadoImg = await enviarMensajeWhatsApp(remitenteId, '', imgUrl);
+          if (imgUrl) {
+            console.log('📤 Enviando Imagen vía CDN:', imgUrl)
+            const enviadoImg = await enviarMensajeWhatsApp(remitenteId, '', imgUrl)
 
-            // Guardar imagen en el Inbox
+            // Guardar imagen en CRM
             await supabase.from('mensajes').insert({
               conversacion_id: convExist.id,
               remitente: 'bot',
               contenido: '[Imagen del curso]',
               tipo: 'imagen',
               url_archivo: imgUrl
-            });
+            })
 
-            // Enviar el texto de recomendacion despues de la imagen
-            await marcarEscribiendo(remitenteId);
-            await sleep(1500);
-            await enviarMensajeWhatsApp(remitenteId, restoTexto);
+            // Pausa y enviar el texto
+            await marcarEscribiendo(remitenteId)
+            await sleep(1500)
+            await enviarMensajeWhatsApp(remitenteId, restoTexto)
 
-            // Guardar texto en el Inbox
+            // Guardar texto en CRM
             await supabase.from('mensajes').insert({
               conversacion_id: convExist.id,
               remitente: 'bot',
               contenido: restoTexto,
               tipo: 'texto'
-            });
+            })
 
-            if (!enviadoImg) {
-              console.warn('⚠️ Meta no acepto la imagen, solo texto enviado.');
-            }
+            if (!enviadoImg) console.warn('⚠️ Falló el envío de la imagen por Meta')
           } else {
-            // Sin imagen, enviar solo el texto
-            await enviarMensajeWhatsApp(remitenteId, restoTexto);
+            // Sin imagen (o falló CDN), enviar solo el texto
+            await enviarMensajeWhatsApp(remitenteId, restoTexto)
             await supabase.from('mensajes').insert({
               conversacion_id: convExist.id,
               remitente: 'bot',
               contenido: restoTexto,
               tipo: 'texto'
-            });
+            })
           }
           
           await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
