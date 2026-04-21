@@ -417,43 +417,81 @@ export async function POST(solicitud) {
           ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
           : null;
 
-        // Si es recomendación de curso -> enviar TODO el texto como 1 solo mensaje
+        // Si es recomendación de curso -> FLUJO ESPECIAL con imagen, texto y botones
         if (intencion === 'COURSE_RECOMMENDED') {
-          await marcarEscribiendo(remitenteId)
-          await sleep(2500)
-          
-          const envioTexto = await enviarMensajeWhatsApp(remitenteId, respuesta)
-          console.log('📤 Recomendación enviada:', envioTexto)
-          
-          await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id,
-            remitente: 'bot',
-            contenido: respuesta,
-            tipo: 'texto'
-          })
-
-          // Imagen del diplomado como mensaje separado
-          if (imagenUrl) {
+          // --- PASO 1: Imagen del diplomado PRIMERO (via Supabase Storage CDN) ---
+          if (datos && datos.imagen && datos.imagen !== 'null') {
             await marcarEscribiendo(remitenteId)
-            await sleep(1500)
-            console.log('📤 Enviando imagen a WhatsApp:', imagenUrl)
-            try {
-              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '📚 Tu diplomado recomendado:', imagenUrl)
+            await sleep(2000)
+            
+            const imgUrlCDN = await obtenerImagenCDN(datos.imagen)
+            console.log('🖼️ Imagen CDN URL:', imgUrlCDN)
+            
+            if (imgUrlCDN) {
+              const cursoNombre = datos.curso_interes || 'Tu diplomado recomendado'
+              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, `📚 ${cursoNombre}`, imgUrlCDN)
               console.log('📤 Resultado envío imagen:', imgEnviada)
               
               await supabase.from('mensajes').insert({
                 conversacion_id: convExist.id,
                 remitente: 'bot',
-                contenido: imgEnviada ? '🖼️ [Imagen del diplomado]' : `[⚠️ Error imagen: ${imagenUrl}]`,
+                contenido: `📚 ${cursoNombre}`,
                 tipo: 'imagen',
-                url_archivo: imagenUrl
+                url_archivo: imgUrlCDN
               })
-            } catch (imgErr) {
-              console.error('❌ Error crítico enviando imagen:', imgErr.message)
             }
           }
+
+          // --- PASO 2: Separar la respuesta en partes lógicas ---
+          // Buscar "Sin embargo" para separar la recomendación del cierre
+          const idxSinEmbargo = respuesta.indexOf('Sin embargo')
+          const idxTeGustaria = respuesta.indexOf('¿Te gustaría')
           
-          await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
+          let textoRecomendacion = respuesta
+          let textoSinEmbargo = null
+          let textoTeGustaria = null
+          
+          if (idxSinEmbargo > 0) {
+            textoRecomendacion = respuesta.substring(0, idxSinEmbargo).trim()
+            
+            if (idxTeGustaria > idxSinEmbargo) {
+              textoSinEmbargo = respuesta.substring(idxSinEmbargo, idxTeGustaria).trim()
+              textoTeGustaria = respuesta.substring(idxTeGustaria).trim()
+              // Limpiar los emojis de "👉 Visita..." del texto ya que irán como botones
+              textoTeGustaria = textoTeGustaria.split('\n').filter(l => !l.trim().startsWith('👉')).join('\n').trim()
+            } else {
+              textoSinEmbargo = respuesta.substring(idxSinEmbargo).trim()
+            }
+          }
+
+          // Enviar texto de recomendación
+          await marcarEscribiendo(remitenteId)
+          await sleep(2500)
+          await enviarMensajeWhatsApp(remitenteId, textoRecomendacion)
+          await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id, remitente: 'bot', contenido: textoRecomendacion, tipo: 'texto'
+          })
+
+          // Enviar "Sin embargo..." separado
+          if (textoSinEmbargo) {
+            await marcarEscribiendo(remitenteId)
+            await sleep(2000)
+            await enviarMensajeWhatsApp(remitenteId, textoSinEmbargo)
+            await supabase.from('mensajes').insert({
+              conversacion_id: convExist.id, remitente: 'bot', contenido: textoSinEmbargo, tipo: 'texto'
+            })
+          }
+
+          // --- PASO 3: Enviar pregunta con BOTONES interactivos ---
+          const msgBotones = textoTeGustaria || '¿Te gustaría venir a conocer la escuela o prefieres una llamada rápida? 👇'
+          await marcarEscribiendo(remitenteId)
+          await sleep(1500)
+          await enviarMensajeWhatsApp(remitenteId, msgBotones, null, ['Visita a Escuela 🏫', 'Llamada Info 📞'])
+          await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id, remitente: 'bot', contenido: msgBotones, tipo: 'texto'
+          })
+          
+          await supabase.from('conversaciones').update({ ultimo_mensaje: msgBotones }).eq('id', convExist.id)
         } else {
           // Para otros mensajes: dividir en burbujas con pausas
           const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
@@ -464,7 +502,12 @@ export async function POST(solicitud) {
             await sleep(delay)
             
             if (i === partes.length - 1 && opcionesLimpias) {
-              await enviarMensajeWhatsApp(remitenteId, partes[i], null, opcionesLimpias)
+              // Si hay opciones y son más de 3, usar lista. Si no, botones.
+              if (opcionesLimpias.length > 3) {
+                await enviarListaWhatsApp(remitenteId, partes[i], 'Menú de Diplomados', opcionesLimpias)
+              } else {
+                await enviarMensajeWhatsApp(remitenteId, partes[i], null, opcionesLimpias)
+              }
             } else {
               await enviarMensajeWhatsApp(remitenteId, partes[i])
             }
@@ -487,6 +530,47 @@ export async function POST(solicitud) {
   } catch (error) {
     console.error('❌ Error Webhook:', error.message, error.stack)
     return NextResponse.json({ error: 'Error interno' }, { status: 200 })
+  }
+}
+
+// === FUNCIÓN: Obtener imagen desde Supabase Storage CDN (con cache automático) ===
+async function obtenerImagenCDN(nombreArchivo) {
+  try {
+    const rutaStorage = `cursos/${nombreArchivo}`
+    
+    // Verificar si ya existe en Supabase Storage
+    const { data: archivos } = await supabase.storage.from('recursos').list('cursos', { search: nombreArchivo })
+    
+    if (archivos && archivos.length > 0) {
+      const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
+      console.log('🖼️ Imagen encontrada en Supabase:', data.publicUrl)
+      return data.publicUrl
+    }
+    
+    // Si no existe, descargar de Vercel y subir a Supabase
+    const urlVercel = `https://total-english.vercel.app/cursos/${nombreArchivo}`
+    console.log('🖼️ Descargando imagen de Vercel:', urlVercel)
+    
+    const response = await axios.get(urlVercel, { responseType: 'arraybuffer' })
+    const buffer = Buffer.from(response.data)
+    
+    const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
+    const { error: uploadErr } = await supabase.storage.from('recursos').upload(rutaStorage, buffer, {
+      contentType,
+      upsert: true
+    })
+    
+    if (uploadErr) {
+      console.error('❌ Error subiendo imagen a Supabase:', uploadErr.message)
+      return urlVercel // Fallback a Vercel URL
+    }
+    
+    const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
+    console.log('🖼️ Imagen subida a Supabase:', data.publicUrl)
+    return data.publicUrl
+  } catch (err) {
+    console.error('❌ Error en obtenerImagenCDN:', err.message)
+    return null
   }
 }
 
@@ -565,5 +649,47 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
       }
     }
     return false
+  }
+}
+
+// === FUNCIÓN: Enviar Lista Interactiva de WhatsApp ===
+async function enviarListaWhatsApp(to, mensaje, botonTexto, opciones) {
+  const token = process.env.META_WHATSAPP_TOKEN
+  const phoneId = process.env.META_PHONE_NUMBER_ID
+  const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`
+
+  const payload = {
+    messaging_product: "whatsapp",
+    to: to,
+    type: "interactive",
+    interactive: {
+      type: "list",
+      body: { text: mensaje },
+      action: {
+        button: botonTexto.substring(0, 20),
+        sections: [{
+          title: "Diplomados Disponibles",
+          rows: opciones.slice(0, 10).map((opt, i) => ({
+            id: `diploma_${i}`,
+            title: opt.substring(0, 24),
+            description: `Información sobre ${opt}`.substring(0, 72)
+          }))
+        }]
+      }
+    }
+  }
+
+  const headers = {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+  }
+
+  try {
+    const response = await axios.post(url, payload, headers)
+    console.log('✅ Lista enviada:', JSON.stringify(response.data))
+    return true
+  } catch (error) {
+    console.warn(`⚠️ Error enviando lista:`, error.response?.data || error.message)
+    // Fallback: enviar como texto simple
+    return await enviarMensajeWhatsApp(to, `${mensaje}\n\n${opciones.map((o, i) => `${i+1}. ${o}`).join('\n')}`)
   }
 }
