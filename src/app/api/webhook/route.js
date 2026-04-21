@@ -419,37 +419,63 @@ export async function POST(solicitud) {
 
         // Si es recomendación de curso -> FLUJO ESPECIAL con imagen y texto
         if (intencion === 'COURSE_RECOMMENDED') {
-          // --- PASO 1: Imagen del diplomado PRIMERO (via Supabase Storage CDN) ---
+          // --- PASO 1: Separar el mensaje de "Un momento..." del resto ---
+          // Usamos regex para detectar saltos de línea (\n o \n\n)
+          const partesRespuesta = respuesta.split(/\n\s*\n/)
+          let msgEspera = "Un momento estoy buscando el mejor diplomado.."
+          let restoTexto = respuesta
+          
+          if (partesRespuesta[0].toLowerCase().includes("un momento")) {
+            msgEspera = partesRespuesta[0].trim()
+            restoTexto = partesRespuesta.slice(1).join("\n\n").trim()
+          }
+
+          // Enviar mensaje de espera PRIMERO
+          await marcarEscribiendo(remitenteId)
+          await sleep(1500)
+          await enviarMensajeWhatsApp(remitenteId, msgEspera)
+          await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id, remitente: 'bot', contenido: msgEspera, tipo: 'texto'
+          })
+
+          // --- PASO 2: Imagen del diplomado (via Supabase Storage CDN) ---
           if (datos && datos.imagen && datos.imagen !== 'null') {
             await marcarEscribiendo(remitenteId)
             await sleep(2000)
             
-            const imgUrlCDN = await obtenerImagenCDN(datos.imagen)
-            console.log('🖼️ Imagen CDN URL:', imgUrlCDN)
+            let imgUrlFinal = await obtenerImagenCDN(datos.imagen)
             
-            if (imgUrlCDN) {
-              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '', imgUrlCDN)
-              console.log('📤 Resultado envío imagen:', imgEnviada)
+            // Fallback directo si falló el CDN
+            if (!imgUrlFinal) {
+              const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+              imgUrlFinal = `${origin}/cursos/${datos.imagen}`
+              console.log('⚠️ CDN falló, usando fallback directo:', imgUrlFinal)
+            }
+            
+            if (imgUrlFinal) {
+              console.log('📤 Enviando imagen final:', imgUrlFinal)
+              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '', imgUrlFinal)
+              console.log('📤 Resultado envío imagen WhatsApp:', imgEnviada)
               
               await supabase.from('mensajes').insert({
                 conversacion_id: convExist.id,
                 remitente: 'bot',
                 contenido: '🖼️ [Imagen del diplomado]',
                 tipo: 'imagen',
-                url_archivo: imgUrlCDN
+                url_archivo: imgUrlFinal
               })
             }
           }
 
-          // --- PASO 2: Enviar recomendación como texto completo (1 solo bloque) ---
+          // --- PASO 3: Enviar recomendación final ---
           await marcarEscribiendo(remitenteId)
           await sleep(2500)
-          await enviarMensajeWhatsApp(remitenteId, respuesta)
+          await enviarMensajeWhatsApp(remitenteId, restoTexto)
           await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: respuesta, tipo: 'texto'
+            conversacion_id: convExist.id, remitente: 'bot', contenido: restoTexto, tipo: 'texto'
           })
           
-          await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
+          await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
         } else {
           // Para otros mensajes: dividir en burbujas con pausas
           const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
@@ -497,35 +523,44 @@ async function obtenerImagenCDN(nombreArchivo) {
     const rutaStorage = `cursos/${nombreArchivo}`
     
     // Verificar si ya existe en Supabase Storage
-    const { data: archivos } = await supabase.storage.from('recursos').list('cursos', { search: nombreArchivo })
+    const { data: archivos, error: listError } = await supabase.storage.from('recursos').list('cursos', { search: nombreArchivo })
+    
+    if (listError) console.error('❌ Error listando bucket Supabase:', listError.message)
+    console.log('📂 Archivos encontrados en cursos/:', JSON.stringify(archivos))
     
     if (archivos && archivos.length > 0) {
       const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
-      console.log('🖼️ Imagen encontrada en Supabase:', data.publicUrl)
+      console.log('🖼️ Imagen ya en Supabase:', data.publicUrl)
       return data.publicUrl
     }
     
     // Si no existe, descargar de Vercel y subir a Supabase
-    const urlVercel = `https://total-english.vercel.app/cursos/${nombreArchivo}`
-    console.log('🖼️ Descargando imagen de Vercel:', urlVercel)
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+    const urlVercel = `${origin}/cursos/${nombreArchivo}`
+    console.log('🖼️ Descargando imagen de:', urlVercel)
     
-    const response = await axios.get(urlVercel, { responseType: 'arraybuffer' })
-    const buffer = Buffer.from(response.data)
-    
-    const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
-    const { error: uploadErr } = await supabase.storage.from('recursos').upload(rutaStorage, buffer, {
-      contentType,
-      upsert: true
-    })
-    
-    if (uploadErr) {
-      console.error('❌ Error subiendo imagen a Supabase:', uploadErr.message)
-      return urlVercel // Fallback a Vercel URL
+    try {
+      const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
+      const buffer = Buffer.from(response.data)
+      
+      const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
+      const { error: uploadErr } = await supabase.storage.from('recursos').upload(rutaStorage, buffer, {
+        contentType,
+        upsert: true
+      })
+      
+      if (uploadErr) {
+        console.error('❌ Error subiendo imagen a Supabase:', uploadErr.message)
+        return urlVercel 
+      }
+      
+      const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
+      console.log('🖼️ Imagen subida con éxito:', data.publicUrl)
+      return data.publicUrl
+    } catch (fetchErr) {
+      console.error(`❌ Error descargando de Vercel (${urlVercel}):`, fetchErr.message)
+      return null
     }
-    
-    const { data } = supabase.storage.from('recursos').getPublicUrl(rutaStorage)
-    console.log('🖼️ Imagen subida a Supabase:', data.publicUrl)
-    return data.publicUrl
   } catch (err) {
     console.error('❌ Error en obtenerImagenCDN:', err.message)
     return null
