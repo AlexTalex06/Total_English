@@ -405,8 +405,8 @@ export async function POST(solicitud) {
           if (datos.imagen.startsWith('http')) {
             imagenUrl = datos.imagen
           } else {
-            // Usar dominio de producción directamente
-            const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(solicitud.url).origin
+            // Dominio de producción - Meta necesita una URL pública accesible
+            const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english-crm.vercel.app'
             imagenUrl = `${origin}/cursos/${datos.imagen}`
           }
           console.log('🖼️ Imagen URL construida:', imagenUrl)
@@ -417,50 +417,70 @@ export async function POST(solicitud) {
           ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
           : null;
 
-        // SIEMPRE dividir la respuesta en burbujas de texto con pausas
-        const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
-        
-        for (let i = 0; i < partes.length; i++) {
+        // Si es recomendación de curso -> enviar TODO el texto como 1 solo mensaje
+        if (intencion === 'COURSE_RECOMMENDED') {
           await marcarEscribiendo(remitenteId)
-          const delay = Math.min(Math.max(partes[i].length * 30, 1000), 3000)
-          await sleep(delay)
+          await sleep(2500)
           
-          // Si es la última parte Y hay opciones, enviar con opciones
-          if (i === partes.length - 1 && opcionesLimpias) {
-            await enviarMensajeWhatsApp(remitenteId, partes[i], null, opcionesLimpias)
-          } else {
-            await enviarMensajeWhatsApp(remitenteId, partes[i])
-          }
+          const envioTexto = await enviarMensajeWhatsApp(remitenteId, respuesta)
+          console.log('📤 Recomendación enviada:', envioTexto)
           
           await supabase.from('mensajes').insert({
             conversacion_id: convExist.id,
             remitente: 'bot',
-            contenido: partes[i],
+            contenido: respuesta,
             tipo: 'texto'
           })
-        }
 
-        // Si hay imagen, enviarla DESPUÉS del texto como mensaje separado
-        if (imagenUrl) {
-          await marcarEscribiendo(remitenteId)
-          await sleep(1500)
-          console.log('📤 Enviando imagen a WhatsApp:', imagenUrl)
-          const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '📚 Tu diplomado recomendado:', imagenUrl)
-          console.log('📤 Resultado envío imagen:', imgEnviada)
+          // Imagen del diplomado como mensaje separado
+          if (imagenUrl) {
+            await marcarEscribiendo(remitenteId)
+            await sleep(1500)
+            console.log('📤 Enviando imagen a WhatsApp:', imagenUrl)
+            try {
+              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '📚 Tu diplomado recomendado:', imagenUrl)
+              console.log('📤 Resultado envío imagen:', imgEnviada)
+              
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id,
+                remitente: 'bot',
+                contenido: imgEnviada ? '🖼️ [Imagen del diplomado]' : `[⚠️ Error imagen: ${imagenUrl}]`,
+                tipo: 'imagen',
+                url_archivo: imagenUrl
+              })
+            } catch (imgErr) {
+              console.error('❌ Error crítico enviando imagen:', imgErr.message)
+            }
+          }
           
-          const { error: insertImgErr } = await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id,
-            remitente: 'bot',
-            contenido: imgEnviada ? '🖼️ [Imagen del diplomado]' : `[⚠️ Error al enviar imagen: ${imagenUrl}]`,
-            tipo: 'imagen',
-            url_archivo: imagenUrl
-          })
-          if (insertImgErr) console.error("Error insertando imagen en DB:", insertImgErr.message)
+          await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
+        } else {
+          // Para otros mensajes: dividir en burbujas con pausas
+          const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
+          
+          for (let i = 0; i < partes.length; i++) {
+            await marcarEscribiendo(remitenteId)
+            const delay = Math.min(Math.max(partes[i].length * 30, 1000), 3000)
+            await sleep(delay)
+            
+            if (i === partes.length - 1 && opcionesLimpias) {
+              await enviarMensajeWhatsApp(remitenteId, partes[i], null, opcionesLimpias)
+            } else {
+              await enviarMensajeWhatsApp(remitenteId, partes[i])
+            }
+            
+            await supabase.from('mensajes').insert({
+              conversacion_id: convExist.id,
+              remitente: 'bot',
+              contenido: partes[i],
+              tipo: 'texto'
+            })
+          }
+          
+          await supabase.from('conversaciones').update({ 
+            ultimo_mensaje: partes[partes.length - 1] 
+          }).eq('id', convExist.id)
         }
-
-        await supabase.from('conversaciones').update({ 
-          ultimo_mensaje: partes[partes.length - 1] 
-        }).eq('id', convExist.id)
       }
     }
     return NextResponse.json({ estado: 'procesado' }, { status: 200 })
