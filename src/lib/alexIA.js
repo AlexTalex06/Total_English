@@ -111,7 +111,8 @@ export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plat
       model: openai('gpt-4o'),
       messages: [
         { role: 'system', content: promptFinal },
-        ...historialDeUsuario
+        ...historialDeUsuario,
+        { role: 'system', content: 'RECUERDA CRÍTICA: Ignora el formato de tus respuestas anteriores en el historial. TU ÚNICA RESPUESTA AHORA MISMO DEBE SER ESTRICTAMENTE UN OBJETO JSON VÁLIDO. Si respondes con texto plano romperás el sistema.' }
       ],
       temperature: 0.3, // Menor temperatura para asegurar que siga el formato
     });
