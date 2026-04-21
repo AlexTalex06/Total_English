@@ -178,13 +178,14 @@ export async function POST(solicitud) {
         }))
 
         // OBTENER CITAS PRÓXIMAS PARA EVITAR CONFLICTOS
-        const { data: citasFuturas } = await supabase.from('citas')
+        const { data: citasFuturasData } = await supabase.from('citas')
           .select('fecha, hora')
           .gte('fecha', new Date().toISOString().split('T')[0])
+          .eq('estado', 'pendiente')
           .order('fecha', { ascending: true })
           .limit(20)
         
-        const listaCitas = (citasFuturas || []).map(c => `- ${c.fecha} a las ${c.hora}`).join('\n')
+        const listaCitas = (citasFuturasData || []).map(c => `- ${c.fecha} a las ${c.hora}`).join('\n')
 
         // Inyectar contexto de lo que YA sabemos
         const fechaActualTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' });
@@ -224,12 +225,7 @@ export async function POST(solicitud) {
         if (cnf) configBot = cnf;
 
         // Consultar citas de los próximos 7 días para que la IA sepa qué está ocupado
-        const hoy = new Date().toISOString().split('T')[0];
-        const { data: citasFuturas } = await supabase.from('citas')
-          .select('fecha, hora')
-          .gte('fecha', hoy)
-          .eq('estado', 'pendiente');
-        if (citasFuturas) citasExistentes = citasFuturas;
+        if (citasFuturasData) citasExistentes = citasFuturasData;
 
         const contextoCrmPlus = `${contextoCrm}\n\n## CITAS OCUPADAS ACTUALMENTE:\n${citasExistentes.length > 0 
           ? citasExistentes.map(c => `- ${c.fecha} a las ${c.hora}`).join('\n')
