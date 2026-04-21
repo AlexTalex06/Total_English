@@ -433,35 +433,39 @@ export async function POST(solicitud) {
           await sleep(1000)
           await enviarMensajeWhatsApp(remitenteId, msgEspera)
 
-          // 2. Enviar Imagen + Recomendación (como Caption)
+          // 2. Enviar Recomendación (Texto) primero para asegurar entrega
+          await marcarEscribiendo(remitenteId)
+          await sleep(2000)
+          await enviarMensajeWhatsApp(remitenteId, restoTexto)
+          
+          await supabase.from('mensajes').insert({
+            conversacion_id: convExist.id, remitente: 'bot', contenido: restoTexto, tipo: 'texto'
+          })
+
+          // 3. Enviar Imagen (Separada)
           if (datos && datos.imagen && datos.imagen !== 'null') {
             await marcarEscribiendo(remitenteId)
-            await sleep(2000)
+            await sleep(1500)
             
-            // Intentar CDN de Supabase (más fiable para Meta)
+            // Intentar CDN de Supabase
             let imgUrl = await obtenerImagenCDN(datos.imagen)
             
-            // Fallback a Vercel si falla Supabase
+            // Fallback a Vercel
             if (!imgUrl) {
               const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
               imgUrl = `${origin}/cursos/${datos.imagen}`
             }
             
-            console.log('📤 Enviando Imagen + Texto:', imgUrl)
-            const enviado = await enviarMensajeWhatsApp(remitenteId, restoTexto, imgUrl)
+            console.log('📤 Enviando Imagen separada:', imgUrl)
+            await enviarMensajeWhatsApp(remitenteId, '', imgUrl)
             
-            if (enviado) {
-              await supabase.from('mensajes').insert({
-                conversacion_id: convExist.id,
-                remitente: 'bot',
-                contenido: restoTexto,
-                tipo: 'imagen',
-                url_archivo: imgUrl
-              })
-            }
-          } else {
-            // Si por algo no hay imagen, mandar solo texto
-            await enviarMensajeWhatsApp(remitenteId, restoTexto)
+            await supabase.from('mensajes').insert({
+              conversacion_id: convExist.id,
+              remitente: 'bot',
+              contenido: '🖼️ [Imagen del diplomado]',
+              tipo: 'imagen',
+              url_archivo: imgUrl
+            })
           }
           
           await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
@@ -611,12 +615,14 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
   }
 
+  console.log('📤 Payload enviado a Meta:', JSON.stringify(payload))
+
   try {
     const response = await axios.post(url, payload, headers)
     console.log('✅ Meta API respuesta:', JSON.stringify(response.data))
     return true
   } catch (error) {
-    console.warn(`⚠️ Error en primer intento para ${to}:`, error.response?.data || error.message)
+    console.warn(`⚠️ Error en primer intento para ${to}:`, JSON.stringify(error.response?.data) || error.message)
 
     // LÓGICA DE MÉXICO: Si falla con 521, intentar con 52
     if (to.startsWith('521') && to.length === 13) {
