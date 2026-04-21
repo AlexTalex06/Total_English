@@ -417,7 +417,7 @@ export async function POST(solicitud) {
           ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
           : null;
 
-        // Si es recomendación de curso -> FLUJO ESPECIAL con imagen, texto y botones
+        // Si es recomendación de curso -> FLUJO ESPECIAL con imagen y texto
         if (intencion === 'COURSE_RECOMMENDED') {
           // --- PASO 1: Imagen del diplomado PRIMERO (via Supabase Storage CDN) ---
           if (datos && datos.imagen && datos.imagen !== 'null') {
@@ -428,7 +428,7 @@ export async function POST(solicitud) {
             console.log('🖼️ Imagen CDN URL:', imgUrlCDN)
             
             if (imgUrlCDN) {
-              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '📚', imgUrlCDN)
+              const imgEnviada = await enviarMensajeWhatsApp(remitenteId, '', imgUrlCDN)
               console.log('📤 Resultado envío imagen:', imgEnviada)
               
               await supabase.from('mensajes').insert({
@@ -441,56 +441,15 @@ export async function POST(solicitud) {
             }
           }
 
-          // --- PASO 2: Separar la respuesta en partes lógicas ---
-          // Buscar "Sin embargo" para separar la recomendación del cierre
-          const idxSinEmbargo = respuesta.indexOf('Sin embargo')
-          const idxTeGustaria = respuesta.indexOf('¿Te gustaría')
-          
-          let textoRecomendacion = respuesta
-          let textoSinEmbargo = null
-          let textoTeGustaria = null
-          
-          if (idxSinEmbargo > 0) {
-            textoRecomendacion = respuesta.substring(0, idxSinEmbargo).trim()
-            
-            if (idxTeGustaria > idxSinEmbargo) {
-              textoSinEmbargo = respuesta.substring(idxSinEmbargo, idxTeGustaria).trim()
-              textoTeGustaria = respuesta.substring(idxTeGustaria).trim()
-              // Limpiar los emojis de "👉 Visita..." del texto ya que irán como botones
-              textoTeGustaria = textoTeGustaria.split('\n').filter(l => !l.trim().startsWith('👉')).join('\n').trim()
-            } else {
-              textoSinEmbargo = respuesta.substring(idxSinEmbargo).trim()
-            }
-          }
-
-          // Enviar texto de recomendación
+          // --- PASO 2: Enviar recomendación como texto completo (1 solo bloque) ---
           await marcarEscribiendo(remitenteId)
           await sleep(2500)
-          await enviarMensajeWhatsApp(remitenteId, textoRecomendacion)
+          await enviarMensajeWhatsApp(remitenteId, respuesta)
           await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: textoRecomendacion, tipo: 'texto'
-          })
-
-          // Enviar "Sin embargo..." separado
-          if (textoSinEmbargo) {
-            await marcarEscribiendo(remitenteId)
-            await sleep(2000)
-            await enviarMensajeWhatsApp(remitenteId, textoSinEmbargo)
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id, remitente: 'bot', contenido: textoSinEmbargo, tipo: 'texto'
-            })
-          }
-
-          // --- PASO 3: Enviar pregunta con BOTONES interactivos ---
-          const msgBotones = textoTeGustaria || '¿Te gustaría venir a conocer la escuela o prefieres una llamada rápida? 👇'
-          await marcarEscribiendo(remitenteId)
-          await sleep(1500)
-          await enviarMensajeWhatsApp(remitenteId, msgBotones, null, ['Visita a Escuela 🏫', 'Llamada Info 📞'])
-          await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: msgBotones, tipo: 'texto'
+            conversacion_id: convExist.id, remitente: 'bot', contenido: respuesta, tipo: 'texto'
           })
           
-          await supabase.from('conversaciones').update({ ultimo_mensaje: msgBotones }).eq('id', convExist.id)
+          await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
         } else {
           // Para otros mensajes: dividir en burbujas con pausas
           const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
