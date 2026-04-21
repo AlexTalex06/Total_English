@@ -433,39 +433,35 @@ export async function POST(solicitud) {
           await sleep(1000)
           await enviarMensajeWhatsApp(remitenteId, msgEspera)
 
-          // 2. Enviar Recomendación (Texto) primero para asegurar entrega
-          await marcarEscribiendo(remitenteId)
-          await sleep(2000)
-          await enviarMensajeWhatsApp(remitenteId, restoTexto)
-          
-          await supabase.from('mensajes').insert({
-            conversacion_id: convExist.id, remitente: 'bot', contenido: restoTexto, tipo: 'texto'
-          })
-
-          // 3. Enviar Imagen (Separada)
+          // 2. Enviar Imagen + Recomendación (Burbuja única)
           if (datos && datos.imagen && datos.imagen !== 'null') {
             await marcarEscribiendo(remitenteId)
-            await sleep(1500)
+            await sleep(2000)
             
-            // Intentar CDN de Supabase
+            // Intentar obtener del CDN de Supabase primero
             let imgUrl = await obtenerImagenCDN(datos.imagen)
             
-            // Fallback a Vercel
+            // Si falla el CDN, construir URL dinámica basada en el host actual
             if (!imgUrl) {
-              const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-              imgUrl = `${origin}/cursos/${datos.imagen}`
+              const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'total-english.vercel.app'
+              const protocol = host.includes('localhost') ? 'http' : 'https'
+              imgUrl = `${protocol}://${host}/cursos/${datos.imagen}`
             }
             
-            console.log('📤 Enviando Imagen separada:', imgUrl)
-            await enviarMensajeWhatsApp(remitenteId, '', imgUrl)
+            console.log('📤 Reintentando Imagen + Texto:', imgUrl)
+            const enviado = await enviarMensajeWhatsApp(remitenteId, restoTexto, imgUrl)
             
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id,
-              remitente: 'bot',
-              contenido: '🖼️ [Imagen del diplomado]',
-              tipo: 'imagen',
-              url_archivo: imgUrl
-            })
+            if (enviado) {
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id,
+                remitente: 'bot',
+                contenido: restoTexto, // Importante: el texto debe ir aquí para que se vea en el Inbox
+                tipo: 'imagen',
+                url_archivo: imgUrl
+              })
+            }
+          } else {
+            await enviarMensajeWhatsApp(remitenteId, restoTexto)
           }
           
           await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
