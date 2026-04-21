@@ -188,13 +188,21 @@ export default function PaginaInbox() {
 
     const unreadCount = c.mensajes?.filter(m => !m.leido && m.remitente === 'usuario').length || 0;
     if (unreadCount > 0) {
+      // Actualización optimista del estado local
+      setConversaciones(prev => prev.map(conv => {
+        if (conv.id === c.id) {
+          return { ...conv, mensajes: conv.mensajes.map(m => m.remitente === 'usuario' ? { ...m, leido: true } : m) };
+        }
+        return conv;
+      }));
+      
       try {
         await fetch('/api/mensajes/leer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversacion_id: c.id })
         });
-        cargarConversacionesRef.current?.();
+        // No necesitamos cargarConversaciones aquí por la actualización optimista
       } catch (err) { console.error('Error marcando leido:', err) }
     }
   }

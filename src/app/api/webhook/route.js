@@ -426,13 +426,15 @@ export async function POST(solicitud) {
           const enviadoCorrectamente = await enviarMensajeWhatsApp(remitenteId, respuesta, imagenUrl, opcionesLimpias)
           const respuestaFinal = enviadoCorrectamente ? respuesta : `[⚠️ WHATSAPP BLOQUEÓ EL ENVÍO]\n${respuesta}`
 
-          await supabase.from('mensajes').insert({
+          const { error: insertErr } = await supabase.from('mensajes').insert({
             conversacion_id: convExist.id,
             remitente: 'bot',
             contenido: respuestaFinal,
             tipo: imagenUrl ? 'imagen' : 'texto',
             url_archivo: imagenUrl || null
           })
+          if (insertErr) console.error("Error insertando mensaje en DB:", insertErr.message)
+          
           await supabase.from('conversaciones').update({ ultimo_mensaje: respuestaFinal }).eq('id', convExist.id)
         }
       }
