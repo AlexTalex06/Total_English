@@ -195,7 +195,7 @@ export async function POST(solicitud) {
         const { data: cnf } = await supabase.from('configuracion_bot').select('*').eq('id', 1).single();
         if (cnf) configBot = cnf;
 
-        const { respuesta, datos, intencion } = await consultarAlex([
+        const { respuesta, datos, opciones, intencion } = await consultarAlex([
           { role: 'system', content: contextoCrm },
           ...historialFormat
         ], nombrePerfil, 'WhatsApp', tablaDinamicaCursos, configBot)
@@ -256,14 +256,16 @@ export async function POST(solicitud) {
           try {
             const { data: admins } = await supabase.from('usuarios').select('email').eq('rol', 'admin');
             const adminEmail = admins && admins.length > 0 ? admins[0].email : null;
+            console.log('📧 Intentando notificar por email a:', adminEmail);
             if (adminEmail) {
-              await notificarEscalamientoAdmin({
+              const resEmail = await notificarEscalamientoAdmin({
                 adminEmail: adminEmail,
                 nombreProspecto: prosExist?.nombre_alumno || prosExist?.nombre || nombrePerfil || 'Desconocido',
                 telefonoProspecto: remitenteId,
                 motivo: texto || 'escalamiento',
                 conversacionId: convExist.id
               });
+              console.log('📧 Resultado de notificación email:', resEmail);
             } else {
               console.warn('⚠️ No se encontró email de administrador para enviar alerta de escalamiento.');
             }
@@ -414,8 +416,8 @@ export async function POST(solicitud) {
         }
 
         // Preparar opciones (sanitizar)
-        const opcionesLimpias = (datos?.opciones && Array.isArray(datos.opciones) && datos.opciones.length > 0)
-          ? datos.opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
+        const opcionesLimpias = (opciones && Array.isArray(opciones) && opciones.length > 0)
+          ? opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
           : null;
 
         // Si es recomendación de curso -> FLUJO ESPECIAL con imagen y texto
@@ -453,10 +455,15 @@ export async function POST(solicitud) {
               url_archivo: imgUrl
             })
 
-            // Pausa y enviar el texto
+            // Pausa y enviar el texto (con botones si hay)
             await marcarEscribiendo(remitenteId)
             await sleep(1500)
-            await enviarMensajeWhatsApp(remitenteId, restoTexto)
+            
+            if (opcionesLimpias) {
+              await enviarMensajeWhatsApp(remitenteId, restoTexto, null, opcionesLimpias)
+            } else {
+              await enviarMensajeWhatsApp(remitenteId, restoTexto)
+            }
 
             // Guardar texto en CRM
             await supabase.from('mensajes').insert({
@@ -468,8 +475,12 @@ export async function POST(solicitud) {
 
             if (!enviadoImg) console.warn('⚠️ Falló el envío de la imagen por Meta')
           } else {
-            // Sin imagen (o falló CDN), enviar solo el texto
-            await enviarMensajeWhatsApp(remitenteId, restoTexto)
+            // Sin imagen (o falló CDN), enviar solo el texto (con botones si hay)
+            if (opcionesLimpias) {
+              await enviarMensajeWhatsApp(remitenteId, restoTexto, null, opcionesLimpias)
+            } else {
+              await enviarMensajeWhatsApp(remitenteId, restoTexto)
+            }
             await supabase.from('mensajes').insert({
               conversacion_id: convExist.id,
               remitente: 'bot',

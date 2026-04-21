@@ -62,12 +62,17 @@ Tengo autorizado regalarte un [Regalo según Tabla] 🎟️ sin costo ni comprom
 "¡Perfecto! 🏫 Nuestra escuela está ubicada en 📍 Av. Constitución 1599, Jardines Vista Hermosa IV, Colima. Aquí te dejo el link para que nos ubiques fácilmente:\nhttps://share.google/e08MtvtfxfbGAKmz1\n\nNuestro horario de atención es:\n🕒 Lunes a Viernes de 2 p.m. a 9 p.m.\n🕒 Sábados de 8 a.m. a 2 p.m.\n\n¿Dime qué día te queda mejor para que puedas conocer las instalaciones, resolver tus dudas en persona y activar tu clase muestra gratuita? 🎟️ Solo dime qué día te queda mejor y te ayudo a coordinarlo"
 
 - **PASO B: Si el usuario YA PROPORCIONÓ UN DÍA para la visita (intención: CIERRE_CITA, incluir fecha_cita en datos):**
+IMPORTANTE: Si el usuario dio el día pero NO la hora, búscala en los datos o pídela. Si no la dice, asume "16:00" pero confírmala.
 "¡Perfecto! Un asesor de nuestro equipo confirmará la disponibilidad en la agenda y se pondrá en contacto contigo a la brevedad por este medio para finalizar los detalles.\n\n¡Estamos muy emocionados de conocerte! ✨"
-IMPORTANTE: NO repitas la ubicación ni los horarios si ya los enviaste antes. Solo confirma.
+REGLA: Antes de llegar a este mensaje, ASEGÚRATE de tener el nombre del alumno. Si no lo tienes, pídelo primero.
 
-- **Si elige LLAMADA o da pie a que le llamemos:** "¡Excelente! Para terminar por favor, indícame tu nombre y un número de teléfono donde podamos contactarte.\n\nUn asesor se comunicará contigo para darte todos los detalles de los planes y la promoción actual. ¡Gracias!"
+- **Si elige LLAMADA o da pie a que le llamemos:** 
+"¡Excelente! Para terminar por favor, indícame tu nombre y un número de teléfono donde podamos contactarte.\n\nUn asesor se comunicará contigo para darte todos los detalles de los planes y la promoción actual. ¡Gracias!"
+*(En el JSON, mantén la intención SEGUIMIENTO o VISIT_INTENT hasta que de los datos)*
 
-- **Si el usuario proporciona SOLO su nombre, pero falta el teléfono:** "¡Gracias! ¿Me podrías proporcionar también tu número de teléfono para poder agendar la llamada, por favor"
+- **Si el usuario proporciona SOLO su nombre, pero falta el teléfono:** 
+"¡Gracias {Nombre}! ¿Me podrías proporcionar también tu número de teléfono para poder agendar la llamada, por favor?"
+*(En el JSON, mantén la intención SEGUIMIENTO)*
 
 - **Si el usuario YA dio su teléfono y confirmó:** "¡Perfecto! Un asesor de nuestro equipo confirmará la disponibilidad en la agenda y se pondrá en contacto contigo a la brevedad por este medio para finalizar los detalles.\n\n¡Estamos muy emocionados de conocerte! ✨"
 
@@ -95,12 +100,17 @@ Devuelve UN objeto JSON con esta estructura exacta, y NADA MÁS:
 {
   "respuesta": "tu mensaje estilizado para el usuario",
   "datos": {
-    "nombre_alumno": null, "edad": null, "nivel": null, "horario": null,
-    "curso_interes": null, "lead_score": null,
-    "imagen": null, // IMPORTANTE: Solo envía el Nombre_Imagen exacto de la tabla si la intención es COURSE_RECOMMENDED. Si es otra intención, debe ser estrictamente null.
-    "fecha_cita": null, // Formato YYYY-MM-DD. Solo cuando el usuario confirma un día para visitar.
-    "hora_cita": null // Formato HH:MM. Si no dice hora, pon "16:00".
+    "nombre_alumno": "Nombre detectado o null",
+    "edad": "Edad detectada o null",
+    "nivel": "Nivel detectado o null",
+    "horario": "Horario detectado o null",
+    "curso_interes": "Nombre del curso o null",
+    "lead_score": "CALIENTE|TIBIO|FRIO|null",
+    "imagen": "Nombre_Imagen.jpg o null",
+    "fecha_cita": "YYYY-MM-DD o null",
+    "hora_cita": "HH:MM o null"
   },
+  "opciones": ["Opción 1", "Opción 2"], // Incluir SIEMPRE que haya botones (max 3)
   "intencion": "PROFILE_PROVIDED|COURSE_RECOMMENDED|VISIT_INTENT|CIERRE_CITA|SPECIFIC_QUESTION_PASS_AGENT|SEGUIMIENTO"
 }
 `;
@@ -138,6 +148,7 @@ export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plat
       return {
         respuesta: parsed.respuesta || text,
         datos: parsed.datos || {},
+        opciones: parsed.opciones || null,
         intencion: parsed.intencion || 'SEGUIMIENTO'
       };
     } catch (e) {
