@@ -504,46 +504,16 @@ export async function POST(solicitud) {
   }
 }
 
-// Helper para asegurar que las imágenes se sirvan desde una URL estable (Supabase Storage)
+// Helper para asegurar que las imágenes se sirvan desde una URL 100% estable y sin bloqueos de red
 async function obtenerImagenCDN(nombreArchivo) {
-  if (!nombreArchivo || nombreArchivo === 'null' || nombreArchivo === '...') return null
+  if (!nombreArchivo || nombreArchivo.trim() === 'null' || nombreArchivo.trim() === '...') return null
   
-  try {
-      const rutaStorage = `cursos/${nombreArchivo}`
-      const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-      const urlVercel = `${origin}/cursos/${nombreArchivo}`
-      
-      // Intentar ver si ya existe en storage
-      const { data: archivos } = await supabase.storage.from('chat-media').list('cursos', {
-        search: nombreArchivo
-      })
-      
-      if (archivos && archivos.length > 0) {
-        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-        return data.publicUrl
-      }
-      
-      // Intentar subirlo si no existe para mayor estabilidad (Meta confía más en Supabase Storage que en Vercel Edge)
-      try {
-        const axios = require('axios')
-        const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
-        const buffer = Buffer.from(response.data)
-        const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
-        
-        await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
-          contentType,
-          upsert: true
-        })
-        
-        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-        return data.publicUrl
-      } catch (e) {
-        console.error('Error subiendo a Supabase:', e.message)
-        return urlVercel // Fallback
-      }
-  } catch (err) {
-    return null
-  }
+  // Solución Definitiva: Usar GitHub Raw como CDN público puro. 
+  // Esto evade cualquier bloqueo de Vercel Edge o Supabase bot-protection que Meta estuviera sufriendo.
+  const archivoLimpio = nombreArchivo.trim()
+  const githubCDN = `https://raw.githubusercontent.com/AlexTalex06/Total_English/main/public/cursos/${archivoLimpio}`
+  
+  return githubCDN
 }
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
