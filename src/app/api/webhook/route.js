@@ -191,7 +191,7 @@ export async function POST(solicitud) {
         const fechaActualTexto = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' });
         const contextoCrm = `CONTEXTO ACTUAL DEL PROSPECTO:
         Fecha de Hoy: ${fechaActualTexto}
-        Nombre Alumno: ${freshPros.nombre_alumno || 'Desconocido'}
+        Nombre Alumno: ${freshPros.nombre_alumno || freshPros.nombre || nombrePerfil || 'Desconocido'}
         Edad: ${freshPros.edad || 'Desconocida'}
         Categoría: ${freshPros.categoria_edad || 'Desconocida'}
         Nivel: ${freshPros.nivel || 'Desconocido'}
