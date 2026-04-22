@@ -272,8 +272,8 @@ export async function POST(solicitud) {
               `💬 *Motivo:* El usuario ha solicitado ayuda o el bot no pudo responder.\n\n` +
               `🔗 *Ver en Inbox:* https://total-english-crm.vercel.app/inbox`;
             
-            console.log('📢 Notificando al admin por WhatsApp (Escalamiento):', adminPhone);
-            await enviarMensajeWhatsApp(adminPhone, msgAdminEscalamiento);
+            console.log('📢 Notificación WhatsApp Admin desactivada temporalmente');
+            // await enviarMensajeWhatsApp(adminPhone, msgAdminEscalamiento);
           }
 
             // Notificación por correo con Resend
@@ -434,8 +434,8 @@ export async function POST(solicitud) {
               `📊 *Nivel:* ${nivelFinal}\n\n` +
               `🔗 *Ver en Citas:* https://total-english-crm.vercel.app/citas`;
             
-            console.log('📢 Notificando al admin:', adminPhone);
-            await enviarMensajeWhatsApp(adminPhone, msgAdmin);
+            console.log('📢 Notificación WhatsApp Admin desactivada temporalmente');
+            // await enviarMensajeWhatsApp(adminPhone, msgAdmin);
 
             // Notificación por Email (Modo Seguro para Resend)
             try {
