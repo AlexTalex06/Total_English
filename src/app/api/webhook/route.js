@@ -500,19 +500,45 @@ export async function POST(solicitud) {
   }
 }
 
-// Helper para asegurar que las imágenes se sirvan desde una URL estable
+// Helper para asegurar que las imágenes se sirvan desde una URL estable (Supabase Storage)
 async function obtenerImagenCDN(nombreArchivo) {
   if (!nombreArchivo || nombreArchivo === 'null' || nombreArchivo === '...') return null
   
-  const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-  const urlVercel = `${origin}/cursos/${nombreArchivo}`
-  
   try {
-      // Intentar subir a Supabase solo si es necesario, pero devolver Vercel por defecto por velocidad
-      // Meta prefiere URLs que respondan rápido y con el Content-Type correcto.
-      return urlVercel
+      const rutaStorage = `cursos/${nombreArchivo}`
+      const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+      const urlVercel = `${origin}/cursos/${nombreArchivo}`
+      
+      // Intentar ver si ya existe en storage
+      const { data: archivos } = await supabase.storage.from('chat-media').list('cursos', {
+        search: nombreArchivo
+      })
+      
+      if (archivos && archivos.length > 0) {
+        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
+        return data.publicUrl
+      }
+      
+      // Intentar subirlo si no existe para mayor estabilidad (Meta confía más en Supabase Storage que en Vercel Edge)
+      try {
+        const axios = require('axios')
+        const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
+        const buffer = Buffer.from(response.data)
+        const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
+        
+        await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
+          contentType,
+          upsert: true
+        })
+        
+        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
+        return data.publicUrl
+      } catch (e) {
+        console.error('Error subiendo a Supabase:', e.message)
+        return urlVercel // Fallback
+      }
   } catch (err) {
-    return urlVercel
+    return null
   }
 }
 
