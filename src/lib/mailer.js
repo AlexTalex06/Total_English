@@ -66,3 +66,43 @@ export async function notificarEscalamientoAdmin({ adminEmail, nombreProspecto, 
     return { success: false, error: error.message }
   }
 }
+
+/**
+ * Manda un correo de alerta al administrador cuando se agenda una nueva cita.
+ */
+export async function notificarCitaAdmin({ adminEmail, nombreAlumno, fecha, hora, curso, nivel }) {
+  if (!process.env.RESEND_API_KEY) return { success: false, error: 'API Key missing' }
+  const resend = new Resend(process.env.RESEND_API_KEY)
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'Sistema Total English <onboarding@resend.dev>',
+      to: adminEmail,
+      subject: `📅 Nueva Cita Agendada: ${nombreAlumno}`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <div style="background-color: #00236f; padding: 15px; border-radius: 6px 6px 0 0;">
+            <h2 style="color: white; margin: 0;">📅 Nueva Cita Confirmada</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p style="font-size: 16px; color: #334155;"><strong>Alumno:</strong> ${nombreAlumno}</p>
+            <p style="font-size: 16px; color: #334155;"><strong>Fecha:</strong> ${fecha}</p>
+            <p style="font-size: 16px; color: #334155;"><strong>Hora:</strong> ${hora}</p>
+            <p style="font-size: 16px; color: #334155;"><strong>Curso:</strong> ${curso}</p>
+            <p style="font-size: 16px; color: #334155;"><strong>Nivel:</strong> ${nivel}</p>
+            
+            <a href="${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/citas" 
+               style="display: inline-block; background-color: #00236f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
+              Ver Calendario de Citas
+            </a>
+          </div>
+        </div>
+      `
+    })
+    if (error) return { success: false, error }
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+

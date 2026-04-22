@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { consultarAlex } from '@/lib/alexIA'
 import { escalarAHumano } from '@/lib/prospectoSync'
-import { notificarEscalamientoAdmin } from '@/lib/mailer'
+import { notificarEscalamientoAdmin, notificarCitaAdmin } from '@/lib/mailer'
 import axios from 'axios'
 
 export async function GET(solicitud) {
@@ -276,12 +276,12 @@ export async function POST(solicitud) {
             await enviarMensajeWhatsApp(adminPhone, msgAdminEscalamiento);
           }
 
-          // Notificación por correo con Resend
-          try {
-            const { data: admins } = await supabase.from('usuarios').select('email').eq('rol', 'admin');
-            const adminEmail = admins && admins.length > 0 ? admins[0].email : null;
-            console.log('📧 Intentando notificar por email a:', adminEmail);
-            if (adminEmail) {
+            // Notificación por correo con Resend
+            try {
+              // Forzamos el correo verificado del usuario para evitar el error de Resend en modo prueba
+              const adminEmail = 'aniygdragon@gmail.com'; 
+              console.log('📧 Notificando por email (Modo Seguro):', adminEmail);
+              if (adminEmail) {
               const resEmail = await notificarEscalamientoAdmin({
                 adminEmail: adminEmail,
                 nombreProspecto: prosExist?.nombre_alumno || prosExist?.nombre || nombrePerfil || 'Desconocido',
@@ -436,8 +436,25 @@ export async function POST(solicitud) {
             
             console.log('📢 Notificando al admin:', adminPhone);
             await enviarMensajeWhatsApp(adminPhone, msgAdmin);
+
+            // Notificación por Email (Modo Seguro para Resend)
+            try {
+              const emailAdmin = 'aniygdragon@gmail.com';
+              console.log('📧 Notificando cita por email a:', emailAdmin);
+              await notificarCitaAdmin({
+                adminEmail: emailAdmin,
+                nombreAlumno: nombreFinal,
+                fecha: fCitaStr,
+                hora: datos.hora_cita || '16:00',
+                curso: cursoFinal,
+                nivel: nivelFinal
+              });
+            } catch (eMailErr) {
+              console.error('❌ Error enviando email de cita:', eMailErr);
+            }
           }
         }
+
 
         // 7. Enviar a Meta con Pausas y Simulación de Escritura
         let imagenUrl = null
