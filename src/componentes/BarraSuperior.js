@@ -91,6 +91,30 @@ export default function BarraSuperior() {
         })
       }
 
+      // Recently created appointments (last 24h) - notifies when AlexIA books a new appointment
+      const { data: citasNuevas } = await supabase
+        .from('citas')
+        .select('id, fecha, hora, creado_en, prospectos(nombre, nombre_alumno)')
+        .gte('creado_en', new Date(Date.now() - 24*60*60*1000).toISOString())
+        .order('creado_en', { ascending: false })
+        .limit(5)
+      
+      if (citasNuevas) {
+        citasNuevas.forEach(c => {
+          // Evitar duplicar con citas de hoy
+          if (!notifs.some(n => n.id === 'c_' + c.id)) {
+            notifs.push({
+              id: 'nc_' + c.id,
+              tipo: 'cita_nueva',
+              icono: 'calendar_add_on',
+              color: 'bg-emerald-100 text-emerald-600',
+              texto: `📅 Nueva cita agendada: ${c.prospectos?.nombre_alumno || c.prospectos?.nombre || 'Alumno'} - ${c.fecha} a las ${c.hora}`,
+              tiempo: obtenerTiempoRelativo(c.creado_en)
+            })
+          }
+        })
+      }
+
       // Unread messages
       const { count } = await supabase
         .from('mensajes')
