@@ -322,45 +322,21 @@ export async function POST(solicitud) {
               }
             } else {
               // Si ya existe, actualizamos
-              let idTarget = prosExist.id;
-
-              // Bifurcación multi-alumno
-               const incomingName = datos.nombre_alumno ? String(datos.nombre_alumno).trim() : null;
-               const currentName = prosExist.nombre_alumno ? String(prosExist.nombre_alumno).trim() : null;
-               const isInvalidName = (n) => !n || ['...', 'desconocido', 'n/a', 'null'].includes(String(n).toLowerCase());
+              // Si ya existe, actualizamos el mismo registro para evitar duplicados
+              const isInvalidName = (n) => !n || ['...', 'desconocido', 'n/a', 'null', 'usuario'].includes(String(n).toLowerCase());
+              const updateData = { actualizado_en: new Date().toISOString() };
               
-              if (incomingName && !isInvalidName(incomingName) && currentName && !isInvalidName(currentName) && incomingName.toLowerCase() !== currentName.toLowerCase()) {
-                console.log(`Bifurcando prospecto de ${currentName} a -> ${incomingName}`);
-                const propObj = { ...prosExist };
-                delete propObj.id; delete propObj.creado_en; delete propObj.actualizado_en;
-                propObj.nombre_alumno = datos.nombre_alumno;
-                propObj.edad = datos.edad ? parseInt(datos.edad) : null;
-                propObj.nivel = datos.nivel || null;
-                propObj.horario = datos.horario || null;
-                propObj.categoria_edad = datos.categoria_edad || null;
-                propObj.estado = 'nuevo';
-                propObj.lead_score = null;
+              if (datos.nombre_alumno && !isInvalidName(datos.nombre_alumno)) updateData.nombre_alumno = datos.nombre_alumno;
+              if (datos.edad) updateData.edad = parseInt(datos.edad);
+              if (datos.nivel && !isInvalidName(datos.nivel)) updateData.nivel = datos.nivel;
+              if (datos.horario && !isInvalidName(datos.horario)) updateData.horario = datos.horario;
+              if (datos.curso_interes && !isInvalidName(datos.curso_interes)) updateData.curso_interes = datos.curso_interes;
+              if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
+              if (datos.lead_score && !isInvalidName(datos.lead_score)) updateData.lead_score = datos.lead_score;
 
-                const { data: nuevoHijo } = await supabase.from('prospectos').insert(propObj).select('*').single();
-                if (nuevoHijo) {
-                  await supabase.from('conversaciones').update({ prospecto_id: nuevoHijo.id }).eq('id', convExist.id);
-                  idTarget = nuevoHijo.id;
-                  prosExist = nuevoHijo;
-                }
-              } else {
-                const updateData = { actualizado_en: new Date().toISOString() };
-                if (datos.nombre_alumno && !isInvalidName(datos.nombre_alumno)) updateData.nombre_alumno = datos.nombre_alumno;
-                if (datos.edad) updateData.edad = parseInt(datos.edad);
-                if (datos.nivel && !isInvalidName(datos.nivel)) updateData.nivel = datos.nivel;
-                if (datos.horario && !isInvalidName(datos.horario)) updateData.horario = datos.horario;
-                if (datos.curso_interes && !isInvalidName(datos.curso_interes)) updateData.curso_interes = datos.curso_interes;
-                if (datos.categoria_edad) updateData.categoria_edad = datos.categoria_edad;
-                if (datos.parentesco) updateData.parentesco = datos.parentesco;
-                if (datos.lead_score && !isInvalidName(datos.lead_score)) updateData.lead_score = datos.lead_score;
-
-                const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', idTarget);
-                if (crmError) console.error('Error actualizando prospecto:', crmError.message);
-              }
+              const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
+              if (crmError) console.error('Error actualizando prospecto:', crmError.message);
+            }
             }
           } catch (errSync) {
             console.error('❌ Error fatal en sync CRM:', errSync.message);
