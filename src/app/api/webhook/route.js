@@ -219,7 +219,7 @@ export async function POST(solicitud) {
           : 'No hay citas agendadas aún, todos los horarios están libres.'}`;
 
         const { respuesta, datos, opciones, intencion } = await consultarAlex([
-          { role: 'system', content: contextoCrmPlus },
+          { role: 'system', content: contextoCrmPlus.replace('{Telefono}', remitenteId) },
           ...historialFormat
         ], nombrePerfil, 'WhatsApp', tablaDinamicaCursos, configBot)
 
