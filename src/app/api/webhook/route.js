@@ -431,10 +431,10 @@ export async function POST(solicitud) {
           ? opciones.map(o => o.replace(/["\[\]]/g, '').trim()).filter(o => o !== '' && !o.toLowerCase().includes('opcional'))
           : null;
 
-        // 8. PREPARAR IMAGEN (Universal)
+        // 8. PREPARAR IMAGEN (Solo en recomendación de curso)
         let imgUrl = null
         try {
-          if (datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...' && datos.imagen !== 'Desconocido') {
+          if (intencion === 'COURSE_RECOMMENDED' && datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...' && datos.imagen !== 'Desconocido') {
             imgUrl = await obtenerImagenCDN(datos.imagen)
           }
         } catch (imgErr) {
