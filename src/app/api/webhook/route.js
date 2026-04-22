@@ -424,9 +424,26 @@ export async function POST(solicitud) {
           console.log('🖼️ Imagen URL construida:', imagenUrl)
         }
 
+        // === INICIO DEL BLOQUEO DE CARRERA (Optimistic Lock) ===
+        // Prevenir mensajes duplicados si el usuario envía 2 mensajes muy rápido
+        const { data: convCheck } = await supabase.from('conversaciones')
+          .select('actualizado_en')
+          .eq('id', convExist.id)
+          .single();
+
+        if (convCheck?.actualizado_en) {
+          const timeSinceUpdate = Date.now() - new Date(convCheck.actualizado_en).getTime();
+          if (timeSinceUpdate < 3000) {
+            console.log('⏳ Ignorando mensaje por carrera (doble envío rápido)');
+            return NextResponse.json({ estado: 'ignorado_carrera' }, { status: 200 });
+          }
+        }
+        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', convExist.id);
+        // === FIN DEL BLOQUEO ===
+
         // Preparar opciones (sanitizar)
         const opcionesLimpias = (opciones && Array.isArray(opciones) && opciones.length > 0)
-          ? opciones.filter(o => o && typeof o === 'string' && o.trim() !== '' && !o.toLowerCase().includes('opcional'))
+          ? opciones.map(o => o.replace(/["\[\]]/g, '').trim()).filter(o => o !== '' && !o.toLowerCase().includes('opcional'))
           : null;
 
         // 8. PREPARAR IMAGEN (Universal)
@@ -435,50 +452,67 @@ export async function POST(solicitud) {
           if (datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...' && datos.imagen !== 'Desconocido') {
             imgUrl = await obtenerImagenCDN(datos.imagen)
           }
-          // La imagen se envía dentro del loop de texto para mejor flujo (Step 9)
         } catch (imgErr) {
           console.error('❌ Error preparando imagen:', imgErr.message)
         }
 
-        // 8. ENVIAR TEXTO E IMAGEN (Lógica de flujo premium)
+        // 8. ENVIAR TEXTO E IMAGEN (Lógica agrupada)
         try {
-          const partesRespuesta = respuesta.split('\n\n').filter(p => p.trim() !== '')
-          let imagenEnviada = false
-
-          for (let i = 0; i < partesRespuesta.length; i++) {
-            const burbujaActual = partesRespuesta[i].trim()
-            if (!burbujaActual) continue
-
-            // Simular escritura proporcional al texto
-            await marcarEscribiendo(remitenteId)
-            await sleep(Math.min(Math.max(burbujaActual.length * 15, 1000), 3000))
-
-            // Enviar la burbuja de texto
-            const esUltima = (i === partesRespuesta.length - 1)
-            if (esUltima && opcionesLimpias) {
-              await enviarMensajeWhatsApp(remitenteId, burbujaActual, null, opcionesLimpias)
+          if (imgUrl) {
+            // LÓGICA CON IMAGEN: Enviar recomendación como pie de foto (caption)
+            const partesRespuesta = respuesta.split('\n\n').filter(p => p.trim() !== '')
+            
+            let textoIntro = '';
+            let textoCaption = '';
+            
+            if (partesRespuesta.length > 0 && partesRespuesta[0].toLowerCase().includes('momento')) {
+              textoIntro = partesRespuesta[0];
+              textoCaption = partesRespuesta.slice(1).join('\n\n');
             } else {
-              await enviarMensajeWhatsApp(remitenteId, burbujaActual)
+              textoCaption = respuesta;
             }
 
-            // --- INSERCIÓN ESTRATÉGICA DE IMAGEN ---
-            // Si es una recomendación, enviamos la imagen después de la introducción "Un momento..." o del primer beneficio
-            if (!imagenEnviada && imgUrl && (burbujaActual.toLowerCase().includes('momento') || burbujaActual.toLowerCase().includes('basado'))) {
-              await sleep(1000)
-              await enviarMensajeWhatsApp(remitenteId, null, imgUrl)
-              imagenEnviada = true
-              
-              // Guardar imagen en CRM
-              await supabase.from('mensajes').insert({
-                conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
-              })
+            // Enviar "Un momento..." como texto separado si existe
+            if (textoIntro) {
+              await marcarEscribiendo(remitenteId)
               await sleep(1500)
+              await enviarMensajeWhatsApp(remitenteId, textoIntro)
+              await supabase.from('mensajes').insert({ conversacion_id: convExist.id, remitente: 'bot', contenido: textoIntro, tipo: 'texto' })
             }
 
-            // Guardar texto en CRM
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id, remitente: 'bot', contenido: burbujaActual, tipo: 'texto'
-            })
+            // Enviar la imagen con el resto de la recomendación como caption
+            if (textoCaption) {
+              await marcarEscribiendo(remitenteId)
+              await sleep(2000)
+              
+              // Importante: enviarMensajeWhatsApp recibe (to, mensajeCaption, imagen, opciones)
+              await enviarMensajeWhatsApp(remitenteId, textoCaption, imgUrl, opcionesLimpias)
+              
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen] ' + textoCaption, tipo: 'imagen', url_archivo: imgUrl
+              })
+            }
+          } else {
+            // LÓGICA SIN IMAGEN: Enviar múltiples burbujas de texto
+            const partesRespuesta = respuesta.split('\n\n').filter(p => p.trim() !== '')
+            for (let i = 0; i < partesRespuesta.length; i++) {
+              const burbujaActual = partesRespuesta[i].trim()
+              if (!burbujaActual) continue
+
+              await marcarEscribiendo(remitenteId)
+              await sleep(Math.min(Math.max(burbujaActual.length * 15, 1000), 3000))
+
+              const esUltima = (i === partesRespuesta.length - 1)
+              if (esUltima && opcionesLimpias) {
+                await enviarMensajeWhatsApp(remitenteId, burbujaActual, null, opcionesLimpias)
+              } else {
+                await enviarMensajeWhatsApp(remitenteId, burbujaActual)
+              }
+
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id, remitente: 'bot', contenido: burbujaActual, tipo: 'texto'
+              })
+            }
           }
 
           // Si por alguna razón la imagen no se envió (ej: no hubo palabras clave), enviarla al final
