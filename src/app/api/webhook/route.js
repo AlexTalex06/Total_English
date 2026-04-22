@@ -394,12 +394,16 @@ export async function POST(solicitud) {
           // --- NOTIFICACIÓN AL ADMINISTRADOR ---
           const adminPhone = process.env.ADMIN_PHONE_NUMBER;
           if (adminPhone) {
+            const nombreFinal = prosExist.nombre_alumno || datos.nombre_alumno || prosExist.nombre || nombrePerfil || 'Alumno';
+            const cursoFinal = prosExist.curso_interes || datos.curso_interes || 'Por definir';
+            const nivelFinal = prosExist.nivel || datos.nivel || 'No especificado';
+            
             const msgAdmin = `🇬🇧 *¡NUEVA CITA AGENDADA EN TOTAL ENGLISH!* 🇬🇧\n\n` +
-              `👤 *Alumno:* ${datos.nombre_alumno || nombrePerfil}\n` +
+              `👤 *Alumno:* ${nombreFinal}\n` +
               `📅 *Fecha:* ${fCitaStr}\n` +
               `⏰ *Hora:* ${datos.hora_cita || '16:00'}\n` +
-              `📚 *Curso:* ${datos.curso_interes || 'Por definir'}\n` +
-              `📊 *Nivel:* ${datos.nivel || 'No especificado'}\n\n` +
+              `📚 *Curso:* ${cursoFinal}\n` +
+              `📊 *Nivel:* ${nivelFinal}\n\n` +
               `🔗 *Ver en Citas:* https://total-english-crm.vercel.app/citas`;
             
             console.log('📢 Notificando al admin:', adminPhone);
@@ -560,6 +564,37 @@ async function marcarEscribiendo(to) {
   } catch (e) {}
 }
 
+async function uploadImageToMeta(imgUrl) {
+  try {
+    const token = process.env.META_WHATSAPP_TOKEN;
+    const phoneId = process.env.META_PHONE_NUMBER_ID;
+    
+    // 1. Descargar la imagen
+    const imageRes = await fetch(imgUrl);
+    if (!imageRes.ok) throw new Error('No se pudo descargar la imagen');
+    const blob = await imageRes.blob();
+    
+    // 2. Subir a Meta
+    const formData = new FormData();
+    formData.append('file', blob, 'imagen.jpg');
+    formData.append('type', 'image');
+    formData.append('messaging_product', 'whatsapp');
+
+    const metaUrl = `https://graph.facebook.com/v18.0/${phoneId}/media`;
+    const uploadRes = await fetch(metaUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    
+    const data = await uploadRes.json();
+    return data.id; // Retorna el Media ID de Meta
+  } catch (error) {
+    console.error('❌ Error subiendo imagen a Meta:', error.message);
+    return null;
+  }
+}
+
 async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null) {
   const token = process.env.META_WHATSAPP_TOKEN
   const phoneId = process.env.META_PHONE_NUMBER_ID
@@ -571,8 +606,14 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
   }
 
   if (imagen) {
-    payload.type = "image"
-    payload.image = { link: imagen }
+    // Intentar subir a Meta primero para obtener un ID (100% confiable)
+    const mediaId = await uploadImageToMeta(imagen);
+    payload.type = "image";
+    if (mediaId) {
+      payload.image = { id: mediaId };
+    } else {
+      payload.image = { link: imagen }; // Fallback a link
+    }
   } else if (opciones && opciones.length > 0) {
     payload.type = "interactive"
     payload.interactive = {
@@ -596,7 +637,6 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
 
   try {
     const response = await axios.post(url, payload, headers)
-    console.log('✅ Meta API OK:', response.data)
     return true
   } catch (error) {
     console.error('❌ ERROR META API:', error.response?.data || error.message)
