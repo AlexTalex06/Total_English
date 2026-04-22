@@ -346,12 +346,29 @@ export async function POST(solicitud) {
 
         // 5b. GUARDAR NOMBRE DEL ALUMNO (Forzado durante agendamiento)
         if (prosExist && (intencion === 'SCHEDULING_DATE' || intencion === 'CIERRE_CITA')) {
-          const nombreExtraido = datos.nombre_alumno;
           const isInvalidN = (n) => !n || ['...', 'desconocido', 'n/a', 'null', 'usuario', ''].includes(String(n).toLowerCase().trim());
-          if (nombreExtraido && !isInvalidN(nombreExtraido)) {
-            console.log('📌 Forzando guardado de nombre_alumno:', nombreExtraido);
-            await supabase.from('prospectos').update({ nombre_alumno: nombreExtraido }).eq('id', prosExist.id);
-            prosExist.nombre_alumno = nombreExtraido; // Actualizar referencia local
+          
+          // Intentar obtener el nombre: 1) del JSON de la IA, 2) del mensaje del usuario (cuando respondió a "¿Cuál es tu nombre?")
+          let nombreFinal = datos.nombre_alumno;
+          
+          if (isInvalidN(nombreFinal) && intencion === 'SCHEDULING_DATE') {
+            // Si la IA no extrajo el nombre, el texto del usuario ES el nombre (acaba de responder a la pregunta del nombre)
+            const textoLimpio = texto.trim();
+            // Validar que parece un nombre (2-5 palabras, sin números, sin URLs)
+            if (textoLimpio && textoLimpio.split(/\s+/).length <= 5 && !/\d/.test(textoLimpio) && !textoLimpio.includes('http')) {
+              nombreFinal = textoLimpio;
+            }
+          }
+          
+          // También buscar en el prospecto existente por si ya se guardó antes
+          if (isInvalidN(nombreFinal) && prosExist.nombre_alumno) {
+            nombreFinal = prosExist.nombre_alumno;
+          }
+
+          if (nombreFinal && !isInvalidN(nombreFinal)) {
+            console.log('📌 Guardando nombre_alumno:', nombreFinal);
+            await supabase.from('prospectos').update({ nombre_alumno: nombreFinal }).eq('id', prosExist.id);
+            prosExist.nombre_alumno = nombreFinal;
           }
         }
 
