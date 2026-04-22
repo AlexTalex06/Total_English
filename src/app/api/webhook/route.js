@@ -365,10 +365,20 @@ export async function POST(solicitud) {
           }
 
           if (!citaExistente) {
-            await supabase.from('prospectos').update({ estado: 'agendado', lead_score: 'CALIENTE' }).eq('id', prosExist.id)
-            const insertCita = { prospecto_id: prosExist.id, fecha: fCitaStr, hora: datos.hora_cita || '16:00', tipo: 'Inscripción / Sesión Informativa', estado: 'pendiente' };
-            console.log('📅 Creando cita:', insertCita);
-            await supabase.from('citas').insert(insertCita);
+            const insertCita = { 
+              prospecto_id: prosExist.id, 
+              fecha: fCitaStr, 
+              hora: datos.hora_cita || '16:00', 
+              tipo: 'Inscripción / Sesión Informativa', 
+              estado: 'pendiente' 
+            };
+            console.log('📅 Creando cita oficial:', insertCita);
+            const { error: insErr } = await supabase.from('citas').insert(insertCita);
+            if (insErr) {
+              console.error('❌ Error insertando cita:', insErr.message);
+            } else {
+              await supabase.from('prospectos').update({ estado: 'agendado', lead_score: 'CALIENTE' }).eq('id', prosExist.id)
+            }
           } else {
             if (datos.fecha_cita || datos.hora_cita) {
               const updateCita = {
@@ -424,13 +434,17 @@ export async function POST(solicitud) {
 
           if (imgUrl) {
             console.log('📤 Enviando Imagen Universal:', imgUrl)
-            await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información!', imgUrl)
-            await sleep(1000)
+            // Pausa antes de la imagen para asegurar orden
+            await sleep(500)
+            const imgSent = await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información!', imgUrl)
             
-            // Guardar imagen en CRM
-            await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
-            })
+            if (imgSent) {
+               // Guardar imagen en CRM con URL persistente
+               await supabase.from('mensajes').insert({
+                 conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
+               })
+               await sleep(2000) // Pausa extra después de imagen
+            }
           }
         } catch (imgErr) {
           console.error('❌ Error enviando imagen:', imgErr.message)
