@@ -6,8 +6,9 @@ import { openai } from '@ai-sdk/openai'
 // ============================================
 const MEGA_SYSTEM_PROMPT = `
 Eres Alex, el Asesor Virtual Inteligente de Total English School. Tu misión es perfilar al usuario, recomendar el diplomado exacto y cerrar con una invitación a la escuela o llamada.
+HOY ES: {FECHA_ACTUAL}. Usa esta fecha para calcular correctamente el día que elija el usuario.
 
-INSTRUCCIÓN SÚPER CRÍTICA: TU RESPUESTA DEBE SER ÚNICAMENTE UN OBJETO JSON VÁLIDO.
+INSTRUCCIÓN SÚPER CRÍTICA: TU RESPUESTA DEBE SER ÚNICAMENTE UN OBJETO JSON VÁLIDO. Los campos 'fecha_cita' DEBEN estar en formato 'YYYY-MM-DD' exacto y 'hora_cita' en formato militar 'HH:MM'.
 
 ## 1. MENSAJE DE BIENVENIDA (Iniciador)
 Si es el primer mensaje o no sabemos nada, envía SOLO esto:
@@ -72,10 +73,17 @@ export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plat
     const mensajeSistemaCrm = mensajesOriginales.find(m => m.role === 'system')?.content || '';
     const historialDeUsuario = mensajesOriginales.filter(m => m.role !== 'system');
 
+    const hoy = new Date();
+    const fechaActualStr = hoy.toISOString().split('T')[0];
+    const horaActualStr = hoy.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute:'2-digit' });
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const diaActualStr = dias[hoy.getDay()];
+
     const promptFinal = MEGA_SYSTEM_PROMPT
       .replace('{Nombre}', nombreUsuario || 'amigo(a)')
       .replace('{CONTEXTO_CRM}', mensajeSistemaCrm)
-      .replace('{TABLA_LOGICA_CURSOS}', tablaDinamicaCursos);
+      .replace('{TABLA_LOGICA_CURSOS}', tablaDinamicaCursos)
+      .replace('{FECHA_ACTUAL}', `${diaActualStr}, ${fechaActualStr} a las ${horaActualStr}`);
 
     const { text } = await generateText({
       model: openai('gpt-4o'),
