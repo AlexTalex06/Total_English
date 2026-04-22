@@ -43,7 +43,7 @@ export async function notificarEscalamientoAdmin({ adminEmail, nombreProspecto, 
               <p style="margin: 0;"><strong>Motivo / Último Mensaje:</strong> <em>"${motivo}"</em></p>
             </div>
 
-            <a href="${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/inbox?id=${conversacionId}" 
+            <a href="https://total-english-crm.vercel.app/inbox?id=${conversacionId}" 
                style="display: inline-block; background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
               Ir al Inbox ahora
             </a>
@@ -91,7 +91,7 @@ export async function notificarCitaAdmin({ adminEmail, nombreAlumno, fecha, hora
             <p style="font-size: 16px; color: #334155;"><strong>Curso:</strong> ${curso}</p>
             <p style="font-size: 16px; color: #334155;"><strong>Nivel:</strong> ${nivel}</p>
             
-            <a href="${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/citas" 
+            <a href="https://total-english-crm.vercel.app/citas" 
                style="display: inline-block; background-color: #00236f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
               Ver Calendario de Citas
             </a>
