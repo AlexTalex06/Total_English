@@ -500,41 +500,19 @@ export async function POST(solicitud) {
   }
 }
 
-// === FUNCIÓN: Obtener imagen desde Supabase Storage CDN (con cache automático) ===
+// Helper para asegurar que las imágenes se sirvan desde una URL estable
 async function obtenerImagenCDN(nombreArchivo) {
-  if (!nombreArchivo || nombreArchivo === 'null') return null
+  if (!nombreArchivo || nombreArchivo === 'null' || nombreArchivo === '...') return null
+  
+  const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+  const urlVercel = `${origin}/cursos/${nombreArchivo}?v=${Date.now()}` // Cache busting para Meta
   
   try {
-      const rutaStorage = `cursos/${nombreArchivo}`
-      const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-      const urlVercel = `${origin}/cursos/${nombreArchivo}?v=${Date.now()}`
-      
-      const { data: archivos } = await supabase.storage.from('chat-media').list('cursos', {
-        search: nombreArchivo
-      })
-      
-      if (archivos && archivos.length > 0) {
-        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-        return data.publicUrl
-      }
-      
-      try {
-        const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
-        const buffer = Buffer.from(response.data)
-        const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
-        
-        await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
-          contentType,
-          upsert: true
-        })
-        
-        const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-        return data.publicUrl
-      } catch (e) {
-        return urlVercel
-      }
+      // Intentar subir a Supabase solo si es necesario, pero devolver Vercel por defecto por velocidad
+      // Meta prefiere URLs que respondan rápido y con el Content-Type correcto.
+      return urlVercel
   } catch (err) {
-    return null
+    return urlVercel
   }
 }
 
@@ -591,9 +569,18 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
   }
 
   try {
-    await axios.post(url, payload, headers)
+    const response = await axios.post(url, payload, headers)
+    console.log('✅ Meta API OK:', response.data)
     return true
   } catch (error) {
+    console.error('❌ ERROR META API:', error.response?.data || error.message)
+    if (to.startsWith('521') && to.length === 13) {
+      payload.to = to.replace('521', '52')
+      try {
+        await axios.post(url, payload, headers)
+        return true
+      } catch (retryError) {}
+    }
     return false
   }
 }
