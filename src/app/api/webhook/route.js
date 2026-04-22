@@ -116,6 +116,7 @@ export async function POST(solicitud) {
           if (cExist) {
             convExist = cExist
             prosExist = cExist.prospectos
+          } else {
             // Si no hay prospecto detectado previamente, lo creamos después cuando tengamos datos suficientes
             const { data: nuevaC } = await supabase.from('conversaciones').insert({ 
               prospecto_id: null, 
@@ -303,25 +304,26 @@ export async function POST(solicitud) {
         // 5. Actualizar CRM o Crear Prospecto si ya hay datos suficientes
         if (datos && Object.keys(datos).length > 0) {
           try {
-            // Crear Prospecto solo si tenemos datos mínimos (Edad, Nivel o Horario)
-            if (!prosExist && (datos.edad || datos.nivel || datos.horario || datos.nombre_alumno)) {
-              const { data: nuevoP } = await supabase.from('prospectos').insert({
-                nombre: datos.nombre || nombrePerfil || 'Interesado',
-                nombre_alumno: datos.nombre_alumno || null,
-                telefono: remitenteId,
-                edad: datos.edad ? parseInt(datos.edad) : null,
-                nivel: datos.nivel || null,
-                horario: datos.horario || null,
-                curso_interes: datos.curso_interes || null,
-                estado: 'nuevo'
-              }).select('*').single()
-              
-              if (nuevoP) {
-                prosExist = nuevoP
-                await supabase.from('conversaciones').update({ prospecto_id: nuevoP.id }).eq('id', convExist.id)
+            if (!prosExist) {
+              // Crear Prospecto solo si tenemos datos mínimos (Edad, Nivel o Horario)
+              if (datos.edad || datos.nivel || datos.horario || datos.nombre_alumno) {
+                const { data: nuevoP } = await supabase.from('prospectos').insert({
+                  nombre: datos.nombre || nombrePerfil || 'Interesado',
+                  nombre_alumno: datos.nombre_alumno || null,
+                  telefono: remitenteId,
+                  edad: datos.edad ? parseInt(datos.edad) : null,
+                  nivel: datos.nivel || null,
+                  horario: datos.horario || null,
+                  curso_interes: datos.curso_interes || null,
+                  estado: 'nuevo'
+                }).select('*').single()
+                
+                if (nuevoP) {
+                  prosExist = nuevoP
+                  await supabase.from('conversaciones').update({ prospecto_id: nuevoP.id }).eq('id', convExist.id)
+                }
               }
             } else {
-              // Si ya existe, actualizamos
               // Si ya existe, actualizamos el mismo registro para evitar duplicados
               const isInvalidName = (n) => !n || ['...', 'desconocido', 'n/a', 'null', 'usuario'].includes(String(n).toLowerCase());
               const updateData = { actualizado_en: new Date().toISOString() };
@@ -336,7 +338,6 @@ export async function POST(solicitud) {
 
               const { error: crmError } = await supabase.from('prospectos').update(updateData).eq('id', prosExist.id);
               if (crmError) console.error('Error actualizando prospecto:', crmError.message);
-            }
             }
           } catch (errSync) {
             console.error('❌ Error fatal en sync CRM:', errSync.message);
