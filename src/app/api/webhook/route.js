@@ -505,7 +505,7 @@ async function obtenerImagenCDN(nombreArchivo) {
   if (!nombreArchivo || nombreArchivo === 'null' || nombreArchivo === '...') return null
   
   const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-  const urlVercel = `${origin}/cursos/${nombreArchivo}?v=${Date.now()}` // Cache busting para Meta
+  const urlVercel = `${origin}/cursos/${nombreArchivo}`
   
   try {
       // Intentar subir a Supabase solo si es necesario, pero devolver Vercel por defecto por velocidad
