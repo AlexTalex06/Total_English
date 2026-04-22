@@ -424,22 +424,7 @@ export async function POST(solicitud) {
           console.log('🖼️ Imagen URL construida:', imagenUrl)
         }
 
-        // === INICIO DEL BLOQUEO DE CARRERA (Optimistic Lock) ===
-        // Prevenir mensajes duplicados si el usuario envía 2 mensajes muy rápido
-        const { data: convCheck } = await supabase.from('conversaciones')
-          .select('actualizado_en')
-          .eq('id', convExist.id)
-          .single();
 
-        if (convCheck?.actualizado_en) {
-          const timeSinceUpdate = Date.now() - new Date(convCheck.actualizado_en).getTime();
-          if (timeSinceUpdate < 3000) {
-            console.log('⏳ Ignorando mensaje por carrera (doble envío rápido)');
-            return NextResponse.json({ estado: 'ignorado_carrera' }, { status: 200 });
-          }
-        }
-        await supabase.from('conversaciones').update({ actualizado_en: new Date().toISOString() }).eq('id', convExist.id);
-        // === FIN DEL BLOQUEO ===
 
         // Preparar opciones (sanitizar)
         const opcionesLimpias = (opciones && Array.isArray(opciones) && opciones.length > 0)
@@ -480,17 +465,18 @@ export async function POST(solicitud) {
               await supabase.from('mensajes').insert({ conversacion_id: convExist.id, remitente: 'bot', contenido: textoIntro, tipo: 'texto' })
             }
 
-            // Enviar la imagen con el resto de la recomendación como caption
-            if (textoCaption) {
-              await marcarEscribiendo(remitenteId)
-              await sleep(2000)
-              
-              // Importante: enviarMensajeWhatsApp recibe (to, mensajeCaption, imagen, opciones)
-              await enviarMensajeWhatsApp(remitenteId, textoCaption, imgUrl, opcionesLimpias)
-              
-              await supabase.from('mensajes').insert({
-                conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen] ' + textoCaption, tipo: 'imagen', url_archivo: imgUrl
-              })
+            // Enviar la imagen con la recomendación como caption
+            await marcarEscribiendo(remitenteId)
+            await sleep(2000)
+            await enviarMensajeWhatsApp(remitenteId, textoCaption || null, imgUrl)
+            await supabase.from('mensajes').insert({
+              conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen] ' + (textoCaption || ''), tipo: 'imagen', url_archivo: imgUrl
+            })
+
+            // Si hay botones (Visita/Llamada), enviarlos como mensaje separado DESPUÉS de la imagen
+            if (opcionesLimpias) {
+              await sleep(1000)
+              await enviarMensajeWhatsApp(remitenteId, '¿Qué prefieres? 👇', null, opcionesLimpias)
             }
           } else {
             // LÓGICA SIN IMAGEN: Enviar múltiples burbujas de texto
@@ -514,15 +500,6 @@ export async function POST(solicitud) {
               })
             }
           }
-
-          // Si por alguna razón la imagen no se envió (ej: no hubo palabras clave), enviarla al final
-          if (!imagenEnviada && imgUrl) {
-             await enviarMensajeWhatsApp(remitenteId, null, imgUrl)
-             await supabase.from('mensajes').insert({
-               conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
-             })
-          }
-
         } catch (txtErr) {
           console.error('❌ Error en el flujo de mensajes:', txtErr.message)
         }
@@ -614,15 +591,15 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
     const mediaId = await uploadImageToMeta(imagen);
     payload.type = "image";
     if (mediaId) {
-      payload.image = { id: mediaId };
+      payload.image = { id: mediaId, caption: mensaje || undefined };
     } else {
-      payload.image = { link: imagen }; // Fallback a link
+      payload.image = { link: imagen, caption: mensaje || undefined };
     }
   } else if (opciones && opciones.length > 0) {
     payload.type = "interactive"
     payload.interactive = {
       type: "button",
-      body: { text: mensaje.substring(0, 1024) },
+      body: { text: (mensaje || '¿Qué prefieres?').substring(0, 1024) },
       action: {
         buttons: opciones.slice(0, 3).map((opt, i) => ({
           type: "reply",
