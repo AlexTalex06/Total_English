@@ -425,57 +425,68 @@ export async function POST(solicitud) {
           ? opciones.filter(o => o && typeof o === 'string' && o.trim() !== '' && !o.toLowerCase().includes('opcional'))
           : null;
 
-        // 8. ENVIAR IMAGEN (Universal: si AlexIA la proporciona en 'datos', se envía primero)
+        // 8. PREPARAR IMAGEN (Universal)
         let imgUrl = null
         try {
           if (datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...' && datos.imagen !== 'Desconocido') {
             imgUrl = await obtenerImagenCDN(datos.imagen)
           }
-
-          if (imgUrl) {
-            console.log('📤 Enviando Imagen Universal:', imgUrl)
-            // Pausa antes de la imagen para asegurar orden
-            await sleep(500)
-            const imgSent = await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información!', imgUrl)
-            
-            if (imgSent) {
-               // Guardar imagen en CRM con URL persistente
-               await supabase.from('mensajes').insert({
-                 conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
-               })
-               await sleep(2000) // Pausa extra después de imagen
-            }
-          }
+          // La imagen se envía dentro del loop de texto para mejor flujo (Step 9)
         } catch (imgErr) {
-          console.error('❌ Error enviando imagen:', imgErr.message)
+          console.error('❌ Error preparando imagen:', imgErr.message)
         }
 
-        // 9. ENVIAR TEXTO (Dividido en burbujas con pausas)
+        // 8. ENVIAR TEXTO E IMAGEN (Lógica de flujo premium)
         try {
-          const partesRespuesta = respuesta.split(/\n\s*\n/).filter(p => p.trim() !== '')
-          
+          const partesRespuesta = respuesta.split('\n\n').filter(p => p.trim() !== '')
+          let imagenEnviada = false
+
           for (let i = 0; i < partesRespuesta.length; i++) {
             const burbujaActual = partesRespuesta[i].trim()
             if (!burbujaActual) continue
 
-            const esUltima = (i === partesRespuesta.length - 1)
-            
+            // Simular escritura proporcional al texto
             await marcarEscribiendo(remitenteId)
-            await sleep(Math.min(Math.max(burbujaActual.length * 20, 1000), 2500))
+            await sleep(Math.min(Math.max(burbujaActual.length * 15, 1000), 3000))
 
+            // Enviar la burbuja de texto
+            const esUltima = (i === partesRespuesta.length - 1)
             if (esUltima && opcionesLimpias) {
               await enviarMensajeWhatsApp(remitenteId, burbujaActual, null, opcionesLimpias)
             } else {
               await enviarMensajeWhatsApp(remitenteId, burbujaActual)
             }
 
-            // Guardar en CRM
+            // --- INSERCIÓN ESTRATÉGICA DE IMAGEN ---
+            // Si es una recomendación, enviamos la imagen después de la introducción "Un momento..." o del primer beneficio
+            if (!imagenEnviada && imgUrl && (burbujaActual.toLowerCase().includes('momento') || burbujaActual.toLowerCase().includes('basado'))) {
+              await sleep(1000)
+              await enviarMensajeWhatsApp(remitenteId, null, imgUrl)
+              imagenEnviada = true
+              
+              // Guardar imagen en CRM
+              await supabase.from('mensajes').insert({
+                conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
+              })
+              await sleep(1500)
+            }
+
+            // Guardar texto en CRM
             await supabase.from('mensajes').insert({
               conversacion_id: convExist.id, remitente: 'bot', contenido: burbujaActual, tipo: 'texto'
             })
           }
+
+          // Si por alguna razón la imagen no se envió (ej: no hubo palabras clave), enviarla al final
+          if (!imagenEnviada && imgUrl) {
+             await enviarMensajeWhatsApp(remitenteId, null, imgUrl)
+             await supabase.from('mensajes').insert({
+               conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
+             })
+          }
+
         } catch (txtErr) {
-          console.error('❌ Error enviando texto:', txtErr.message)
+          console.error('❌ Error en el flujo de mensajes:', txtErr.message)
         }
 
         await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)

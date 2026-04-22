@@ -75,32 +75,47 @@ export async function consultarAlex(mensajesOriginales, nombreUsuario = '', plat
 
     const { text } = await generateText({
       model: openai('gpt-4o'),
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: promptFinal },
         ...historialDeUsuario,
-        { role: 'system', content: 'RECUERDA CRÍTICA: Tu única respuesta debe ser estrictamente un objeto JSON válido. Usa \n\n para separar las burbujas de mensaje.' }
+        { role: 'system', content: 'RECUERDA: Tu respuesta DEBE ser un objeto JSON válido. Usa \\n\\n dentro del string "respuesta" para separar las burbujas de mensaje.' }
       ],
       temperature: 0.3,
     });
 
     try {
-      let jsonStr = text;
-      const jsonStart = text.indexOf('{');
-      const jsonEnd = text.lastIndexOf('}');
+      // Limpieza extra por si acaso
+      let jsonStr = text.trim();
+      const jsonStart = jsonStr.indexOf('{');
+      const jsonEnd = jsonStr.lastIndexOf('}');
       if (jsonStart !== -1 && jsonEnd !== -1) {
-        jsonStr = text.substring(jsonStart, jsonEnd + 1);
+        jsonStr = jsonStr.substring(jsonStart, jsonEnd + 1);
       }
 
-      const parsed = JSON.parse(jsonStr);
+      // Reemplazar saltos de línea literales dentro de strings JSON si existen
+      // (A veces el AI los pone sin escapar a pesar del modo JSON)
+      const sanitizedJson = jsonStr.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+      
+      // Intentar parsear el original primero, si falla, el sanitizado
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (e) {
+        // Si el JSON tiene saltos de línea reales dentro de los valores, intentamos arreglarlo
+        // pero con cuidado de no romper el JSON estructural
+        parsed = JSON.parse(text.replace(/[\n\r]/g, ' ')); // Fallback agresivo
+      }
+
       return {
-        respuesta: parsed.respuesta || text,
+        respuesta: parsed.respuesta || "No entendí bien, ¿me repites?",
         datos: parsed.datos || {},
         opciones: parsed.opciones || null,
-        intencion: parsed.intencion || 'SEGUIMIENTO'
+        intencion: parsed.intencion || 'PROFILE_PROVIDED'
       };
     } catch (e) {
       console.error("Error parseando AlexIA:", text);
-      return { respuesta: text, datos: {}, intencion: 'UNKNOWN' };
+      return { respuesta: "Lo siento, tuve un error técnico. ¿Podemos intentar de nuevo?", datos: {}, intencion: 'UNKNOWN' };
     }
   } catch (err) {
     console.error("Error en consultarAlex:", err);
