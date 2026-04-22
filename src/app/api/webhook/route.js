@@ -497,39 +497,43 @@ async function obtenerImagenCDN(nombreArchivo) {
       const { data: archivos, error: listError } = await supabase.storage.from('chat-media').list('cursos', { search: nombreArchivo })
       if (listError) console.error('❌ Error listando bucket Supabase:', listError.message)
       
+// Helper para asegurar que las imágenes se sirvan desde una URL estable (Supabase o Vercel con cache-busting)
+async function obtenerImagenCDN(nombreArchivo) {
+  if (!nombreArchivo || nombreArchivo === 'null') return null
+  
+  try {
+      const rutaStorage = `cursos/${nombreArchivo}`
+      const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
+      const urlVercel = `${origin}/cursos/${nombreArchivo}?v=${Date.now()}` // Cache busting para Meta
+      
+      // Intentar ver si ya existe en storage
+      const { data: archivos } = await supabase.storage.from('chat-media').list('cursos', {
+        search: nombreArchivo
+      })
+      
       if (archivos && archivos.length > 0) {
         const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
-        console.log('🖼️ Imagen ya en Supabase:', data.publicUrl)
         return data.publicUrl
       }
       
-      const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-      const urlVercel = `${origin}/cursos/${nombreArchivo}`
-      console.log('🖼️ Intentando descargar de Vercel para CDN:', urlVercel)
-      
+      // Intentar subirlo si no existe para mayor estabilidad
       try {
-        const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 8000 })
+        const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
         const buffer = Buffer.from(response.data)
         const contentType = nombreArchivo.endsWith('.png') ? 'image/png' : 'image/jpeg'
         
-        const { error: uploadErr } = await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
+        await supabase.storage.from('chat-media').upload(rutaStorage, buffer, {
           contentType,
           upsert: true
         })
         
-        if (uploadErr) {
-          console.error('❌ Error subiendo a Supabase Storage:', uploadErr.message)
-          return urlVercel 
-        }
-        
         const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
         return data.publicUrl
-      } catch (fetchErr) {
-        console.error(`❌ Falló descarga de Vercel (${urlVercel}):`, fetchErr.message)
-        return urlVercel // Fallback a URL directa si falla la descarga
+      } catch (e) {
+        // Fallback a Vercel directo si falla la subida
+        return urlVercel
       }
   } catch (err) {
-    console.error('❌ Error en obtenerImagenCDN:', err.message)
     return null
   }
 }
@@ -566,13 +570,13 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
 
   if (imagen) {
     payload.type = "image"
-    // WhatsApp limita el caption a 1024 caracteres
-    payload.image = { link: imagen, caption: mensaje ? mensaje.substring(0, 1024) : '' }
+    // Sin caption para evitar errores de validación en Meta y permitir que el texto vaya en burbujas separadas
+    payload.image = { link: imagen }
   } else if (opciones && opciones.length > 0) {
     payload.type = "interactive"
     payload.interactive = {
       type: "button",
-      body: { text: mensaje },
+      body: { text: mensaje.substring(0, 1024) },
       action: {
         buttons: opciones.slice(0, 3).map((opt, i) => ({
           type: "reply",
@@ -589,27 +593,16 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
   }
 
-  console.log('📤 Payload enviado a Meta:', JSON.stringify(payload))
-
   try {
-    const response = await axios.post(url, payload, headers)
-    console.log('✅ Meta API respuesta:', JSON.stringify(response.data))
+    await axios.post(url, payload, headers)
     return true
   } catch (error) {
-    const errorData = error.response?.data;
-    console.error(`❌ ERROR META API para ${to}:`, JSON.stringify(errorData, null, 2) || error.message)
-
-    // LÓGICA DE MÉXICO: Si falla con 521, intentar con 52
     if (to.startsWith('521') && to.length === 13) {
-      console.log(`🇲🇽 Intentando reenvío sin el '1' para México...`)
-      const toCorregido = to.replace('521', '52')
-      payload.to = toCorregido
+      payload.to = to.replace('521', '52')
       try {
         await axios.post(url, payload, headers)
         return true
-      } catch (retryError) {
-        console.error(`❌ Falló reintento para ${toCorregido}:`, retryError.response?.data || retryError.message)
-      }
+      } catch (retryError) {}
     }
     return false
   }
