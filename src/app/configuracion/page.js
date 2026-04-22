@@ -17,16 +17,21 @@ export default function PaginaConfiguracion() {
 
   useEffect(() => {
     const cargarConfig = async () => {
-      const { data, error } = await supabase.from('configuracion_bot').select('*').eq('id', 1).single()
-      if (data) {
-        setConfig({
-          nombre_agente: data.nombre_agente || 'Alex',
-          temperatura: data.temperatura || 0.7,
-          agenda_dias: data.agenda_dias || 'Lunes a Sábado',
-          agenda_inicio: data.agenda_inicio || '09:00',
-          agenda_fin: data.agenda_fin || '18:00',
-          agenda_brecha: data.agenda_brecha || 30
-        })
+      try {
+        const res = await fetch('/api/config')
+        const data = await res.json()
+        if (data && !data.error) {
+          setConfig({
+            nombre_agente: data.nombre_agente || 'Alex',
+            temperatura: data.temperatura || 0.7,
+            agenda_dias: data.agenda_dias || 'Lunes a Sábado',
+            agenda_inicio: data.agenda_inicio || '09:00',
+            agenda_fin: data.agenda_fin || '18:00',
+            agenda_brecha: data.agenda_brecha || 30
+          })
+        }
+      } catch (err) {
+        console.error('Fallo cargando config:', err)
       }
       setCargando(false)
     }
@@ -36,21 +41,32 @@ export default function PaginaConfiguracion() {
   const guardarCambios = async (e) => {
     e.preventDefault()
     setGuardando(true)
-    const { error } = await supabase.from('configuracion_bot').update({
-      nombre_agente: config.nombre_agente,
-      temperatura: parseFloat(config.temperatura),
-      agenda_dias: config.agenda_dias,
-      agenda_inicio: config.agenda_inicio,
-      agenda_fin: config.agenda_fin,
-      agenda_brecha: parseInt(config.agenda_brecha),
-      actualizado_en: new Date().toISOString()
-    }).eq('id', 1)
 
-    setGuardando(false)
-    if (error) {
-      alert('Error guardando configuración')
-    } else {
-      alert('¡Configuración de AlexIA guardada con éxito!')
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre_agente: config.nombre_agente,
+          temperatura: parseFloat(config.temperatura),
+          agenda_dias: config.agenda_dias,
+          agenda_inicio: config.agenda_inicio,
+          agenda_fin: config.agenda_fin,
+          agenda_brecha: parseInt(config.agenda_brecha)
+        })
+      })
+
+      const resultado = await res.json()
+
+      if (resultado.success) {
+        alert('¡Configuración de AlexIA guardada con éxito! 🎉')
+      } else {
+        alert('Error: ' + (resultado.error || 'No se pudo guardar'))
+      }
+    } catch (err) {
+      alert('Error de conexión al guardar')
+    } finally {
+      setGuardando(false)
     }
   }
 
