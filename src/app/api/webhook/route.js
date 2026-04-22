@@ -491,22 +491,13 @@ export async function POST(solicitud) {
 
 // === FUNCIÓN: Obtener imagen desde Supabase Storage CDN (con cache automático) ===
 async function obtenerImagenCDN(nombreArchivo) {
-  try {
-    const rutaStorage = `cursos/${nombreArchivo}`
-    
-      const { data: archivos, error: listError } = await supabase.storage.from('chat-media').list('cursos', { search: nombreArchivo })
-      if (listError) console.error('❌ Error listando bucket Supabase:', listError.message)
-      
-// Helper para asegurar que las imágenes se sirvan desde una URL estable (Supabase o Vercel con cache-busting)
-async function obtenerImagenCDN(nombreArchivo) {
   if (!nombreArchivo || nombreArchivo === 'null') return null
   
   try {
       const rutaStorage = `cursos/${nombreArchivo}`
       const origin = process.env.NEXT_PUBLIC_BASE_URL || 'https://total-english.vercel.app'
-      const urlVercel = `${origin}/cursos/${nombreArchivo}?v=${Date.now()}` // Cache busting para Meta
+      const urlVercel = `${origin}/cursos/${nombreArchivo}?v=${Date.now()}`
       
-      // Intentar ver si ya existe en storage
       const { data: archivos } = await supabase.storage.from('chat-media').list('cursos', {
         search: nombreArchivo
       })
@@ -516,7 +507,6 @@ async function obtenerImagenCDN(nombreArchivo) {
         return data.publicUrl
       }
       
-      // Intentar subirlo si no existe para mayor estabilidad
       try {
         const response = await axios.get(urlVercel, { responseType: 'arraybuffer', timeout: 5000 })
         const buffer = Buffer.from(response.data)
@@ -530,7 +520,6 @@ async function obtenerImagenCDN(nombreArchivo) {
         const { data } = supabase.storage.from('chat-media').getPublicUrl(rutaStorage)
         return data.publicUrl
       } catch (e) {
-        // Fallback a Vercel directo si falla la subida
         return urlVercel
       }
   } catch (err) {
@@ -553,9 +542,7 @@ async function marcarEscribiendo(to) {
       to: to,
       sender_action: "typing_on"
     }, { headers: { Authorization: `Bearer ${token}` } })
-  } catch (e) {
-    // console.log("Error typing_on:", e.message)
-  }
+  } catch (e) {}
 }
 
 async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null) {
@@ -570,7 +557,6 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
 
   if (imagen) {
     payload.type = "image"
-    // Sin caption para evitar errores de validación en Meta y permitir que el texto vaya en burbujas separadas
     payload.image = { link: imagen }
   } else if (opciones && opciones.length > 0) {
     payload.type = "interactive"
@@ -597,18 +583,10 @@ async function enviarMensajeWhatsApp(to, mensaje, imagen = null, opciones = null
     await axios.post(url, payload, headers)
     return true
   } catch (error) {
-    if (to.startsWith('521') && to.length === 13) {
-      payload.to = to.replace('521', '52')
-      try {
-        await axios.post(url, payload, headers)
-        return true
-      } catch (retryError) {}
-    }
     return false
   }
 }
 
-// === FUNCIÓN: Enviar Lista Interactiva de WhatsApp ===
 async function enviarListaWhatsApp(to, mensaje, botonTexto, opciones) {
   const token = process.env.META_WHATSAPP_TOKEN
   const phoneId = process.env.META_PHONE_NUMBER_ID
@@ -640,12 +618,9 @@ async function enviarListaWhatsApp(to, mensaje, botonTexto, opciones) {
   }
 
   try {
-    const response = await axios.post(url, payload, headers)
-    console.log('✅ Lista enviada:', JSON.stringify(response.data))
+    await axios.post(url, payload, headers)
     return true
   } catch (error) {
-    console.warn(`⚠️ Error enviando lista:`, error.response?.data || error.message)
-    // Fallback: enviar como texto simple
     return await enviarMensajeWhatsApp(to, `${mensaje}\n\n${opciones.map((o, i) => `${i+1}. ${o}`).join('\n')}`)
   }
 }
