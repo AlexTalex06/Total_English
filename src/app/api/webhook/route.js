@@ -116,22 +116,9 @@ export async function POST(solicitud) {
           if (cExist) {
             convExist = cExist
             prosExist = cExist.prospectos
-          } else {
-            // Si no hay prospecto detectado previamente, lo creamos con el nombre del perfil de WhatsApp
-            if (!prosExist) {
-              const { data: nuevoP } = await supabase.from('prospectos').insert({
-                nombre: nombrePerfil || 'Prospecto WhatsApp',
-                telefono: remitenteId,
-                estado: 'nuevo'
-              }).select('*').single()
-              if (nuevoP) {
-                prosExist = nuevoP
-                console.log(`✅ Prospecto inicial creado con nombre de perfil: ${nombrePerfil}`)
-              }
-            }
-
+            // Si no hay prospecto detectado previamente, lo creamos después cuando tengamos datos suficientes
             const { data: nuevaC } = await supabase.from('conversaciones').insert({ 
-              prospecto_id: prosExist ? prosExist.id : null, 
+              prospecto_id: null, 
               plataforma: 'whatsapp', 
               id_plataforma: remitenteId 
             }).select('*').single()
@@ -316,8 +303,8 @@ export async function POST(solicitud) {
         // 5. Actualizar CRM o Crear Prospecto si ya hay datos suficientes
         if (datos && Object.keys(datos).length > 0) {
           try {
-            // Si NO hay prospecto pero AlexIA ya obtuvo datos, lo creamos ahora (Fallback si falló el inicio)
-            if (!prosExist) {
+            // Crear Prospecto solo si tenemos datos mínimos (Edad, Nivel o Horario)
+            if (!prosExist && (datos.edad || datos.nivel || datos.horario || datos.nombre_alumno)) {
               const { data: nuevoP } = await supabase.from('prospectos').insert({
                 nombre: datos.nombre || nombrePerfil || 'Interesado',
                 nombre_alumno: datos.nombre_alumno || null,
