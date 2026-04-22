@@ -448,122 +448,60 @@ export async function POST(solicitud) {
 
         // Preparar opciones (sanitizar)
         const opcionesLimpias = (opciones && Array.isArray(opciones) && opciones.length > 0)
-          ? opciones.filter(o => o && typeof o === 'string' && o.trim() !== '')
+          ? opciones.filter(o => o && typeof o === 'string' && o.trim() !== '' && !o.toLowerCase().includes('opcional'))
           : null;
 
-        // Si es recomendación de curso -> FLUJO ESPECIAL con imagen y texto
-        if (intencion === 'COURSE_RECOMMENDED') {
-          // 1. Intentar extraer el mensaje de espera "Un momento..."
-          const partesRespuesta = respuesta.split(/\n\s*\n/).filter(p => p.trim() !== '')
-          let msgEspera = "Un momento estoy buscando el mejor diplomado.. 🔍"
-          let restoTexto = respuesta
-          
-          if (partesRespuesta.length > 1) {
-            const primerParte = partesRespuesta[0].toLowerCase()
-            if (primerParte.includes("un momento") || primerParte.includes("buscando")) {
-              msgEspera = partesRespuesta[0].trim()
-              restoTexto = partesRespuesta.slice(1).join("\n\n").trim()
-            }
+        // 8. ENVIAR IMAGEN (Universal: si AlexIA la proporciona en 'datos', se envía primero)
+        let imgUrl = null
+        try {
+          if (datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...' && datos.imagen !== 'Desconocido') {
+            imgUrl = await obtenerImagenCDN(datos.imagen)
           }
 
-          // 2. Enviar mensaje de espera primero
-          try {
-            await marcarEscribiendo(remitenteId)
-            await sleep(800)
-            await enviarMensajeWhatsApp(remitenteId, msgEspera)
-          } catch (e) {
-            console.error('❌ Error enviando mensaje de espera:', e.message)
-          }
-
-          // 3. Enviar imagen (vía CDN)
-          let imgUrl = null
-          try {
-            if (datos?.imagen && datos.imagen !== 'null' && datos.imagen !== '...') {
-              imgUrl = await obtenerImagenCDN(datos.imagen)
-            }
-
-            if (imgUrl) {
-              console.log('📤 Enviando Imagen vía CDN:', imgUrl)
-              await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información de tu diplomado!', imgUrl)
-
-              // Guardar imagen en CRM
-              await supabase.from('mensajes').insert({
-                conversacion_id: convExist.id,
-                remitente: 'bot',
-                contenido: '[Imagen del curso]',
-                tipo: 'imagen',
-                url_archivo: imgUrl
-              })
-            }
-          } catch (imgErr) {
-            console.error('❌ Error crítico en flujo de imagen:', imgErr.message)
-          }
-
-          // 4. Pausa y enviar el texto principal dividido en burbujas
-          try {
-            const burbujasTexto = restoTexto.split(/\n\s*\n/).filter(b => b.trim() !== '')
+          if (imgUrl) {
+            console.log('📤 Enviando Imagen Universal:', imgUrl)
+            await enviarMensajeWhatsApp(remitenteId, '✨ ¡Aquí tienes la información!', imgUrl)
+            await sleep(1000)
             
-            for (let i = 0; i < burbujasTexto.length; i++) {
-              const esUltima = (i === burbujasTexto.length - 1)
-              const burbujaActual = burbujasTexto[i].trim()
-              
-              if (!burbujaActual) continue;
-
-              await marcarEscribiendo(remitenteId)
-              await sleep(1500)
-
-              if (esUltima && opcionesLimpias) {
-                console.log('📤 Enviando Botones con burbuja final:', burbujaActual)
-                await enviarMensajeWhatsApp(remitenteId, burbujaActual, null, opcionesLimpias)
-              } else {
-                await enviarMensajeWhatsApp(remitenteId, burbujaActual)
-              }
-
-              // Guardar en CRM
-              await supabase.from('mensajes').insert({
-                conversacion_id: convExist.id,
-                remitente: 'bot',
-                contenido: burbujaActual,
-                tipo: 'texto'
-              })
-            }
-          } catch (txtErr) {
-            console.error('❌ Error enviando texto principal:', txtErr.message)
-          }
-          
-          await supabase.from('conversaciones').update({ ultimo_mensaje: restoTexto }).eq('id', convExist.id)
-        } else {
-          // Para otros mensajes: dividir en burbujas con pausas
-          const partes = respuesta.split('\n\n').filter(p => p.trim() !== '')
-          
-          for (let i = 0; i < partes.length; i++) {
-            await marcarEscribiendo(remitenteId)
-            const delay = Math.min(Math.max(partes[i].length * 30, 1000), 3000)
-            await sleep(delay)
-            
-            if (i === partes.length - 1 && opcionesLimpias) {
-              // Si hay opciones y son más de 3, usar lista. Si no, botones.
-              if (opcionesLimpias.length > 3) {
-                await enviarListaWhatsApp(remitenteId, partes[i], 'Menú de Diplomados', opcionesLimpias)
-              } else {
-                await enviarMensajeWhatsApp(remitenteId, partes[i], null, opcionesLimpias)
-              }
-            } else {
-              await enviarMensajeWhatsApp(remitenteId, partes[i])
-            }
-            
+            // Guardar imagen en CRM
             await supabase.from('mensajes').insert({
-              conversacion_id: convExist.id,
-              remitente: 'bot',
-              contenido: partes[i],
-              tipo: 'texto'
+              conversacion_id: convExist.id, remitente: 'bot', contenido: '[Imagen]', tipo: 'imagen', url_archivo: imgUrl
             })
           }
-          
-          await supabase.from('conversaciones').update({ 
-            ultimo_mensaje: partes[partes.length - 1] 
-          }).eq('id', convExist.id)
+        } catch (imgErr) {
+          console.error('❌ Error enviando imagen:', imgErr.message)
         }
+
+        // 9. ENVIAR TEXTO (Dividido en burbujas con pausas)
+        try {
+          const partesRespuesta = respuesta.split(/\n\s*\n/).filter(p => p.trim() !== '')
+          
+          for (let i = 0; i < partesRespuesta.length; i++) {
+            const burbujaActual = partesRespuesta[i].trim()
+            if (!burbujaActual) continue
+
+            const esUltima = (i === partesRespuesta.length - 1)
+            
+            await marcarEscribiendo(remitenteId)
+            await sleep(Math.min(Math.max(burbujaActual.length * 20, 1000), 2500))
+
+            if (esUltima && opcionesLimpias) {
+              await enviarMensajeWhatsApp(remitenteId, burbujaActual, null, opcionesLimpias)
+            } else {
+              await enviarMensajeWhatsApp(remitenteId, burbujaActual)
+            }
+
+            // Guardar en CRM
+            await supabase.from('mensajes').insert({
+              conversacion_id: convExist.id, remitente: 'bot', contenido: burbujaActual, tipo: 'texto'
+            })
+          }
+        } catch (txtErr) {
+          console.error('❌ Error enviando texto:', txtErr.message)
+        }
+
+        await supabase.from('conversaciones').update({ ultimo_mensaje: respuesta }).eq('id', convExist.id)
+        return NextResponse.json({ estado: 'procesado' }, { status: 200 })
       }
     }
     return NextResponse.json({ estado: 'procesado' }, { status: 200 })
