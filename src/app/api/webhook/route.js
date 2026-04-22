@@ -344,6 +344,17 @@ export async function POST(solicitud) {
           }
         }
 
+        // 5b. GUARDAR NOMBRE DEL ALUMNO (Forzado durante agendamiento)
+        if (prosExist && (intencion === 'SCHEDULING_DATE' || intencion === 'CIERRE_CITA')) {
+          const nombreExtraido = datos.nombre_alumno;
+          const isInvalidN = (n) => !n || ['...', 'desconocido', 'n/a', 'null', 'usuario', ''].includes(String(n).toLowerCase().trim());
+          if (nombreExtraido && !isInvalidN(nombreExtraido)) {
+            console.log('📌 Forzando guardado de nombre_alumno:', nombreExtraido);
+            await supabase.from('prospectos').update({ nombre_alumno: nombreExtraido }).eq('id', prosExist.id);
+            prosExist.nombre_alumno = nombreExtraido; // Actualizar referencia local
+          }
+        }
+
 
         // 6. Lógica de Citas (Si la intención es CIERRE_CITA)
         if (intencion === 'CIERRE_CITA' && prosExist) {
